@@ -1985,11 +1985,12 @@ function viewStudio(tab, params){
     return f;
   }
   const tabs=h('div',{class:'studio-tabs'});
-  [['browse','Canon Browser'],['inbox','Inbox'],['drafter','Card Drafter'],['board','Promotion Board']].forEach(([k,label])=>
+  [['browse','Canon Browser'],['threads','Open Threads'],['inbox','Inbox'],['drafter','Card Drafter'],['board','Promotion Board']].forEach(([k,label])=>
     tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('studio',{tab:k})}, label)));
   body.append(tabs);
   const host=h('div',null); body.append(host);
   if(tab==='browse') studioBrowse(host);
+  else if(tab==='threads') studioThreads(host);
   else if(tab==='inbox') studioInbox(host);
   else if(tab==='drafter') studioDrafter(host, params&&params.prefill);
   else if(tab==='board') studioBoard(host);
@@ -2015,6 +2016,58 @@ function studioBrowse(host){
       results.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}}, hits.length+' match'+(hits.length===1?'':'es')));
       hits.slice(0,250).forEach(ht=> results.append(h('div',{class:'search-hit'}, h('b',null, ht.file.replace('domains/','')+' :'+ht.n+'  '), h('span',{class:'ln'}, ht.ln))));
     }catch(e){ results.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
+}
+/* ---- Open Threads: walk the domains for unaudited [OPEN]/[DESTINATION] questions,
+        and turn each into an AI handoff or a Draft Canon Card. Read-only on canon. ---- */
+const THREAD_RE=/^\[(OPEN|DESTINATION|UNAUDITED|QUESTION)\]\s*(.*)$/;
+function findOpenThreads(text, file){
+  const lines=text.split('\n'); const out=[]; let heading='';
+  for(let i=0;i<lines.length;i++){ const ln=lines[i];
+    const hm=/^#{1,4}\s+(.*)/.exec(ln); if(hm){ heading=hm[1].trim(); continue; }
+    const mm=THREAD_RE.exec(ln.trim()); if(!mm) continue;
+    const body=[mm[2]]; let j=i+1;
+    while(j<lines.length && lines[j].trim() && !/^#{1,4}\s/.test(lines[j]) && !/^---\s*$/.test(lines[j]) && !THREAD_RE.test(lines[j].trim())){ body.push(lines[j].trim()); j++; }
+    out.push({ file, line:i+1, type:mm[1], heading, text:body.join(' ').replace(/\s+/g,' ').trim() }); i=j-1; }
+  return out;
+}
+function openThreadHandoff(t){
+  return [
+    `# Open canon question — ${t.file.replace('domains/','')}${t.heading? ' › '+t.heading:''}`, '',
+    `I'm building the Godling Universe. Below is an **[${t.type}]** thread I left unaudited in my canon — a question I haven't resolved yet. Help me work it out.`, '',
+    '## The open question', '', '> '+(t.text||'(see the file section — the marker had no inline text)'), '',
+    '## Ground rules for any answer', '',
+    '- Must not contradict already-promoted canon.',
+    '- Must have clear limits (say what it does NOT cover).',
+    '- Must be useful to story, setting, or game.',
+    '- Should not make existing canon pointless.', '',
+    '## What I want back', '',
+    '- 2–3 concrete options, with the trade-offs of each.',
+    '- A recommendation.',
+    '- One declarative **Canon Claim** sentence I could promote as-is.', '',
+    `_Source: ${t.file}, line ${t.line}._`,
+  ].join('\n');
+}
+function threadToCard(t){ return { tag:tagFromCategory(t.file), title:(t.heading||t.text||'Open thread').slice(0,60), category:t.file,
+  source:'Resolving an open thread in '+t.file, claim:'', means:'', donot:'',
+  notes:'From a ['+t.type+'] thread at '+t.file.replace('domains/','')+':'+t.line+(t.text? ' — '+t.text:'') }; }
+function threadRow(t){
+  return h('div',{class:'spark-row', style:{flexDirection:'column', alignItems:'stretch', gap:'8px'}},
+    h('div',null, h('b',null,'['+t.type+'] '), h('span',null, t.text||'(see the file section)')),
+    h('small',{class:'hint', style:{margin:'0'}}, t.file.replace('domains/','')+(t.heading? ' · '+t.heading:'')+' · line '+t.line),
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>{ const md=openThreadHandoff(t); if(navigator.clipboard) navigator.clipboard.writeText(md); toast('Copied an AI handoff — paste it into a chat.'); }}, 'Copy AI handoff'),
+      h('button',{class:'navbtn', onclick:()=>go('studio',{tab:'drafter', params:{prefill:threadToCard(t)}})}, 'Draft a Canon Card →')));
+}
+function studioThreads(host){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Scanning the domains for open threads…'));
+  (async()=>{ try{ const threads=[];
+    for(const d of DOMAIN_FILES){ const r=await ghGetText(cfg, d.file); if(!r) continue; threads.push(...findOpenThreads(r.text, d.file)); }
+    if(!threads.length){ host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'No [OPEN] or [DESTINATION] threads found — the canon is all audited.')); return; }
+    const wrap=h('div',null,
+      h('p',{class:'hint', style:{textAlign:'center'}}, threads.length+' open thread'+(threads.length===1?'':'s')+' to work through — copy one as an AI handoff, or draft it into a card.'));
+    let curFile=''; threads.forEach(t=>{ if(t.file!==curFile){ curFile=t.file; wrap.append(h('div',{class:'kicker', style:{margin:'16px 0 6px'}}, t.file.replace('domains/',''))); } wrap.append(threadRow(t)); });
+    host.replaceChildren(wrap);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
 }
 function studioInbox(host){
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=cfg.makerStem||'field-journal';
