@@ -2099,7 +2099,7 @@ function studioDrafter(host, prefill){
 function studioBoard(host){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the queue…'));
   (async()=>{ try{ const r=await ghGetText(cfg, QUEUE_PATH); if(!r){ host.replaceChildren(h('p',{class:'hint'},'Queue not found.')); return; }
-    const cards=parseQueueCards(r.text);
+    const cards=parseQueueCards(r.text).concat(parseRawIdeas(r.text));
     const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
     const board=h('div',{class:'board'});
     cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
@@ -2114,6 +2114,21 @@ function parseQueueCards(text){
     const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
   if(cur) cards.push(cur);
   cards.forEach(c=> c.col=statusToCol(c.status, c.section)); return cards;
+}
+// Raw ideas live in the RAW DUMP INBOX as a "> date — …" stamp + a paragraph, not as
+// ## cards, so parseQueueCards never saw them. Pull each one out as a Raw-column entry.
+function parseRawIdeas(text){
+  const lines=text.split('\n'); const out=[]; let inRaw=false, cur=null;
+  const flush=()=>{ if(cur){ const body=cur.body.join(' ').replace(/\s+/g,' ').trim();
+    if(body) out.push({ title: body.length>90? body.slice(0,90)+'…' : body, status: cur.label, col:'Raw', section:'RAW DUMP INBOX' }); } cur=null; };
+  for(const ln of lines){
+    const hm=/^#\s+(.*)/.exec(ln); if(hm){ flush(); inRaw=/raw dump/i.test(hm[1]); continue; }
+    if(!inRaw) continue;
+    if(/^---\s*$/.test(ln)){ flush(); continue; }
+    const q=/^>\s?(.*)/.exec(ln); if(q){ flush(); cur={ label:q[1].trim(), body:[] }; continue; }
+    if(cur && ln.trim()) cur.body.push(ln.trim());
+  }
+  flush(); return out;
 }
 function statusToCol(status, section){ const s=(status||'').toLowerCase();
   if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
