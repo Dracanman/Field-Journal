@@ -1,0 +1,13 @@
+{
+  "name": "The Vael Field Journal",
+  "short_name": "Field Journal",
+  "description": "A cozy creative kit for the Godling Universe — make Vael folk, places, creatures, and seeds.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#faf4e6",
+  "theme_color": "#faf4e6",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

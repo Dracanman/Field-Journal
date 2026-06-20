@@ -1,0 +1,1912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Field Journal">
+<meta name="theme-color" content="#faf4e6">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>The Vael Field Journal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500;1,600&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Caveat:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* ---------- design tokens (extracted from the printed kits) ---------- */
+  :root{
+    --paper:#faf4e6;          /* parchment background          */
+    --paper-card:#fbf7ec;     /* keepsake card body            */
+    --paper-slot:#f0e7d0;     /* field/slot fill               */
+    --ink:#2e2a24;            /* titles, dark brown-charcoal   */
+    --ink-soft:#4a463b;       /* body text                     */
+    --gold:#b98e3c;           /* frame + section labels        */
+    --gold-soft:#cdbf9a;      /* rules, faint lines            */
+    --green:#3e6b4f;          /* sprigs, footers, emblem       */
+    --slate:#3e4a6b;          /* filled-in example answers     */
+    --hint:#9a8f7a;           /* italic hints / subtitles      */
+    --shadow:60 52 30;
+    --maxw:1080px;
+  }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-family:'EB Garamond', Georgia, 'Times New Roman', serif;
+    font-size:17px;
+    line-height:1.5;
+    -webkit-text-size-adjust:100%;
+    -webkit-tap-highlight-color:transparent;
+  }
+  h1,h2,h3{ font-weight:600; color:var(--ink); margin:0; }
+  ::selection{ background:#e7ddc2; }
+  button{ font-family:inherit; cursor:pointer; }
+  a{ color:var(--green); }
+
+  /* serif-display fallback: EB Garamond loads if online; system serif otherwise */
+  .display{ font-family:'EB Garamond', Georgia, serif; font-weight:600; letter-spacing:.01em; }
+  .hand{ font-family:'Caveat', 'Segoe Script', cursive; }
+  .kicker{ font-size:12px; letter-spacing:.26em; text-transform:uppercase; color:var(--gold); }
+  .hint{ color:var(--hint); font-style:italic; }
+
+  /* ---------- app shell ---------- */
+  #app{ max-width:var(--maxw); margin:0 auto; padding:24px 18px 96px; }
+  .topbar{
+    position:sticky; top:0; z-index:30;
+    display:flex; align-items:center; gap:12px; flex-wrap:nowrap;
+    background:linear-gradient(var(--paper) 78%, transparent);
+    padding:10px 4px 14px; margin:-8px -4px 8px;
+  }
+  .navmid{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; flex:1 1 auto; min-width:0; }
+  .brand{ display:flex; align-items:center; gap:10px; cursor:pointer; }
+  .brand .mark{ width:30px; height:30px; color:var(--green); flex:0 0 auto; }
+  .brand b{ font-family:'EB Garamond',serif; font-weight:600; color:var(--ink); font-size:18px; }
+  .navbtn{
+    border:1.5px solid var(--gold-soft); background:#fff8; color:var(--ink-soft);
+    border-radius:999px; padding:7px 15px; font-size:15px;
+  }
+  .navbtn:hover{ border-color:var(--gold); }
+  .navbtn.primary{ background:#eef0e4; border-color:#cdd4b9; color:#4d5a36; }
+
+  /* ---------- decorative page frame ---------- */
+  .framed{
+    position:relative; background:var(--paper);
+    border:1.5px solid var(--gold); border-radius:3px;
+    padding:34px 30px 30px;
+    box-shadow:0 0 0 4px var(--paper), 0 0 0 5.5px var(--gold-soft);
+    margin:6px 4px 0;
+  }
+  .framed > .sprig{ position:absolute; width:34px; height:22px; color:var(--green); opacity:.9; }
+  .sprig.tl{ top:10px; left:12px; }
+  .sprig.tr{ top:10px; right:12px; transform:scaleX(-1); }
+  .sprig.bl{ bottom:10px; left:12px; transform:scaleY(-1); }
+  .sprig.br{ bottom:10px; right:12px; transform:scale(-1,-1); }
+  .pagetitle{ text-align:center; margin-bottom:6px; }
+  .pagetitle h2{ font-size:34px; }
+  .divider{ display:flex; align-items:center; justify-content:center; gap:10px; margin:8px 0 4px; color:var(--gold); }
+  .divider .rule{ width:70px; height:1px; background:var(--gold-soft); }
+  .divider .o{ width:7px; height:7px; border:1.4px solid var(--gold); border-radius:50%; }
+  .divider .dot{ width:5px; height:5px; background:var(--gold); border-radius:50%; }
+  .subtitle{ text-align:center; color:var(--hint); font-style:italic; margin:2px 0 22px; }
+  .pagefoot{ text-align:center; color:var(--green); font-style:italic; font-size:14px; margin-top:26px; opacity:.85; }
+
+  /* ---------- home ---------- */
+  .cover{ text-align:center; padding:30px 10px 24px; }
+  .cover .emblem{ width:150px; height:150px; color:var(--green); margin:14px auto 18px; }
+  .cover h1{ font-size:46px; }
+  .cover .sub{ color:var(--gold); letter-spacing:.18em; text-transform:uppercase; font-size:13px; margin-top:8px; }
+  .cover .tag{ color:var(--hint); font-style:italic; margin-top:16px; }
+  .shelf{ margin-top:26px; }
+  .shelf h3{ font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid var(--gold-soft); padding-bottom:8px; margin-bottom:16px; }
+  .grid-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; }
+  .pick{
+    text-align:left; background:var(--paper-card); border:1.5px solid #e6dcc4; border-radius:10px;
+    padding:15px 16px; min-height:104px; display:flex; flex-direction:column; gap:5px;
+    transition:transform .08s ease, box-shadow .12s ease, border-color .12s ease;
+  }
+  .pick:hover{ transform:translateY(-2px); border-color:var(--gold); box-shadow:0 10px 22px -16px rgba(var(--shadow)/.5); }
+  .pick .ribbon{ width:34px; height:5px; border-radius:3px; margin-bottom:3px; }
+  .pick b{ color:var(--ink); font-size:18px; font-weight:600; }
+  .pick small{ color:var(--hint); font-style:italic; font-size:14px; line-height:1.35; }
+
+  /* ---------- worksheet editor ---------- */
+  .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
+  @media (max-width:900px){ .editor-wrap{ grid-template-columns:1fr; } .card-col{ order:-1; } }
+  .field{ margin-bottom:20px; }
+  .field > label{ display:block; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); margin-bottom:5px; }
+  .field .fhint{ color:var(--hint); font-style:italic; font-size:14px; margin-bottom:6px; }
+  .field input, .field textarea{
+    width:100%; border:none; border-bottom:1.5px solid var(--gold-soft); background:transparent;
+    font-family:inherit; font-size:19px; color:var(--ink-soft); padding:4px 2px 8px; resize:none; line-height:1.5;
+  }
+  .field input:focus, .field textarea:focus{ outline:none; border-bottom-color:var(--green); }
+  .field input::placeholder, .field textarea::placeholder{ color:#b6ad96; font-style:italic; }
+  .chips{ display:flex; flex-wrap:wrap; gap:9px; }
+  .chip{
+    display:inline-flex; align-items:center; gap:7px; border:1.5px solid var(--gold-soft);
+    background:#fbf8ef; color:#7a735f; border-radius:999px; padding:7px 14px 7px 11px; font-size:16px;
+  }
+  .chip .dot{ width:10px; height:10px; border-radius:50%; }
+  .chip.active{ color:var(--ink-soft); }
+  .toolrow{ display:flex; flex-wrap:wrap; gap:10px; margin-top:8px; }
+
+  /* ---------- doodle ---------- */
+  .doodle{ border:2px dashed var(--gold-soft); border-radius:6px; background:var(--paper-slot); padding:8px; }
+  .doodle canvas{ display:block; width:100%; height:auto; border-radius:3px; background:#fffdf7; touch-action:none; cursor:crosshair; }
+  .doodle .palette{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:8px; }
+  .swatch{ width:24px; height:24px; border-radius:50%; border:2px solid #0001; padding:0; }
+  .swatch.sel{ outline:2px solid var(--ink); outline-offset:2px; }
+  .toolbtn{ border:1.5px solid var(--gold-soft); background:#fff8; border-radius:8px; padding:5px 10px; font-size:14px; color:var(--ink-soft); }
+  .doodle .ph{ text-align:center; color:var(--hint); font-style:italic; font-size:14px; padding:6px 0 2px; }
+
+  /* ---------- keepsake card ---------- */
+  .card-col{ display:flex; flex-direction:column; align-items:center; gap:14px; position:sticky; top:64px; }
+  .keepsake{
+    width:430px; max-width:100%; background:var(--paper-card);
+    border:1px solid #e6dfca; border-radius:6px; overflow:hidden;
+    box-shadow:0 1px 0 #fffdf6 inset, 0 18px 40px -22px rgba(var(--shadow)/.45), 0 2px 8px -4px rgba(var(--shadow)/.2);
+  }
+  .keepsake.tilt{ transform:rotate(-1deg); }
+  .keepsake .ribbon{ height:7px; }
+  .keepsake .body{ padding:24px 26px 26px; }
+  .keepsake .head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:14px; gap:10px; }
+  .keepsake .head .kick{ font-size:11px; letter-spacing:.24em; text-transform:uppercase; color:#a39a80; }
+  .keepsake .head .word{ font-size:18px; }
+  .keepsake .frame{ border:2px dashed var(--cardframe,#cdbf9a); border-radius:4px; padding:7px; background:var(--cardbg,#f6efde); margin-bottom:18px; }
+  .keepsake .frame img{ display:block; width:100%; height:210px; object-fit:contain; border-radius:2px; }
+  .keepsake .frame .empty{ height:160px; display:flex; align-items:center; justify-content:center; text-align:center; color:#b6ad96; font-style:italic; font-size:14px; padding:0 14px; }
+  .keepsake h3.name{ font-size:34px; line-height:1.08; font-weight:600; margin-bottom:2px; }
+  .keepsake .sub{ font-style:italic; color:var(--hint); font-size:16px; margin-bottom:14px; }
+  .keepsake .rows{ border-top:1px solid #ece5d2; padding-top:14px; display:flex; flex-direction:column; gap:11px; }
+  .keepsake .rw .rl{ font-size:10.5px; letter-spacing:.16em; text-transform:uppercase; color:#a39a80; margin-bottom:2px; }
+  .keepsake .rw .rv{ font-size:16px; color:var(--ink-soft); line-height:1.4; }
+  .keepsake .elt{ display:flex; align-items:center; gap:8px; }
+  .keepsake .elt .dot{ width:9px; height:9px; border-radius:50%; }
+  .keepsake .quote{ margin-top:16px; padding:13px 15px; background:var(--cardbg,#f6efde); border-left:3px solid var(--accent,#b98e3c); border-radius:2px; }
+  .keepsake .quote .hand{ font-size:20px; line-height:1.35; color:#54503f; }
+  .keepsake .cardfoot{ margin-top:16px; text-align:center; font-size:11px; letter-spacing:.2em; text-transform:uppercase; color:#bcb39a; }
+
+  /* ---------- ledger / grids / chart ---------- */
+  .ledger{ width:100%; border-collapse:collapse; }
+  .ledger th{ text-align:left; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); padding:6px 10px; font-weight:600; }
+  .ledger td{ padding:5px 10px; }
+  .ledger input{ width:100%; border:none; border-bottom:1.5px solid var(--gold-soft); background:transparent; font-family:inherit; font-size:18px; color:var(--ink-soft); padding:4px 2px; }
+  .ledger input:focus{ outline:none; border-bottom-color:var(--green); }
+  .ledger .locked input{ color:var(--slate); font-style:italic; }
+  .ledger .open-flag{ font-size:13px; color:#b07a2e; }
+  .specgrid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+  @media (max-width:680px){ .specgrid{ grid-template-columns:repeat(2,1fr); } }
+  .specslot{ background:var(--paper-slot); border:1.5px dashed var(--gold-soft); border-radius:8px; padding:10px; text-align:center; }
+  .specslot .circle{ width:100%; aspect-ratio:1/1; border:1.5px solid var(--gold-soft); border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; background:#fffdf7; }
+  .specslot .circle img{ width:100%; height:100%; object-fit:cover; }
+  .specslot .circle span{ color:#b6ad96; font-style:italic; font-size:12px; }
+  .specslot label{ display:block; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin:8px 0 4px; }
+  .specslot input{ width:100%; border:none; border-bottom:1px solid var(--gold-soft); background:transparent; text-align:center; font-family:inherit; font-size:15px; color:var(--ink-soft); padding:2px; }
+  .palette-grid{ display:flex; gap:12px; flex-wrap:wrap; }
+  .palette-grid .pw{ display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .palette-grid input[type=color]{ width:46px; height:46px; border:1.5px solid var(--gold-soft); border-radius:8px; background:none; padding:2px; }
+  .palette-grid input[type=text]{ width:74px; border:none; border-bottom:1px solid var(--gold-soft); background:transparent; text-align:center; font-family:inherit; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- gallery ---------- */
+  .gal-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
+  .gal-card{ background:var(--paper-card); border:1px solid #e6dcc4; border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
+  .gal-card .thumb{ height:130px; background:#f3ecda; display:flex; align-items:center; justify-content:center; border-bottom:1px solid #ece5d2; }
+  .gal-card .thumb img{ width:100%; height:100%; object-fit:cover; }
+  .gal-card .thumb .none{ color:#c3b89c; font-style:italic; font-size:13px; }
+  .gal-card .meta{ padding:10px 12px; }
+  .gal-card .meta b{ color:var(--ink); }
+  .gal-card .meta small{ display:block; color:var(--hint); font-style:italic; }
+  .gal-card .acts{ display:flex; gap:4px; padding:0 8px 10px; flex-wrap:wrap; }
+  .gal-card .acts button{ font-size:13px; border:1px solid var(--gold-soft); background:#fff8; border-radius:6px; padding:4px 9px; color:var(--ink-soft); }
+  .empty-note{ color:var(--hint); font-style:italic; padding:18px 2px; }
+
+  /* ---------- prose (tour) ---------- */
+  .prose{ max-width:760px; margin:0 auto; }
+  .prose h3{ font-size:14px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin:22px 0 6px; }
+  .prose p{ margin:0 0 12px; }
+  .prose .layer{ border-left:3px solid var(--gold-soft); padding-left:14px; margin:8px 0; }
+  .prose table{ border-collapse:collapse; margin:8px 0; }
+  .prose td{ padding:3px 14px 3px 0; }
+  .prose code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; font-size:.92em; }
+
+  /* ---------- modal ---------- */
+  .modal-bg{ position:fixed; inset:0; background:#2e2a2466; display:flex; align-items:center; justify-content:center; padding:18px; z-index:60; }
+  .modal{ background:var(--paper); border:1.5px solid var(--gold); border-radius:10px; max-width:620px; width:100%; max-height:88vh; overflow:auto; padding:24px 26px; box-shadow:0 30px 60px -20px #2e2a2480; }
+  .modal h2{ font-size:24px; margin-bottom:6px; }
+  .modal textarea{ width:100%; min-height:240px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; border:1px solid var(--gold-soft); border-radius:8px; padding:12px; background:#fffdf7; color:var(--ink-soft); }
+  .toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:var(--ink); color:#faf4e6; padding:11px 20px; border-radius:999px; font-size:15px; z-index:80; box-shadow:0 12px 30px -12px #2e2a24aa; }
+
+  /* ---------- mode gating (Cozy / Full kit) ---------- */
+  body.mode-simple .advanced-only{ display:none !important; }
+  body.mode-full .simple-only{ display:none !important; }
+  body.profile-maker .world-only{ display:none !important; }
+  body.profile-world .maker-only{ display:none !important; }
+
+  /* ---------- Naming Tree plate (scaled 1500x1480) ---------- */
+  .plate-wrap{ width:100%; overflow:hidden; margin:0 auto; }
+  .plate-inner{ width:1500px; transform-origin:top left; }
+  .plate-stage{ position:relative; width:1500px; height:1480px; overflow:hidden; border-radius:6px; box-shadow:0 14px 40px -22px rgba(60,52,30,0.5); }
+
+  /* ---------- Canon Studio (worldbuilder) ---------- */
+  .studio-tabs{ display:flex; flex-wrap:wrap; gap:8px; justify-content:center; margin-bottom:18px; }
+  .studio-tabs .tab{ border:1.5px solid var(--gold-soft); background:#fff8; color:var(--ink-soft); border-radius:999px; padding:8px 16px; font-size:15px; }
+  .studio-tabs .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
+  .canon-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
+  .canon-list .pick small{ text-transform:none; letter-spacing:0; }
+  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; }
+  .canon-doc h2{ font-size:24px; margin:14px 0 6px; }
+  .canon-doc h3{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:16px 0 4px; }
+  .canon-doc p{ margin:0 0 10px; }
+  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; }
+  .canon-doc code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; }
+  .search-row{ display:flex; gap:10px; margin-bottom:16px; max-width:820px; margin-inline:auto; }
+  .search-row input{ flex:1; border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
+  .search-hit{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; }
+  .search-hit b{ color:var(--green); } .search-hit .ln{ color:var(--ink-soft); font-size:14px; }
+  .board{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .board .col{ background:#faf4e6; border:1px solid var(--gold-soft); border-radius:10px; padding:10px; }
+  .board .col h4{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; text-align:center; }
+  .board .pcard{ background:#fff8; border:1px solid #e6dcc4; border-radius:7px; padding:8px 10px; margin-bottom:7px; font-size:14px; }
+  .board .pcard b{ color:var(--ink); display:block; }
+  .board .pcard small{ color:var(--hint); }
+  .drafter label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
+  .drafter input, .drafter textarea, .drafter select{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .drafter textarea{ min-height:64px; resize:vertical; }
+  .drafter .idline{ font-family:ui-monospace,monospace; color:var(--green); font-weight:600; }
+  .drafter .preview{ background:#f0e7d0; border-radius:8px; padding:12px 14px; white-space:pre-wrap; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; max-height:320px; overflow:auto; }
+  /* tags */
+  .taginput{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .tagchip{ background:#eef0e4; border:1px solid #cdd4b9; border-radius:999px; padding:3px 10px; font-size:13px; color:#4d5a36; display:inline-flex; gap:6px; align-items:center; }
+  .tagchip button{ border:none; background:none; color:#8a8268; font-size:14px; padding:0; line-height:1; }
+  .filter-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; }
+  .filter-row input, .filter-row select{ border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:7px 14px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .navbtn.mode{ background:#f3ecda; }
+  .modeswitch{ display:inline-flex; align-items:center; flex:0 0 auto; border:1.5px solid var(--gold-soft); border-radius:999px; overflow:hidden; }
+  .modeswitch .seg{ border:none; background:transparent; padding:7px 14px; font-size:14px; color:var(--hint); }
+  .modeswitch .seg.on{ background:#eef0e4; color:#4d5a36; font-weight:600; }
+  .chip.dash{ border-style:dashed; color:var(--green); }
+  .choice-hint{ color:var(--hint); font-style:italic; font-size:14px; margin-top:8px; min-height:1em; }
+  .lore-note{ max-width:640px; margin:16px auto 0; font-size:14px; color:var(--ink-soft); }
+  .lore-note b{ color:var(--green); }
+
+  /* ---------- intro overlay ---------- */
+  .intro-bg{ position:fixed; inset:0; background:#2e2a2455; display:flex; align-items:center; justify-content:center; padding:20px; z-index:70; }
+  .intro{ background:var(--paper); border:1.5px solid var(--gold); border-radius:14px; max-width:440px; width:100%; padding:26px 26px 22px; text-align:center; box-shadow:0 30px 70px -24px #2e2a2480; }
+  .intro .em{ width:64px; height:64px; color:var(--green); margin:0 auto 8px; }
+  .intro h2{ font-size:26px; margin-bottom:10px; }
+  .intro p{ margin:0 0 8px; }
+  .intro .steps{ text-align:left; margin:12px auto 16px; max-width:330px; color:var(--ink-soft); }
+  .intro .steps li{ margin:6px 0; }
+
+  /* ---------- github panel ---------- */
+  .gh label{ display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
+  .gh input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .gh .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .gh .warn{ font-size:13px; color:#9a7b3a; background:#f6edd6; border-radius:8px; padding:9px 12px; margin-top:14px; }
+
+  /* ---------- print ---------- */
+  .book-stage{ display:none; }
+  .book-cover{ text-align:center; }
+  .book-cover .emblem{ width:140px; height:140px; color:var(--green); margin:0 auto 14px; }
+  @media print{
+    .topbar, .navbtn, .toolrow, .doodle .palette, .editor-col, .pagefoot, .gal-card .acts, .filter-row{ display:none !important; }
+    body{ background:#fff; }
+    #app{ padding:0; }
+    .editor-wrap{ display:block; }
+    .card-col{ position:static; }
+    .keepsake.tilt{ transform:none; }
+    .keepsake{ box-shadow:none; border:1px solid #ccc; margin:0 auto; }
+    .framed{ box-shadow:none; }
+    .no-print{ display:none !important; }
+    .print-only{ display:block !important; }
+    /* PDF "book": hide the app, show the book stage, one card per page */
+    body.printing-book #app{ display:none !important; }
+    body.printing-book .book-stage{ display:block !important; }
+    .book-cover{ page-break-after:always; padding-top:120px; }
+    .book-page{ page-break-after:always; display:flex; justify-content:center; padding:26px 0; }
+  }
+  .print-only{ display:none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="ic-sprig" viewBox="0 0 60 38">
+      <g fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round">
+        <path d="M8 30 C20 28 34 22 52 8"/>
+        <ellipse cx="16" cy="27" rx="4" ry="2.4" transform="rotate(-20 16 27)"/>
+        <ellipse cx="25" cy="23" rx="4" ry="2.4" transform="rotate(-26 25 23)"/>
+        <ellipse cx="34" cy="18" rx="4" ry="2.4" transform="rotate(-32 34 18)"/>
+        <ellipse cx="43" cy="13" rx="4" ry="2.4" transform="rotate(-38 43 13)"/>
+      </g>
+    </symbol>
+    <symbol id="ic-seedling" viewBox="0 0 100 100">
+      <g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <circle cx="50" cy="50" r="44" stroke-width="1.3"/>
+        <circle cx="50" cy="50" r="40" stroke-width="1.3"/>
+        <path d="M50 70 V40"/>
+        <path d="M50 44 C42 40 36 42 34 36 C42 34 48 38 50 44Z" fill="currentColor" fill-opacity=".12"/>
+        <path d="M50 40 C58 36 64 38 66 32 C58 30 52 34 50 40Z" fill="currentColor" fill-opacity=".12"/>
+        <path d="M50 70 L42 80 M50 70 L58 80 M50 74 L50 82"/>
+        <circle cx="44" cy="30" r="2" fill="currentColor"/>
+        <circle cx="56" cy="27" r="2" fill="currentColor"/>
+        <circle cx="50" cy="33" r="2" fill="currentColor"/>
+      </g>
+    </symbol>
+  </defs>
+</svg>
+
+<script>
+"use strict";
+/* ============================================================================
+   The Vael Field Journal — a self-contained, offline, iPad-friendly creative kit.
+   No build step, no server, no runtime. One file. Saves her work in localStorage.
+   Ported faithfully from the "Vael Portrait Maker" artifact + the printed kits.
+   ============================================================================ */
+
+/* ---------- tiny DOM helper (user text always via textContent / strings) ---- */
+function h(tag, attrs, ...kids){
+  const e = document.createElement(tag);
+  if (attrs) for (const k in attrs){
+    const v = attrs[k];
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k === 'html') e.innerHTML = v;           // trusted static markup only
+    else if (k.startsWith('on') && typeof v === 'function') e.addEventListener(k.slice(2), v);
+    else if (k === 'value') e.value = v;
+    else e.setAttribute(k, v);
+  }
+  for (const kid of kids.flat()){
+    if (kid == null || kid === false) continue;
+    e.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return e;
+}
+function svgUse(id, cls){
+  const ns='http://www.w3.org/2000/svg';
+  const s=document.createElementNS(ns,'svg'); if(cls) s.setAttribute('class',cls);
+  const u=document.createElementNS(ns,'use'); u.setAttribute('href','#'+id); s.append(u); return s;
+}
+const $app = document.getElementById('app');
+
+/* ---------- elements (the twelve canon broad elements — roster stays open) -- */
+const ELEMENTS = [
+  { key:'earth',     label:'Earth',     note:'rock, soil, stone — the raw solid ground', accent:'oklch(0.55 0.06 70)'  },
+  { key:'water',     label:'Water',     note:'rivers, rain, tide — flowing and cohesive', accent:'oklch(0.60 0.10 235)' },
+  { key:'air',       label:'Air',       note:'wind, breath, sky, sound',                  accent:'oklch(0.74 0.04 215)' },
+  { key:'fire',      label:'Fire',      note:'heat, flame, the spark that transforms',    accent:'oklch(0.63 0.17 40)'  },
+  { key:'wood',      label:'Wood',      note:'living growth — slow, green, regenerative', accent:'oklch(0.55 0.09 150)' },
+  { key:'light',     label:'Light',     note:'radiance, true sight, the glow',            accent:'oklch(0.74 0.12 92)'  },
+  { key:'shadow',    label:'Shadow',    note:'darkness & concealment — gentle, like night', accent:'oklch(0.45 0.04 300)' },
+  { key:'metal',     label:'Metal',     note:'refined ore, alloy, the forged',            accent:'oklch(0.66 0.02 250)' },
+  { key:'lightning', label:'Lightning', note:'charge, spark, the electric arc',           accent:'oklch(0.70 0.16 300)' },
+  { key:'ice',       label:'Ice',       note:'true cold — frost, stillness',              accent:'oklch(0.82 0.07 220)' },
+  { key:'crystal',   label:'Crystal',   note:'lattice, resonance, stored light',          accent:'oklch(0.68 0.11 330)' },
+  { key:'life',      label:'Life',      note:'the instant vital force — animate & heal',  accent:'oklch(0.66 0.14 355)' },
+];
+// Expressions: "same element underneath, different skin." Flavors, not elements.
+const EXPRESSIONS = [
+  { key:'storm',  label:'Storm',  note:'lightning + air' },
+  { key:'loam',   label:'Loam',   note:'a flavor of earth' },
+  { key:'stone',  label:'Stone',  note:'a flavor of earth' },
+  { key:'root',   label:'Root',   note:'a flavor of wood' },
+  { key:'breath', label:'Breath', note:'a flavor of air' },
+  { key:'steam',  label:'Steam',  note:'a flavor of water' },
+  { key:'mist',   label:'Mist',   note:'a flavor of water or air' },
+  { key:'frost',  label:'Frost',  note:'a flavor of ice' },
+  { key:'ember',  label:'Ember',  note:'a flavor of fire' },
+  { key:'memory', label:'Memory', note:'a thread across elements' },
+];
+const ACCENTS = {
+  green:'oklch(0.56 0.07 158)', gold:'oklch(0.66 0.09 92)', ember:'oklch(0.60 0.10 47)',
+  sky:'oklch(0.62 0.08 232)',   stone:'oklch(0.56 0.04 75)', violet:'oklch(0.55 0.08 300)',
+  rose:'oklch(0.62 0.09 20)',
+};
+function deriveBg(accent){ return accent.replace(/oklch\(([0-9.]+) ([0-9.]+) ([0-9.]+)\)/, (m,l,c,hh)=>`oklch(0.96 ${Math.min(parseFloat(c),0.03)} ${hh})`); }
+function deriveFrame(accent){ return accent.replace(/oklch\(([0-9.]+) ([0-9.]+) ([0-9.]+)\)/, (m,l,c,hh)=>`oklch(0.82 ${Math.min(parseFloat(c),0.05)} ${hh})`); }
+// element/expression resolution incl. her own custom additions (roster is open)
+function allElements(){ return ELEMENTS.concat(DB.elements||[]); }
+function allExpressions(){ return EXPRESSIONS.concat(DB.expressions||[]); }
+function findElement(key){ return allElements().find(e=>e.key===key); }
+function findExpression(key){ return allExpressions().find(e=>e.key===key); }
+function elementLabelOf(key){ const e=findElement(key); return e? e.label : (key||''); }
+function expressionLabelOf(key){ const e=findExpression(key); return e? e.label : (key||''); }
+function elementAccentOf(key){ const e=findElement(key); return e&&e.accent? e.accent : ACCENTS.gold; }
+
+/* ---------- worksheet definitions (faithful to the printed pages) ---------- */
+/* field types: short | long | element | word                                  */
+const WORKSHEETS = [
+  /* ===== Kit A — Vael Field Journal ===== */
+  {
+    id:'portrait', kit:'field', title:'Portrait of a Vael',
+    subtitle:'now you — invent one, or bring one to life',
+    accent:'green', card:{ kicker:'Specimen · The Vael', name:'name', subPrefix:'grown in ', sub:'grew', word:'word', quote:'line' },
+    imageHint:'draw or collage your Vael here',
+    fields:[
+      {key:'name', label:'Their name', hint:"e.g. 'Mosswen'", type:'short'},
+      {key:'grew', label:'Where they grew', hint:'swamp? mountain? wood?', type:'short'},
+      {key:'body', label:'What their body shows', hint:'bark? moss? stone? glow?', type:'long', row:true},
+      {key:'element', label:'Their element', hint:'pick one — or add your own', type:'element'},
+      {key:'word', label:'A word that fits them', hint:'gentle…', type:'word'},
+      {key:'line', label:'A line about them', hint:'a small, true thing only you know', type:'long', quote:true},
+    ],
+    example:{ name:'Mosswen', grew:'a quiet, misty swamp', body:'soft green moss, dripping willow-hair, bark like wet driftwood', element:'water', word:'gentle', line:'Mosswen hums to the frogs at night, and they hum back. The whole swamp goes quiet to listen.' },
+  },
+  {
+    id:'grove', kit:'field', title:'A Grove of My Own',
+    subtitle:'every place has a feeling — map one',
+    accent:'green', card:{ kicker:'A Grove', name:'name', sub:'who', subPrefix:'home to ', quote:'secret' },
+    imageHint:'sketch your grove, glade, or gathering-place',
+    fields:[
+      {key:'name', label:'Its name', hint:"e.g. 'The Hushwood'", type:'short'},
+      {key:'who', label:'Who lives here', hint:'who gathers in this place?', type:'short'},
+      {key:'smell', label:'A smell or a sound', hint:'wet green leaves and soft humming…', type:'short', row:true},
+      {key:'secret', label:'One secret it keeps', hint:'the pond shows your reflection as a tree…', type:'long', quote:true},
+    ],
+    example:{ name:'The Hushwood', who:'a family of moss-folk and many frogs', smell:'wet green leaves and soft humming', secret:'the pond shows your reflection as a tree' },
+  },
+  {
+    id:'ourgrove', kit:'field', title:'Our Grove',
+    subtitle:'a quiet place grown by two hands',
+    accent:'rose', card:{ kicker:'Grown by two hands', name:'name', sub:'feel', subPrefix:'it feels ', quote:'memory' },
+    imageHint:'sketch your grove here — let it belong to both of you',
+    fields:[
+      {key:'name', label:'Its name', hint:'a place that belongs to both of you', type:'short'},
+      {key:'feel', label:'What does it feel like', type:'short'},
+      {key:'grows', label:'What grows here', type:'short', row:true},
+      {key:'protects', label:'What protects it', type:'short'},
+      {key:'soundsmell', label:'What sound or smell lives here', type:'short', row:true},
+      {key:'light', label:'What little light does it keep', type:'short'},
+      {key:'symbol', label:'A symbol for us', hint:'a shape, a mark, a small drawn thing', type:'short'},
+      {key:'memory', label:'A memory this place keeps', hint:'a small, shared, true thing', type:'long', quote:true},
+    ],
+    example:null,
+  },
+  {
+    id:'sacred', kit:'field', title:'A Sacred Creature',
+    subtitle:'a rare living thing the folk revere',
+    accent:'gold', specimen:'specimen no.',
+    card:{ kicker:'Sacred Creature', name:'called', sub:'madeof', subPrefix:'made of ', quote:'sacred' },
+    imageHint:'your creature — drawn or collaged',
+    fields:[
+      {key:'called', label:'What is it called?', hint:"e.g. 'The Leaflight'", type:'short'},
+      {key:'madeof', label:'What is it made of?', hint:'wood? stone? mist? light?', type:'short'},
+      {key:'big', label:'How big is it?', hint:'small, like a young deer?', type:'short', row:true},
+      {key:'found', label:'Where is it found?', hint:'deep groves, only at dusk?', type:'short'},
+      {key:'sacred', label:'Why is it sacred?', hint:'what do the rooted folk believe of it?', type:'long', quote:true},
+    ],
+    example:{ called:'The Leaflight', madeof:'living leaves that glow soft gold', big:'small, like a young deer', found:'deep groves, only at dusk', sacred:"the rooted folk believe it carries lost loved ones' light" },
+  },
+  {
+    id:'case', kit:'field', title:'A Case for the Keeper',
+    subtitle:'work a mystery like an investigator — the facts, the suspects, the theory',
+    accent:'stone', card:{ kicker:'A Keeper’s Case', name:'caseof', subPrefix:'The case of ', quote:'theory' },
+    imageHint:'red string, clippings, a face or a clue',
+    fields:[
+      {key:'caseof', label:'The case of…', hint:'name the mystery', type:'short'},
+      {key:'facts', label:'The facts (what is known)', type:'long', row:true},
+      {key:'s1name', label:'Suspect — name', hint:'who or what might be behind it', type:'short'},
+      {key:'s1motive', label:'Suspect — motive', type:'short', row:true},
+      {key:'s2name', label:'Another suspect — name', type:'short'},
+      {key:'s2motive', label:'Another suspect — motive', type:'short', row:true},
+      {key:'theory', label:'Your theory (what really happened)', hint:'case closed, or left open?', type:'long', quote:true},
+    ],
+    example:null,
+  },
+  {
+    id:'free-field', kit:'field', title:'A Page for Anything',
+    subtitle:'draw the first thing this world makes you picture',
+    accent:'green', card:{ kicker:'A Page for Anything', name:'title', quote:'note' },
+    imageHint:'a tree, a face, a far-off island — anything at all',
+    fields:[
+      {key:'title', label:'Call it anything (or nothing)', hint:'optional', type:'short'},
+      {key:'note', label:'A note, if you like', hint:'or leave it blank for another day', type:'long', quote:true},
+    ],
+    example:null,
+  },
+
+  /* ===== Kit B — Worldmaker's Pages ===== */
+  {
+    id:'people', kit:'world', title:'Invent a People',
+    subtitle:'a whole new folk, made of anything you like',
+    accent:'ember', card:{ kicker:'A People', name:'name', sub:'madeof', subPrefix:'made of ', quote:'special' },
+    imageHint:'draw or collage one of your people',
+    fields:[
+      {key:'name', label:'Their name', hint:"e.g. 'The Emberkin'", type:'short'},
+      {key:'madeof', label:'Made of', hint:'living coal? glass? mist?', type:'short'},
+      {key:'live', label:'Where they live', hint:'warm volcano ash?', type:'short', row:true},
+      {key:'treasure', label:'What they treasure', type:'short'},
+      {key:'special', label:'One thing that makes them special', hint:'a gift, a quirk, a small magic', type:'long', quote:true},
+    ],
+    example:{ name:'The Emberkin', madeof:'living coal — warm to the touch, glowing at the cracks', live:'in the warm ash of old volcanoes', treasure:'the first ember from their birth-fire, kept in a locket', special:'When two Emberkin hold hands, their light flares brighter — so they never feel cold or alone if they stay together.' },
+  },
+  {
+    id:'creature', kit:'world', title:'A Creature of the Cloudsea',
+    subtitle:'gentle or terrible, tiny or titanic',
+    accent:'sky', specimen:'field specimen no.',
+    card:{ kicker:'Cloudsea Creature', name:'called', sub:'big', subPrefix:'', quote:'where' },
+    imageHint:'your creature — drawn or collaged',
+    fields:[
+      {key:'called', label:'What is it called?', hint:"e.g. 'The Driftmother'", type:'short'},
+      {key:'big', label:'How big?', hint:'a sparrow? a whale? an island?', type:'short'},
+      {key:'eats', label:'What does it eat?', hint:'mana-plankton? clouds?', type:'short', row:true},
+      {key:'temperament', label:'Gentle or dangerous?', type:'short'},
+      {key:'where', label:'Where in the sky-sea?', hint:'the high quiet currents?', type:'long', quote:true},
+    ],
+    example:{ called:'The Driftmother', big:'as big as a small island', eats:'clouds — it sips mana-plankton through trailing veils', temperament:'gentle and slow; sailors steer by its glow', where:'the high quiet currents, far above the rest' },
+  },
+  {
+    id:'place', kit:'world', title:'A Place in the World',
+    subtitle:'a ruin, an island, a hidden doorway',
+    accent:'stone', card:{ kicker:'A Place', name:'name', sub:'kind', subPrefix:'', quote:'hidden' },
+    imageHint:'sketch your place — island, ruin, or hidden doorway',
+    fields:[
+      {key:'name', label:'Its name', hint:"e.g. 'The Hollow Spire'", type:'short'},
+      {key:'kind', label:'What kind of place', hint:'a drifting island with a ruined tower?', type:'short'},
+      {key:'hidden', label:"What's hidden there", hint:'a single warm light still burning?', type:'short', row:true},
+      {key:'danger', label:"What's the danger", hint:'the stairs crumble as you climb?', type:'long', quote:true},
+    ],
+    example:{ name:'The Hollow Spire', kind:'a drifting island with a ruined tower', hidden:'a single warm light still burning at the top', danger:'the stairs crumble as you climb' },
+  },
+  {
+    id:'seed', kit:'world', title:'A Seed of Power',
+    subtitle:'the right Seed can change anything',
+    accent:'violet', card:{ kicker:'A Seed of Power', name:'called', sub:'takes', subPrefix:'taken by ', quote:'changes' },
+    imageHint:"draw your Seed's pattern — a spiral, a swirl",
+    fields:[
+      {key:'called', label:'What is it called?', hint:"e.g. 'The Skyward Seed'", type:'short'},
+      {key:'seedtype', label:'What kind of Seed? (optional)', type:'choice', advanced:true, cardLabel:'Seed type',
+        note:'a seed reads differently depending on who takes it',
+        options:[
+          {value:'Beast Seed',          prompt:'for example only — if this is a Beast Seed, what would it do to a beast?'},
+          {value:'Sapient Seed',        prompt:'for example only — if this is a Sapient Seed, what would it do to a people?'},
+          {value:'Relic Seed',          prompt:'for example only — if this is a Relic Seed, what tool or item would grow from it?'},
+          {value:'Memory Seed',         prompt:'for example only — if this is a Memory Seed, what lost skill or memory would it bring back?'},
+          {value:'Arkborne-grade Seed', prompt:'for example only — if this is an Arkborne-grade Seed, what could it do that only an Arkborne could hold?'},
+        ]},
+      {key:'takes', label:'Who or what takes it?', hint:'a wingless creature?', type:'short'},
+      {key:'changes', label:'What changes in them?', hint:'they slowly grow wings?', type:'long', row:true, quote:true},
+      {key:'found', label:'Where would someone find it?', hint:'atop the tallest floating mountain?', type:'short'},
+    ],
+    example:{ called:'The Skyward Seed', seedtype:'Beast Seed', takes:'a creature with no wings', changes:'they slowly grow great feathered wings', found:'at the very top of the tallest floating mountain, where the wind never stops' },
+  },
+  {
+    id:'free-world', kit:'world', title:"A Worldmaker's Page",
+    subtitle:'invent the strangest thing you can',
+    accent:'violet', card:{ kicker:"Worldmaker's Page", name:'title', quote:'note' },
+    imageHint:'a creature, a place, a rule of magic no one has seen',
+    fields:[
+      {key:'title', label:'Name it (or not)', hint:'optional', type:'short'},
+      {key:'note', label:'What is it?', hint:'a new god, a strange law of magic, a whole little story', type:'long', quote:true},
+    ],
+    example:null,
+  },
+
+  /* ===== special layouts ===== */
+  { id:'namekeeper', kit:'field', title:"The Name-Keeper's Page", special:'ledger', accent:'green',
+    subtitle:'a ledger of name-roots and the elements they carry' },
+  { id:'folk', kit:'field', title:'Vael Folk — a Card', special:'folk', accent:'green',
+    subtitle:'a little deck of your folk — same trunk, different branches',
+    imageHint:'a small portrait',
+    fields:[
+      {key:'name', label:'Name', type:'short'},
+      {key:'branch', label:'Branch', hint:'their family / name-root', type:'short'},
+      {key:'grew', label:'Grew in', type:'short', row:true},
+      {key:'element', label:'Element', type:'element'},
+      {key:'trait', label:'A trait', type:'short'},
+    ],
+    card:{ kicker:'Vael Folk', name:'name', sub:'grew', subPrefix:'grew in ', quote:'trait' },
+    example:null },
+  { id:'specimens', kit:'field', title:'Seeds & Specimens', special:'specimens', accent:'gold',
+    subtitle:'little cards for seeds, leaves, and found things' },
+  { id:'warmth', kit:'field', title:'The Warmth-Keeper', special:'warmth', accent:'rose',
+    subtitle:'design something cozy — a colorway, a blanket, a scarf' },
+];
+const WS = Object.fromEntries(WORKSHEETS.map(w=>[w.id,w]));
+const SEED_SLOTS = ['A Seed','A Leaf','A Stone','A Flower','A Bark','A Root','A Feather','A Spark','Your own'];
+const KNOWN_ROOTS = [ {root:'-druun', meaning:'earth · stone · buried-roots', locked:true}, {root:'-thari', meaning:'wood · grove · sanctuary', locked:true} ];
+const OPEN_ROOTS = ['-maren','-aeryn','-karin','-lunai','-sorin'];
+
+/* ---------- persistence ---------------------------------------------------- */
+const KEY = 'vfj.v4';
+let DB = load();
+// the Naming Tree's seed state — Del's draft (maren/aeryn proposed; druun/thari locked canon)
+function namingDefault(){ return {
+  established: { Earth:'-druun', Wood:'-thari', Water:'-maren', Air:'-aeryn' },
+  locked: ['-druun','-thari'],
+  openRoots: ['-karin','-lunai','-sorin'],
+  tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
+}; }
+function defaults(){ return { creations:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', naming:namingDefault() }; }
+function load(){
+  try{
+    let d = JSON.parse(localStorage.getItem(KEY));
+    if(!d){ d = JSON.parse(localStorage.getItem('vfj.v3')) || JSON.parse(localStorage.getItem('vfj.v2')) || JSON.parse(localStorage.getItem('vfj.v1')); }  // migrate v3/v2/v1
+    if(d && d.creations){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
+  }catch(e){}
+  return defaults();
+}
+function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){ toast('Could not save — storage may be full.'); } scheduleSync(); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; return DB.counters[wsId]; }
+
+/* ---------- app state & router -------------------------------------------- */
+let VIEW = { name:'home' };
+function go(name, params){ VIEW = Object.assign({name}, params); window.scrollTo(0,0); render(); }
+
+function render(){
+  $app.replaceChildren(topbar());
+  const v = VIEW.name;
+  if (v==='home') $app.append(viewHome());
+  else if (v==='tour') $app.append(viewTour());
+  else if (v==='gallery') $app.append(viewGallery());
+  else if (v==='worksheet') $app.append(viewWorksheet(VIEW.id, VIEW.editId));
+  else if (v==='studio') $app.append(viewStudio(VIEW.tab, VIEW.params));
+  else if (v==='naming') $app.append(viewNamingTree());
+  else $app.append(viewHome());
+}
+
+function topbar(){
+  const full = DB.mode==='full', world = DB.profile==='worldbuilder';
+  return h('div',{class:'topbar no-print'},
+    h('div',{class:'brand', onclick:()=>go('home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
+    h('div',{class:'navmid'},
+      h('button',{class:'navbtn', onclick:()=>go('tour')}, 'Welcome to the World'),
+      h('button',{class:'navbtn', onclick:()=>go('gallery')}, (world?'My Journal':'My Field Journal')+(DB.creations.length?` (${DB.creations.length})`:'')),
+      h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'),
+      h('button',{class:'navbtn world-only', onclick:()=>go('studio')}, '⚒ Canon Studio'),
+      h('button',{class:'navbtn advanced-only', onclick:()=>openGitHubPanel()}, '☁ My file'),
+      h('button',{class:'navbtn advanced-only', title:'how this works', onclick:()=>showIntro(true)}, '?'),
+    ),
+    world? null : modeSwitch(full),
+    h('div',{class:'modeswitch advanced-only', title:'who’s using this'},
+      h('button',{class:'seg'+(!world?' on':''), onclick:()=>{ if(world) setProfile('maker'); }}, '✿ Maker'),
+      h('button',{class:'seg'+(world?' on':''), onclick:()=>{ if(!world) setProfile('worldbuilder'); }}, '⚒ Worldbuilder'),
+    ),
+  );
+}
+// Two-part switch: both labels always visible, active one highlighted — so the
+// "Full kit" the intro mentions is always right there to tap.
+function modeSwitch(full){
+  return h('div',{class:'modeswitch', title:'how much the kit shows'},
+    h('button',{class:'seg'+(!full?' on':''), onclick:()=>{ if(full) setMode('simple'); }}, '✿ Cozy'),
+    h('button',{class:'seg'+(full?' on':''), onclick:()=>{ if(!full) setMode('full'); }}, '✦ Full kit'),
+  );
+}
+function setProfile(p){ DB.profile=p; save(); applyMode(); go(p==='worldbuilder'?'studio':'home'); toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : 'Maker — the journal.'); }
+
+/* ---------- home ----------------------------------------------------------- */
+function viewHome(){
+  const wrap = h('div',null);
+  wrap.append(h('div',{class:'cover'},
+    svgUse('ic-seedling','emblem'),
+    h('h1',{class:'display'},'The Vael Field Journal'),
+    h('div',{class:'sub'},'& Archivist’s Kit'),
+    h('div',{class:'tag'},'a cozy little workshop for the rooted folk of the Godling Universe'),
+    h('div',{class:'tag hand', style:{fontSize:'22px', color:'var(--green)', marginTop:'10px'}}, '“same trunk, different branches”'),
+  ));
+  wrap.append(shelf('The Field Journal — make a little world by hand', 'field'));
+  wrap.append(shelf("The Worldmaker's Pages — invent new corners of the world", 'world'));
+
+  const recent = DB.creations.slice(-6).reverse();
+  if (recent.length){
+    const s = h('div',{class:'shelf'}, h('h3',null,'Lately in your journal'));
+    const g = h('div',{class:'gal-grid'});
+    recent.forEach(c=> g.append(galCard(c)));
+    s.append(g); wrap.append(s);
+  }
+  return wrap;
+}
+function shelf(title, kit){
+  const s = h('div',{class:'shelf'}, h('h3',null,title));
+  const g = h('div',{class:'grid-cards'});
+  WORKSHEETS.filter(w=>w.kit===kit).forEach(w=>{
+    g.append(h('button',{class:'pick', onclick:()=>go('worksheet',{id:w.id})},
+      h('div',{class:'ribbon', style:{background:accentOf(w)}}),
+      h('b',null,w.title),
+      h('small',null,w.subtitle||''),
+    ));
+  });
+  if (kit==='field') g.append(h('button',{class:'pick', onclick:()=>go('naming')},
+    h('div',{class:'ribbon', style:{background:'#6e5232'}}),
+    h('b',null,'The Vael Naming Tree'),
+    h('small',null,'an illustrated plate — trunk, branches, elements, suffixes')));
+  s.append(g); return s;
+}
+function accentOf(w){ return ACCENTS[w.accent]||ACCENTS.gold; }
+
+/* ---------- tour (embedded World Reference) -------------------------------- */
+function viewTour(){
+  const f = framed('Welcome to the World', 'a little tour before you begin — no need to remember it all', 'go gently, go slow');
+  const p = h('div',{class:'prose'});
+  p.innerHTML = `
+    <p>The world is not a planet with a sky above it — <b>the sky <i>is</i> the world.</b> The <b>Cloudsea</b> is an endless expanse of glowing, magic-filled cloud, the oldest place there is. Everything floats and drifts: people sail it, creatures swim it, islands wander through it.</p>
+    <h3>The three layers</h3>
+    <div class="layer"><b>The Top — bright &amp; airy.</b> Full of light, wind, and lightning. It holds the <i>most</i> islands — but they're barely more than cloud and mist, so it's the hardest place to find footing. Sudden roaring gusts tear through.</div>
+    <div class="layer"><b>The Middle — the calm heart.</b> Soft clouds, drifting islands, old ruins, many gentle creatures. The safest layer… mostly.</div>
+    <div class="layer"><b>The Bottom — deep &amp; strange.</b> Heavy, dim, the pressure climbing. The deep magic makes places of fire, ice, or storm turn <i>fiercer</i> than anywhere above.</div>
+    <h3>What fills it</h3>
+    <p><b>Mana-plankton</b> drift everywhere — tiny glowing motes, the base of the food chain. <b>Cloud-whales</b> sip them. <b>Arkborne</b> roam like moving islands — living beings with whole worlds inside. And scattered everywhere: islands, ruins, and rare doorways into other, fading worlds.</p>
+    <h3>The rooted folk — the Vael</h3>
+    <p>Tree-people who grow up out of the ground. A Vael's body shows <b>where they grew</b> — a swamp one looks like a soft willow; a mountain one like weathered stone. They carry their families in their <b>names</b>, and gather in quiet <b>groves</b>. Their motto: <i>“same trunk, different branches.”</i></p>
+    <table>
+      <tr><td><code>-druun</code></td><td>earth, stone, buried roots</td></tr>
+      <tr><td><code>-thari</code></td><td>wood, grove, sanctuary</td></tr>
+      <tr><td><code>-maren -aeryn -karin -lunai -sorin</code></td><td><i>still waiting for their element</i></td></tr>
+    </table>
+    <h3>Power &amp; the divine</h3>
+    <p><b>Seeds</b> are small, almost-living things that grant a gift to whoever plants one inside themselves — the right Seed can change nearly anything. <b>Godlings</b> are souls who lived and died in another world, pulled here and given a flickering spark of the divine. The Vael quietly hope one might come for them.</p>
+    <h3>The shadow, and the hope</h3>
+    <p>Over all of it hangs a <b>shadow</b> — a vast, cold thing that slowly unmakes worlds; it took the Vael's own god. They have a word for the dread they survived: <b>the Nafl-Hum</b>, the Void-Hum. But this is a world about <b>hope</b>: small, living, growing things holding fast against the dark. The light is the point; the shadow is only what it pushes against.</p>
+    <p class="hint">(Don't mix it up with <b>Shadow the element</b> — that's just gentle darkness, like night, that anyone can carry. The Nafl-Hum is the enemy; the element is not.)</p>
+    <p class="hint">Wondering about something? Ask the person who gave you this — they dreamed up this whole world, and would love to tell you about it.</p>
+  `;
+  f.querySelector('.framed-body').append(p);
+  return f;
+}
+
+/* ---------- framed page wrapper ------------------------------------------- */
+function framed(title, subtitle, foot){
+  const f = h('div',{class:'framed'},
+    svgUse('ic-sprig','sprig tl'), svgUse('ic-sprig','sprig tr'),
+    svgUse('ic-sprig','sprig bl'), svgUse('ic-sprig','sprig br'),
+    h('div',{class:'pagetitle'}, h('h2',{class:'display'}, title)),
+    h('div',{class:'divider'}, h('span',{class:'o'}), h('span',{class:'rule'}), h('span',{class:'dot'}), h('span',{class:'rule'}), h('span',{class:'o'})),
+    subtitle? h('div',{class:'subtitle'}, subtitle): null,
+    h('div',{class:'framed-body'}),
+    foot? h('div',{class:'pagefoot'}, foot): null,
+  );
+  return f;
+}
+
+/* ---------- doodle component ---------------------------------------------- */
+function Doodle(initial, placeholder){
+  const W=900, H=680;
+  const cv = h('canvas');
+  const dpr = Math.min(window.devicePixelRatio||1, 2);
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx = cv.getContext('2d');
+  ctx.scale(dpr,dpr); ctx.lineCap='round'; ctx.lineJoin='round';
+  let color='#4a463b', erasing=false, drawing=false, last=null;
+  const undo=[];
+  function snapshot(){ try{ undo.push(cv.toDataURL('image/png')); if(undo.length>14) undo.shift(); }catch(e){} }
+  function loadDataURL(url){ const img=new Image(); img.onload=()=>{ ctx.clearRect(0,0,W,H); const r=Math.min(W/img.width,H/img.height); const w=img.width*r,hh=img.height*r; ctx.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); }; img.src=url; }
+  if (initial) loadDataURL(initial);
+  function pos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height), p:e.pressure&&e.pressure>0?e.pressure:0.5 }; }
+  cv.addEventListener('pointerdown', e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); snapshot(); drawing=true; last=pos(e); dab(last); });
+  cv.addEventListener('pointermove', e=>{ if(!drawing) return; e.preventDefault(); const p=pos(e); stroke(last,p); last=p; });
+  function end(){ drawing=false; last=null; }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('pointerleave', end);
+  function setBrush(p){ ctx.globalCompositeOperation = erasing?'destination-out':'source-over'; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth = (erasing?22:2.2) + (p?.p?p.p*4:2); }
+  function dab(p){ setBrush(p); ctx.beginPath(); ctx.arc(p.x,p.y, ctx.lineWidth/2, 0, Math.PI*2); ctx.fill(); }
+  function stroke(a,b){ setBrush(b); ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke(); }
+
+  const colors=['#4a463b','#3e6b4f','#b98e3c','#b3566a','#4a6b8a','#8a6bb0'];
+  const palette = h('div',{class:'palette no-print'});
+  const swatches = colors.map(c=>{
+    const b=h('button',{class:'swatch'+(c===color?' sel':''), style:{background:c}, title:c, onclick:()=>{ color=c; erasing=false; refreshSel(); }});
+    b.dataset.c=c; return b;
+  });
+  function refreshSel(){ swatches.forEach(s=> s.classList.toggle('sel', !erasing && s.dataset.c===color)); eraseBtn.classList.toggle('sel', erasing); }
+  const eraseBtn = h('button',{class:'swatch', style:{background:'#fff', borderStyle:'dashed'}, title:'eraser', onclick:()=>{ erasing=true; refreshSel(); }}, '');
+  const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ snapshot(); loadDataURL(rd.result); }; rd.readAsDataURL(f); }});
+  palette.append(...swatches, eraseBtn,
+    h('button',{class:'toolbtn', onclick:()=>{ if(undo.length){ loadDataURL(undo.pop()); } }}, '↶ Undo'),
+    h('button',{class:'toolbtn', onclick:()=>{ snapshot(); ctx.clearRect(0,0,W,H); }}, 'Clear'),
+    h('button',{class:'toolbtn', onclick:()=>fileIn.click()}, '+ Photo'), fileIn,
+  );
+
+  const el = h('div',{class:'doodle'}, placeholder? h('div',{class:'ph no-print'},placeholder):null, cv, palette);
+  function isBlank(){ const d=ctx.getImageData(0,0,cv.width,cv.height).data; for(let i=3;i<d.length;i+=4){ if(d[i]!==0) return false; } return true; }
+  return { el, getData:()=> isBlank()? null : cv.toDataURL('image/png') };
+}
+
+/* ---------- worksheet editor ----------------------------------------------- */
+function viewWorksheet(id, editId){
+  const w = WS[id];
+  if (w.special==='ledger') return viewLedger();
+  if (w.special==='specimens') return viewSpecimens(editId);
+  if (w.special==='warmth') return viewWarmth(editId);
+  return viewCardEditor(w, editId);
+}
+
+function viewCardEditor(w, editId){
+  const existing = editId? DB.creations.find(c=>c.id===editId): null;
+  const initial = existing? existing.fields : (w.fields.find(f=>f.type==='element')? {element:'water'}:{});
+  return buildCardEditor(w, existing, Object.assign({}, initial), existing? existing.image : null);
+}
+
+// Rebuildable card editor. `seedImage` lets "Show me the example" (and edit)
+// re-open the same page pre-filled, without any router round-trip.
+function buildCardEditor(w, existing, state, seedImage){
+  const f = framed(w.title, w.subtitle, w.kit==='field'? 'The Vael Field Journal — go gently, go slow' : "The Worldmaker's Pages — the world is wider because you're in it");
+  const wrap = h('div',{class:'editor-wrap'});
+  const editor = h('div',{class:'editor-col no-print'});
+  const cardCol = h('div',{class:'card-col'});
+
+  const doodle = Doodle(seedImage, w.imageHint);
+  let importedImage = existing? (existing.importedImage||null) : null;   // full-res photo / Procreate art
+  let tags = existing? (existing.tags||[]).slice() : [];
+  const currentImage = ()=> importedImage || doodle.getData();
+  const previewSpec = (w.specimen && !existing)? (DB.counters[w.id]||0)+1 : (existing && existing.specimenNo);
+  function repaint(){ cardCol.replaceChildren(keepsake(w, state, currentImage(), {specimenNo:previewSpec}), cardActions()); }
+
+  w.fields.forEach(fld=>{
+    if (fld.type==='element'){
+      editor.append(h('div',{class:'field'},
+        h('label',null,fld.label),
+        fld.hint? h('div',{class:'fhint'}, fld.hint):null,
+        elementPicker(state, repaint),
+      ));
+    } else if (fld.type==='choice'){
+      editor.append(choiceField(fld, state, repaint));
+    } else {
+      const tag = fld.type==='long'? 'textarea':'input';
+      const inp = h(tag,{ value: state[fld.key]||'', placeholder: fld.hint||'', rows: fld.type==='long'?2:null,
+        oninput:e=>{ state[fld.key]=e.target.value; repaint(); } });
+      editor.append(h('div',{class:'field'}, h('label',null,fld.label), inp));
+    }
+  });
+
+  editor.append(h('div',{class:'field'}, h('label',null,'A doodle — draw with finger or Pencil'), doodle.el));
+  doodle.el.addEventListener('pointerup', ()=> setTimeout(repaint,0));
+  doodle.el.querySelector('.palette').addEventListener('click', ()=> setTimeout(repaint,30));
+
+  // full-res import (a photo, or finished art from Procreate)
+  const importPreview = h('div',null);
+  const importIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; downscaleToDataURL(file, 1800, 0.86, url=>{ importedImage=url; paintImport(); repaint(); }); }});
+  function paintImport(){
+    importPreview.replaceChildren();
+    if (importedImage){
+      importPreview.append(
+        h('img',{src:importedImage, style:{maxWidth:'190px', maxHeight:'150px', borderRadius:'6px', display:'block', marginBottom:'6px', border:'1px solid var(--gold-soft)'}}),
+        h('button',{class:'toolbtn', onclick:()=>{ importedImage=null; paintImport(); repaint(); }}, 'Use my doodle instead'));
+    }
+  }
+  paintImport();
+  editor.append(h('div',{class:'field'},
+    h('label',null,'Or add a finished picture'),
+    h('div',{class:'fhint'},'a photo, or art painted in Procreate (kept full size)'),
+    importPreview,
+    h('button',{class:'navbtn', onclick:()=>importIn.click()}, 'Add a photo / Procreate art'), importIn));
+
+  // tags (advanced) — for search/filter in the gallery
+  const tagWrap=h('div',{class:'taginput'});
+  function paintTags(){ tagWrap.replaceChildren(...tags.map((t,i)=> h('span',{class:'tagchip'}, '#'+t, h('button',{title:'remove', onclick:()=>{ tags.splice(i,1); paintTags(); }}, '×'))),
+    (function(){ const ti=h('input',{placeholder:'add a tag…', style:{border:'none',background:'transparent',fontFamily:'inherit',fontSize:'14px',minWidth:'90px'}, onkeydown:e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/(^-|-$)/g,''); if(v&&!tags.includes(v)){ tags.push(v); paintTags(); } } }}); return ti; })()); }
+  paintTags();
+  editor.append(h('div',{class:'field advanced-only'}, h('label',null,'Tags'), h('div',{class:'fhint'},'press Enter after each — for searching later'), tagWrap));
+
+  const tools = h('div',{class:'toolrow'});
+  if (w.example) tools.append(h('button',{class:'navbtn', onclick:()=>{
+    const rebuilt = buildCardEditor(w, existing, Object.assign({}, w.example), seedImage);
+    $app.replaceChildren(topbar(), rebuilt); window.scrollTo(0,0);
+  }}, 'Show me the example'));
+  tools.append(h('button',{class:'navbtn primary', onclick:()=>{ saveCreation(w, state, doodle.getData(), existing, importedImage, tags); }}, existing?'Save changes':'Save to my journal'));
+  tools.append(h('button',{class:'navbtn', onclick:()=>go('home')}, 'Start fresh'));
+  editor.append(tools);
+
+  function cardActions(){
+    return h('div',{class:'toolrow no-print'},
+      h('button',{class:'navbtn', onclick:()=>window.print()}, 'Print / Save PDF'),
+      h('button',{class:'navbtn advanced-only', onclick:()=>sendToProcreate(w, state, currentImage(), {specimenNo:previewSpec})}, 'Save as image →'));
+  }
+
+  wrap.append(editor, cardCol);
+  f.querySelector('.framed-body').append(wrap);
+  repaint();
+  return f;
+}
+
+// element picker: the 12 (+ her own); an optional expression "flavor" (advanced).
+function elementPicker(state, repaint){
+  const box = h('div',null);
+  const erow = h('div',{class:'chips'});
+  function elChip(e){ const on = state.element===e.key;
+    return h('button',{class:'chip'+(on?' active':''), style:{ borderColor:on?(e.accent||'var(--gold-soft)'):'var(--gold-soft)', background:on?deriveBg(e.accent||ACCENTS.gold):'#fbf8ef' },
+      onclick:()=>{ state.element=e.key; paintEls(); repaint(); }}, h('span',{class:'dot', style:{background:e.accent||'var(--gold-soft)'}}), e.label); }
+  function paintEls(){ erow.replaceChildren(...allElements().map(elChip),
+    h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push({key,label:n.trim(),accent:ACCENTS.gold,custom:true}); save(); state.element=key; paintEls(); repaint(); } }}, '+ add your own')); }
+  paintEls();
+  box.append(erow);
+
+  const xwrap = h('div',{class:'advanced-only', style:{marginTop:'12px'}}, h('div',{class:'fhint'}, 'their flavor — optional (same element, different skin)'));
+  const xrow = h('div',{class:'chips'});
+  function xChip(e){ const on = state.expression===e.key;
+    return h('button',{class:'chip'+(on?' active':''), style:{ borderColor:on?'var(--green)':'var(--gold-soft)', background:on?'#eef0e4':'#fbf8ef' },
+      onclick:()=>{ state.expression = on? '' : e.key; paintX(); repaint(); }}, e.label); }
+  function paintX(){ xrow.replaceChildren(...allExpressions().map(xChip),
+    h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push({key,label:n.trim()}); save(); state.expression=key; paintX(); repaint(); } }}, '+ add a flavor')); }
+  paintX();
+  xwrap.append(xrow);
+  box.append(xwrap);
+  return box;
+}
+
+// choice field (e.g. Seed type): chips that reveal a per-option example prompt.
+function choiceField(fld, state, repaint){
+  const wrapc = h('div',{class:'field'+(fld.advanced?' advanced-only':'')}, h('label',null,fld.label));
+  if (fld.note) wrapc.append(h('div',{class:'fhint'}, fld.note));
+  const row = h('div',{class:'chips'});
+  const hintEl = h('div',{class:'choice-hint'});
+  function opts(){ const o=fld.options.slice(); const v=state[fld.key]; if(v && !o.some(x=>x.value===v)) o.push({value:v, prompt:''}); return o; }
+  function promptFor(v){ const o=fld.options.find(x=>x.value===v); return o? o.prompt : (v? 'for example only — if this is '+v+', what would it do?' : ''); }
+  function paint(){
+    row.replaceChildren(...opts().map(o=>{ const on=state[fld.key]===o.value;
+      return h('button',{class:'chip'+(on?' active':''), style:{borderColor:on?'var(--gold)':'var(--gold-soft)', background:on?'#f4ecd6':'#fbf8ef'},
+        onclick:()=>{ state[fld.key]= on? '' : o.value; paint(); hintEl.textContent=promptFor(state[fld.key]); repaint(); }}, o.value); }),
+      h('button',{class:'chip dash', onclick:()=>{ const n=prompt('What kind of Seed?'); if(n&&n.trim()){ state[fld.key]=n.trim(); paint(); hintEl.textContent=promptFor(state[fld.key]); repaint(); } }}, '+ add your own'));
+  }
+  paint(); hintEl.textContent = promptFor(state[fld.key]);
+  wrapc.append(row, hintEl);
+  return wrapc;
+}
+
+/* ---------- keepsake card renderer ----------------------------------------- */
+function keepsake(w, state, image, opts){
+  opts = opts||{};
+  const c = w.card || {};
+  let accent = accentOf(w);
+  const hasElement = w.fields && w.fields.some(f=>f.type==='element');
+  if (hasElement && state.element) accent = elementAccentOf(state.element);
+  const cardBg = deriveBg(accent), cardFrame = deriveFrame(accent);
+  const nameVal = (state[c.name]||'').trim();
+  const wordVal = c.word? (state[c.word]||'').trim():'';
+  const quoteVal = (state[c.quote]||'').trim();
+  const subVal = c.sub? (state[c.sub]||'').trim():'';
+
+  const k = h('div',{class:'keepsake'+(opts.flat?'':' tilt'), style:{ '--accent':accent, '--cardbg':cardBg, '--cardframe':cardFrame }});
+  k.append(h('div',{class:'ribbon', style:{background:accent}}));
+  const body = h('div',{class:'body'});
+
+  const kick = c.kicker || w.title;
+  body.append(h('div',{class:'head'},
+    h('div',{class:'kick'}, opts.specimenNo? `${kick} · no. ${opts.specimenNo}` : kick),
+    wordVal? h('div',{class:'word hand', style:{color:accent}}, wordVal): h('span'),
+  ));
+
+  // image frame
+  const frame = h('div',{class:'frame'});
+  if (image) frame.append(h('img',{src:image, alt:''}));
+  else frame.append(h('div',{class:'empty'}, w.imageHint||'a little drawing goes here'));
+  body.append(frame);
+
+  body.append(h('h3',{class:'name display'}, nameVal || placeholderName(w)));
+  if (c.sub && subVal) body.append(h('div',{class:'sub'}, (c.subPrefix||'')+subVal));
+
+  // remaining rows (skip name/sub/word/quote/element)
+  const skip = new Set([c.name, c.sub, c.word, c.quote].filter(Boolean));
+  const rows = h('div',{class:'rows'});
+  let any=false;
+  (w.fields||[]).forEach(fld=>{
+    if (skip.has(fld.key)) return;
+    if (fld.type==='element'){
+      if (state.element){ any=true; const lbl=elementLabelOf(state.element)+(state.expression? ' · '+expressionLabelOf(state.expression):'');
+        rows.append(h('div',{class:'rw elt'}, h('span',{class:'dot', style:{background:accent}}), h('span',{class:'rl', style:{margin:0}}, 'Element'), h('span',{class:'rv', style:{fontStyle:'italic'}}, lbl))); }
+      return;
+    }
+    const v=(state[fld.key]||'').trim(); if(!v) return; any=true;
+    rows.append(h('div',{class:'rw'}, h('div',{class:'rl'}, fld.cardLabel||fld.label), h('div',{class:'rv'}, v)));
+  });
+  if (any) body.append(rows);
+
+  if (c.quote){
+    body.append(h('div',{class:'quote'}, h('div',{class:'hand'}, quoteVal || quotePlaceholder(w))));
+  }
+  body.append(h('div',{class:'cardfoot'}, w.kit==='field'?'The Vael Field Journal':"The Worldmaker's Pages"));
+  k.append(body);
+  return k;
+}
+function placeholderName(w){
+  return { portrait:'A New Vael', grove:'A New Grove', ourgrove:'Our Grove', sacred:'A Sacred Creature',
+    people:'A New People', creature:'A New Creature', place:'A New Place', seed:'A New Seed',
+    case:'An Open Case', folk:'A Vael' }[w.id] || 'Something New';
+}
+function quotePlaceholder(w){ return 'A small, true line goes here — only you know it yet.'; }
+
+/* ---------- save / specimen numbering -------------------------------------- */
+function saveCreation(w, state, image, existing, importedImage, tags){
+  const named = (state[(w.card&&w.card.name)] || state.name || state.called || state.title || '').trim();
+  if (existing){
+    existing.fields = Object.assign({}, state);
+    existing.image = image; existing.importedImage = importedImage||null; existing.tags = tags||[]; existing.updatedAt = Date.now();
+    save(); toast('Saved.'); go('gallery'); return;
+  }
+  const rec = { id:uid(), worksheetId:w.id, kit:w.kit, fields:Object.assign({},state), image, importedImage:importedImage||null, tags:tags||[], createdAt:Date.now(), updatedAt:Date.now() };
+  if (w.specimen) rec.specimenNo = nextSpecimen(w.id);
+  DB.creations.push(rec); save();
+  toast(named? `“${named}” is real now.` : 'Saved to your journal.');
+  go('gallery');
+}
+
+/* ---------- ledger: the Name-Keeper ---------------------------------------- */
+function viewLedger(){
+  const f = framed("The Name-Keeper's Page",
+    'a name remembers what a family is made of — keep your ledger of roots',
+    'Stack two roots to mark a joined family — like -druun + -thari.');
+  const body = f.querySelector('.framed-body');
+  body.append(h('p',{class:'hint', style:{maxWidth:'640px',margin:'0 auto 16px'}},
+    'The first two roots are already known. Five more are still waiting for their element — what might each one hold? Play freely; nothing here is fixed.'));
+  const tbl = h('table',{class:'ledger'});
+  tbl.append(h('tr',null, h('th',null,'Name-piece'), h('th',null,'What it means')));
+  KNOWN_ROOTS.forEach(r=>{
+    tbl.append(h('tr',{class:'locked'}, h('td',null,h('input',{value:r.root, readonly:true})), h('td',null,h('input',{value:r.meaning, readonly:true}))));
+  });
+  OPEN_ROOTS.forEach(root=>{
+    const val = DB.roots[root]||'';
+    tbl.append(h('tr',null,
+      h('td',null,h('input',{value:root, readonly:true})),
+      h('td',null,h('input',{value:val, placeholder:'what might it hold? (open)', oninput:e=>{ DB.roots[root]=e.target.value; save(); }})),
+    ));
+  });
+  body.append(tbl);
+  const lore = h('div',{class:'lore-note advanced-only'});
+  lore.innerHTML = `
+    <p>Each root carries an <b>element-cluster</b>: <code>-druun</code> gathers Earth (stone, loam, buried-roots);
+    <code>-thari</code> gathers Wood (root, grove, sanctuary). The naming system and the magic system are the same
+    idea in two forms.</p>
+    <p>Roots <b>stack</b> to mark a joined family — <code>-druun</code> + <code>-thari</code> → <b>Vaeldruunthari</b>,
+    the fused earth-and-wood branch.</p>
+    <p>Some roots even have a <b>sacred embodiment creature</b> — a rare being that <i>is</i> the concept the word
+    names. Two are known: <b>Druun</b> (earth &amp; stone) and the <b>thari embodiment</b>, a creature of living
+    wood and grove.</p>`;
+  body.append(lore);
+  body.append(h('p',{class:'open-flag', style:{maxWidth:'640px',margin:'18px auto 0'}},
+    'These five roots are deliberately open in the canon — your guesses here are play, kept just for you, until you choose to share them.'));
+  body.append(h('div',{class:'toolrow', style:{justifyContent:'center', marginTop:'16px'}},
+    h('button',{class:'navbtn', onclick:()=>go('naming')}, 'See the Naming Tree →')));
+  return f;
+}
+
+/* ---------- specimens grid ------------------------------------------------- */
+function viewSpecimens(editId){
+  const w = WS.specimens;
+  const existing = editId? DB.creations.find(c=>c.id===editId):null;
+  const slots = existing? existing.slots.slice() : SEED_SLOTS.map(label=>({label, caption:'', image:null}));
+  const f = framed(w.title, w.subtitle, "Press a leaf, draw a seed — a keeper's collection grows slowly.");
+  const grid = h('div',{class:'specgrid'});
+  slots.forEach((slot,i)=>{
+    const circle = h('div',{class:'circle'});
+    if (slot.image) circle.append(h('img',{src:slot.image, alt:''})); else circle.append(h('span',null,'draw / photo'));
+    const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>{ slot.image=rd.result; circle.replaceChildren(h('img',{src:rd.result, alt:''})); }; rd.readAsDataURL(file); }});
+    circle.style.cursor='pointer'; circle.addEventListener('click',()=>fileIn.click());
+    grid.append(h('div',{class:'specslot'},
+      circle, fileIn,
+      h('input',{value:slot.label, oninput:e=>slot.label=e.target.value}),
+      h('input',{class:'cap', value:slot.caption, placeholder:'a word', oninput:e=>slot.caption=e.target.value, style:{fontStyle:'italic'}}),
+    ));
+  });
+  f.querySelector('.framed-body').append(grid,
+    h('div',{class:'toolrow no-print', style:{justifyContent:'center', marginTop:'20px'}},
+      h('button',{class:'navbtn primary', onclick:()=>{
+        if (existing){ existing.slots=slots; existing.updatedAt=Date.now(); }
+        else DB.creations.push({ id:uid(), worksheetId:'specimens', kit:'field', slots, createdAt:Date.now(), updatedAt:Date.now() });
+        save(); toast('Specimen sheet saved.'); go('gallery');
+      }}, existing?'Save changes':'Save to my journal'),
+      h('button',{class:'navbtn', onclick:()=>window.print()}, 'Print'),
+      h('button',{class:'navbtn', onclick:()=>go('home')}, 'Back'),
+    ));
+  return f;
+}
+
+/* ---------- warmth-keeper -------------------------------------------------- */
+function viewWarmth(editId){
+  const w = WS.warmth;
+  const existing = editId? DB.creations.find(c=>c.id===editId):null;
+  const state = existing? Object.assign({}, existing.fields): {};
+  const colors = existing? existing.colors.slice() : ['#b3566a','#e2c391','#6f8f6a','#c9b9d6','#8a6b54','#dfe5ea'];
+  const f = framed(w.title, w.subtitle, 'The warmest things are made slowly, one stitch at a time.');
+  const wrap = h('div',{class:'editor-wrap'});
+  const left = h('div',{class:'editor-col'});
+  const doodle = Doodle(existing?existing.image:null, 'plan or chart it — a swatch, a pattern, a sketch');
+  left.append(h('div',{class:'field'}, h('label',null,'Plan or chart it'), doodle.el));
+  const right = h('div',null);
+  [['what','What is it?','a scarf? a blanket? mittens?'],['who','Who is it for?',''],['fiber','The fiber','wool? something magical?'],['palette','Name your palette','']].forEach(([k,label,hint])=>{
+    right.append(h('div',{class:'field'}, h('label',null,label), hint?h('div',{class:'fhint'},hint):null,
+      h('input',{value:state[k]||'', oninput:e=>state[k]=e.target.value})));
+  });
+  right.append(h('div',{class:'field'}, h('label',null,'Colorway'),
+    h('div',{class:'palette-grid'}, ...colors.map((col,i)=>{
+      const ci=h('input',{type:'color', value:col, oninput:e=>colors[i]=e.target.value});
+      return h('div',{class:'pw'}, ci);
+    }))));
+  right.append(h('div',{class:'toolrow no-print'},
+    h('button',{class:'navbtn primary', onclick:()=>{
+      if (existing){ existing.fields=state; existing.colors=colors; existing.image=doodle.getData(); existing.updatedAt=Date.now(); }
+      else DB.creations.push({ id:uid(), worksheetId:'warmth', kit:'field', fields:state, colors, image:doodle.getData(), createdAt:Date.now(), updatedAt:Date.now() });
+      save(); toast('Saved to your journal.'); go('gallery');
+    }}, existing?'Save changes':'Save to my journal'),
+    h('button',{class:'navbtn', onclick:()=>go('home')}, 'Back'),
+  ));
+  wrap.append(left, right);
+  f.querySelector('.framed-body').append(wrap);
+  return f;
+}
+
+/* ---------- gallery -------------------------------------------------------- */
+function viewGallery(){
+  const wrap = h('div',null);
+  wrap.append(h('div',{class:'cover', style:{padding:'10px 0 6px'}},
+    h('h1',{class:'display', style:{fontSize:'34px'}}, DB.profile==='worldbuilder'?'My Journal':'My Field Journal'),
+    h('div',{class:'tag'},'everything you’ve made — revisit it, change it, print it, or weave it into the world')));
+  if (!DB.creations.length){
+    wrap.append(h('div',{class:'empty-note'},'Nothing yet — and that’s alright. Pick a page from the home shelf and make a little something.'));
+    return wrap;
+  }
+  const state={ q:'', kit:'', tag:'' };
+  const allTags=[...new Set(DB.creations.flatMap(c=>c.tags||[]))].sort();
+  const qIn=h('input',{placeholder:'search…', oninput:e=>{ state.q=e.target.value.toLowerCase(); paint(); }});
+  const kitSel=h('select',{onchange:e=>{ state.kit=e.target.value; paint(); }}, h('option',{value:''},'all kits'), h('option',{value:'field'},'Field Journal'), h('option',{value:'world'},"Worldmaker's"));
+  const row=h('div',{class:'filter-row'}, qIn, kitSel);
+  if(allTags.length) row.append(h('select',{onchange:e=>{ state.tag=e.target.value; paint(); }}, h('option',{value:''},'all tags'), ...allTags.map(t=>h('option',{value:t},'#'+t))));
+  row.append(h('button',{class:'navbtn advanced-only', onclick:()=>exportBook()}, '📖 Make a book (PDF)'));
+  wrap.append(row);
+  const host=h('div',null); wrap.append(host);
+  function match(c){
+    if(state.kit && c.kit!==state.kit) return false;
+    if(state.tag && !(c.tags||[]).includes(state.tag)) return false;
+    if(state.q){ const hay=(creationTitle(c)+' '+JSON.stringify(c.fields||{})+' '+((c.tags||[]).join(' '))).toLowerCase(); if(!hay.includes(state.q)) return false; }
+    return true;
+  }
+  function paint(){
+    host.replaceChildren(); let any=false;
+    ['field','world'].forEach(kit=>{
+      const items=DB.creations.filter(c=>c.kit===kit && match(c)).reverse(); if(!items.length) return; any=true;
+      const s=h('div',{class:'shelf'}, h('h3',null, kit==='field'? 'The Field Journal':"The Worldmaker's Pages"));
+      const g=h('div',{class:'gal-grid'}); items.forEach(c=> g.append(galCard(c))); s.append(g); host.append(s);
+    });
+    if(!any) host.append(h('div',{class:'empty-note'},'Nothing matches that.'));
+  }
+  paint();
+  return wrap;
+}
+function exportBook(){
+  let stage=document.getElementById('book-stage');
+  if(!stage){ stage=h('div',{id:'book-stage', class:'book-stage'}); document.body.append(stage); }
+  stage.replaceChildren();
+  const name=(DB.github&&DB.github.displayName)||'';
+  stage.append(h('div',{class:'book-cover'}, svgUse('ic-seedling','emblem'),
+    h('h1',{class:'display'}, (name? name+'’s ':'')+'Field Journal'),
+    h('div',{class:'hint'},'a corner of the Godling Universe — same trunk, different branches')));
+  let pages=0;
+  DB.creations.forEach(c=>{ const w=WS[c.worksheetId]; if(!w||!w.card) return; pages++;
+    stage.append(h('div',{class:'book-page'}, keepsake(w, c.fields||{}, creationThumb(c), {specimenNo:c.specimenNo, flat:true}))); });
+  if(!pages){ toast('Nothing to put in the book yet.'); return; }
+  document.body.classList.add('printing-book'); window.print();
+  setTimeout(()=>document.body.classList.remove('printing-book'), 600);
+}
+function creationTitle(c){
+  const w=WS[c.worksheetId];
+  if (c.worksheetId==='specimens') return 'Seeds & Specimens';
+  if (c.worksheetId==='warmth') return (c.fields&&c.fields.what)||'A Warmth-Keeper piece';
+  const f=c.fields||{};
+  if (!w || !w.card) return (f.name||f.called||f.title||'Untitled').trim()||'Untitled';
+  return (f[w.card.name]||f.name||f.called||f.title||'Untitled').trim()||'Untitled';
+}
+function creationThumb(c){
+  if (c.importedImage) return c.importedImage;
+  if (c.image) return c.image;
+  if (c.slots){ const s=c.slots.find(x=>x.image); return s?s.image:null; }
+  return null;
+}
+function galCard(c){
+  const w=WS[c.worksheetId];
+  const thumb=creationThumb(c);
+  const card=h('div',{class:'gal-card'},
+    h('div',{class:'thumb'}, thumb? h('img',{src:thumb, alt:''}) : h('span',{class:'none'}, w.title)),
+    h('div',{class:'meta'}, h('b',null, creationTitle(c)), h('small',null, w.title + (c.specimenNo? ` · no. ${c.specimenNo}`:''))),
+    h('div',{class:'acts'},
+      h('button',{onclick:()=>openCreation(c)}, 'Open'),
+      h('button',{onclick:()=>{ const copy=JSON.parse(JSON.stringify(c)); copy.id=uid(); copy.createdAt=copy.updatedAt=Date.now(); if(w.specimen) copy.specimenNo=nextSpecimen(w.id); DB.creations.push(copy); save(); render(); }}, 'Duplicate'),
+      (w.card? h('button',{class:'advanced-only', onclick:()=>sendToProcreate(w, c.fields||{}, creationThumb(c), {specimenNo:c.specimenNo})}, 'Save as image'):null),
+      (w.card? h('button',{class:'advanced-only', onclick:()=>shareCreation(c)}, 'Weave into the world →'):null),
+      h('button',{onclick:()=>{ if(confirm('Gently remove this from your journal?')){ DB.creations=DB.creations.filter(x=>x!==c); save(); render(); } }}, 'Remove'),
+    ),
+  );
+  return card;
+}
+function openCreation(c){
+  if (c.worksheetId==='specimens'){ go('worksheet',{id:'specimens', editId:c.id}); return; }
+  if (c.worksheetId==='warmth'){ go('worksheet',{id:'warmth', editId:c.id}); return; }
+  go('worksheet',{id:c.worksheetId, editId:c.id});
+}
+
+/* ---------- share export (opt-in, Draft only) ------------------------------ */
+const DOMAIN_HINT = { portrait:'domains/41_VAEL.md', folk:'domains/41_VAEL.md', grove:'domains/40_PEOPLES_AND_RACES.md',
+  ourgrove:'domains/40_PEOPLES_AND_RACES.md', sacred:'domains/50_ARKBORNE_AND_SEEDS.md', people:'domains/40_PEOPLES_AND_RACES.md',
+  creature:'domains/50_ARKBORNE_AND_SEEDS.md', place:'domains/10_COSMOLOGY.md', seed:'domains/50_ARKBORNE_AND_SEEDS.md',
+  case:'(campaign / lore thread)' };
+function shareCreation(c){
+  const w=WS[c.worksheetId]; const f=c.fields||{};
+  const title=creationTitle(c);
+  const lines=[];
+  lines.push(`## [new] — ${w.title}: ${title}`,'',
+    '**Status:** Draft (made in the Vael Field Journal kit)',
+    `**Source:** ${w.title} — made by hand in the kit, ${new Date(c.updatedAt||Date.now()).toISOString().slice(0,10)}`,
+    `**Category:** ${DOMAIN_HINT[w.id]||'(Del to file)'}`,'',
+    '### What was made','');
+  w.fields.forEach(fld=>{
+    if (fld.type==='element'){ if(f.element) lines.push(`- **Element:** ${elementLabelOf(f.element)}${f.expression? ' · '+expressionLabelOf(f.expression):''}`); return; }
+    const v=(f[fld.key]||'').trim(); if(v) lines.push(`- **${fld.cardLabel||fld.label}:** ${v}`);
+  });
+  if (c.specimenNo) lines.push(`- **${w.specimen}** ${c.specimenNo}`);
+  lines.push('', '### Note for canon',
+    '> Player-made via the kit — **not canon until Del audits.** Forwarded as a Draft candidate only.');
+  if (Object.values(DB.roots||{}).some(Boolean)){
+    lines.push('> Name-root guesses (if any) are play-proposals for the five **deliberately OPEN** roots (-maren, -aeryn, -karin, -lunai, -sorin) — do not treat as assigned.');
+  }
+  const md=lines.join('\n');
+  showModal('Weave it into the world', 'A clean Draft card for Del’s promotion queue (`02_PROMOTION_QUEUE.md`). Nothing is canon until he audits it — this is just a gentle hand-off.', md);
+}
+function showModal(title, note, text){
+  const ta=h('textarea',{readonly:true}, text);
+  const bg=h('div',{class:'modal-bg', onclick:e=>{ if(e.target===bg) bg.remove(); }},
+    h('div',{class:'modal'},
+      h('h2',{class:'display'},title),
+      h('p',{class:'hint'},note),
+      ta,
+      h('div',{class:'toolrow'},
+        h('button',{class:'navbtn primary', onclick:()=>{ ta.select(); try{ document.execCommand('copy'); }catch(e){} navigator.clipboard&&navigator.clipboard.writeText(text); toast('Copied.'); }}, 'Copy'),
+        h('button',{class:'navbtn', onclick:()=>{ const b=new Blob([text],{type:'text/markdown'}); const a=h('a',{href:URL.createObjectURL(b), download:'field-journal-card.md'}); document.body.append(a); a.click(); a.remove(); }}, 'Download .md'),
+        h('button',{class:'navbtn', onclick:()=>bg.remove()}, 'Close'),
+      ),
+    ));
+  document.body.append(bg);
+}
+
+/* ---------- toast ---------------------------------------------------------- */
+let toastT=null;
+function toast(msg){ const t=h('div',{class:'toast'},msg); document.querySelectorAll('.toast').forEach(x=>x.remove()); document.body.append(t); clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),2600); }
+
+/* ---------- Cozy / Full kit mode ------------------------------------------- */
+function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world');
+  const world = DB.profile==='worldbuilder';
+  b.classList.add(world?'profile-world':'profile-maker');
+  b.classList.add((world || DB.mode==='full')?'mode-full':'mode-simple');   // worldbuilder always sees the full toolset
+}
+// Gating is pure CSS on the body class, so a mode switch only needs to flip the class
+// and refresh the top bar's label — no view re-render, so in-progress edits are kept.
+function setMode(m){ DB.mode=m; save(); applyMode(); if($app.firstChild) $app.replaceChild(topbar(), $app.firstChild); toast(m==='full'? 'Full kit — everything’s here.' : 'Cozy mode — just the essentials.'); }
+
+/* ---------- one-time gentle intro ------------------------------------------ */
+function showIntro(force){
+  if(!force && DB.seenIntro) return;
+  const bg = h('div',{class:'intro-bg', onclick:e=>{ if(e.target===bg) close(); }});
+  function close(){ DB.seenIntro=true; save(); bg.remove(); }
+  bg.append(h('div',{class:'intro'},
+    svgUse('ic-seedling','em'),
+    h('h2',{class:'display'},'A little door into a world'),
+    h('p',{class:'hint'},'This is your space. Nothing here is required, and there’s no wrong way.'),
+    h('ul',{class:'steps'},
+      h('li',null,'Pick a page from the shelf.'),
+      h('li',null,'Fill in what you like — skip what you don’t.'),
+      h('li',null,'Draw it, add a photo, or just write a few words.'),
+      h('li',null,'Tap Save. Come back any time.'),
+    ),
+    h('p',{class:'hint'},'Start in Cozy mode. When you’re ready for more — elements, sharing, saving to the world — tap “Full kit” up top.'),
+    h('div',{class:'toolrow', style:{justifyContent:'center'}},
+      h('button',{class:'navbtn primary', onclick:close}, 'Begin'),
+    ),
+  ));
+  document.body.append(bg);
+}
+
+/* ---------- Procreate: send a card out as an image ------------------------- */
+let _probe;
+function probeCtx(){ if(!_probe) _probe=document.createElement('canvas').getContext('2d'); return _probe; }
+function safeColor(col, fb){ try{ const x=probeCtx(); x.fillStyle='#000000'; x.fillStyle=col; const got=x.fillStyle; return (got==='#000000' && String(col).toLowerCase()!=='#000000')? (fb||'#b98e3c') : col; }catch(e){ return fb||'#b98e3c'; } }
+function loadImg(src){ return new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
+function downscaleToDataURL(file, maxDim, quality, cb){
+  const rd=new FileReader();
+  rd.onload=()=>{ const img=new Image(); img.onload=()=>{
+    let{width:wd,height:ht}=img; const s=Math.min(1, maxDim/Math.max(wd,ht));
+    if(s>=1){ cb(rd.result); return; }
+    const cv=document.createElement('canvas'); cv.width=Math.round(wd*s); cv.height=Math.round(ht*s);
+    const x=cv.getContext('2d'); x.drawImage(img,0,0,cv.width,cv.height);
+    try{ cb(cv.toDataURL('image/jpeg', quality||0.85)); }catch(e){ cb(rd.result); }
+  }; img.onerror=()=>cb(rd.result); img.src=rd.result; };
+  rd.readAsDataURL(file);
+}
+function wrapLines(ctx, text, font, maxW){
+  ctx.font=font; const words=String(text).split(/\s+/); const lines=[]; let line='';
+  for(const wd of words){ const t=line? line+' '+wd : wd; if(ctx.measureText(t).width>maxW && line){ lines.push(line); line=wd; } else line=t; }
+  if(line) lines.push(line); return lines;
+}
+async function renderCardCanvas(w, state, image, opts){
+  opts=opts||{}; const c=w.card||{}; const W=920, M=58, cw=W-M*2;
+  const accent=(w.fields&&w.fields.some(f=>f.type==='element')&&state.element)? elementAccentOf(state.element) : (ACCENTS[w.accent]||ACCENTS.gold);
+  const aCol=safeColor(accent,'#b98e3c');
+  const img=image? await loadImg(image) : null;
+  const ctx0=probeCtx();
+  // build blocks with measured heights
+  const blocks=[];
+  blocks.push({h:34, draw:(x,y)=>{ x.fillStyle='#a39a80'; x.font='600 19px Georgia,serif'; x.fillText(((c.kicker||w.title)+(opts.specimenNo?' · no. '+opts.specimenNo:'')).toUpperCase(), M, y+20); }});
+  if(img){ const ih=360; blocks.push({h:ih+18, draw:(x,y)=>{ x.strokeStyle=safeColor(deriveFrame(accent),'#cdbf9a'); x.lineWidth=2; x.setLineDash&&x.setLineDash([6,5]); x.strokeRect(M,y,cw,ih); x.setLineDash&&x.setLineDash([]);
+    const r=Math.min(cw/img.width,(ih-8)/img.height), iw=img.width*r, hh=img.height*r; x.drawImage(img, M+(cw-iw)/2, y+(ih-hh)/2, iw, hh); }}); }
+  const nameLines=wrapLines(ctx0,(state[c.name]||'').trim()||placeholderName(w),'600 38px Georgia,serif',cw);
+  blocks.push({h:nameLines.length*44+6, draw:(x,y)=>{ x.fillStyle='#2e2a24'; x.font='600 38px Georgia,serif'; nameLines.forEach((ln,i)=>x.fillText(ln,M,y+34+i*44)); }});
+  const subV=c.sub?(state[c.sub]||'').trim():''; if(c.sub&&subV){ const sl=wrapLines(ctx0,(c.subPrefix||'')+subV,'italic 22px Georgia,serif',cw); blocks.push({h:sl.length*28+8, draw:(x,y)=>{ x.fillStyle='#9a8f7a'; x.font='italic 22px Georgia,serif'; sl.forEach((ln,i)=>x.fillText(ln,M,y+22+i*28)); }}); }
+  const skip=new Set([c.name,c.sub,c.word,c.quote].filter(Boolean));
+  (w.fields||[]).forEach(fld=>{ if(skip.has(fld.key))return; let label,val;
+    if(fld.type==='element'){ if(!state.element)return; label='ELEMENT'; val=elementLabelOf(state.element)+(state.expression?' · '+expressionLabelOf(state.expression):''); }
+    else { const v=(state[fld.key]||'').trim(); if(!v)return; label=(fld.cardLabel||fld.label).toUpperCase(); val=v; }
+    const vl=wrapLines(ctx0,val,'20px Georgia,serif',cw);
+    blocks.push({h:18+vl.length*26+10, draw:(x,y)=>{ x.fillStyle='#a39a80'; x.font='600 12px Georgia,serif'; x.fillText(label,M,y+12); x.fillStyle='#4a463b'; x.font='20px Georgia,serif'; vl.forEach((ln,i)=>x.fillText(ln,M,y+34+i*26)); }}); });
+  const qV=c.quote?(state[c.quote]||'').trim():''; if(c.quote&&qV){ const ql=wrapLines(ctx0,qV,'italic 24px Georgia,serif',cw-30); blocks.push({h:ql.length*30+34, draw:(x,y)=>{ x.fillStyle=safeColor(deriveBg(accent),'#f6efde'); x.fillRect(M,y,cw,ql.length*30+26); x.fillStyle=aCol; x.fillRect(M,y,4,ql.length*30+26); x.fillStyle='#54503f'; x.font='italic 24px Georgia,serif'; ql.forEach((ln,i)=>x.fillText(ln,M+18,y+30+i*30)); }}); }
+  // total height
+  let total=M; blocks.forEach(b=>total+=b.h+10); total+=M;
+  const dpr=2, cv=document.createElement('canvas'); cv.width=W*dpr; cv.height=total*dpr; const x=cv.getContext('2d'); x.scale(dpr,dpr);
+  x.fillStyle='#fbf7ec'; x.fillRect(0,0,W,total);
+  x.fillStyle=aCol; x.fillRect(0,0,W,12);
+  let y=M; blocks.forEach(b=>{ b.draw(x,y); y+=b.h+10; });
+  x.fillStyle='#bcb39a'; x.font='600 12px Georgia,serif'; x.fillText((w.kit==='field'?'THE VAEL FIELD JOURNAL':"THE WORLDMAKER'S PAGES"), M, total-22);
+  return cv;
+}
+function sendToProcreate(w, state, image, opts){
+  renderCardCanvas(w, state, image, opts).then(cv=>{
+    cv.toBlob(blob=>{ if(!blob){ toast('Could not make the image.'); return; }
+      const fname=(slug((state[(w.card&&w.card.name)])||w.title)||'card')+'.png';
+      try{ if(navigator.canShare){ const file=new File([blob],fname,{type:'image/png'}); if(navigator.canShare({files:[file]})){ navigator.share({files:[file], title:w.title}).catch(()=>{}); return; } } }catch(e){}
+      const a=h('a',{href:URL.createObjectURL(blob), download:fname}); document.body.append(a); a.click(); a.remove();
+      toast('Saved an image — open it in Procreate or Photos.');
+    }, 'image/png');
+  }).catch(()=>toast('Could not make the image.'));
+}
+
+/* ---------- push to her own file in the repo (GitHub Contents API) --------- */
+function ghCfg(){ return DB.github; }
+function ghReady(){ const g=DB.github; return !!(g && g.token && g.owner && g.repo); }
+function ghHeaders(token){ return { 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }; }
+function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')||'field-journal'; }
+function stemOf(cfg){ return cfg.displayName? slug(cfg.displayName) : 'field-journal'; }
+async function ghTest(cfg){ const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {headers:ghHeaders(cfg.token)}); if(!r.ok) throw new Error('GitHub returned '+r.status); return r.json(); }
+async function ghMeta(cfg, path){ const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(cfg.branch)}`, {headers:ghHeaders(cfg.token)}); if(r.status===404) return null; if(!r.ok) throw new Error('read '+r.status); return r.json(); }
+async function ghPut(cfg, path, content, message, sha){ const body={ message, content:b64(content), branch:cfg.branch }; if(sha) body.sha=sha;
+  const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {method:'PUT', headers:ghHeaders(cfg.token), body:JSON.stringify(body)});
+  if(!r.ok) throw new Error('write '+r.status+' '+(await r.text()).slice(0,140)); return r.json(); }
+// read a repo text file -> { text, sha } (or null if missing). Uses download_url so it
+// works for files over the 1MB contents-API inline limit too.
+async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!meta) return null; const text=await (await fetch(meta.download_url)).text(); return { text, sha:meta.sha }; }
+let syncTimer=null, syncing=false;
+function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 3500); }
+async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return; syncing=true;
+  const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
+  try{
+    const mdPath=`${base}/${stem}.md`, jsonPath=`${base}/${stem}.json`;
+    const mdMeta=await ghMeta(cfg, mdPath); await ghPut(cfg, mdPath, renderJournalMarkdown(), `Update ${stem} journal`, mdMeta&&mdMeta.sha);
+    const jMeta=await ghMeta(cfg, jsonPath); await ghPut(cfg, jsonPath, JSON.stringify(stripForBackup(DB),null,1), `Update ${stem} journal data`, jMeta&&jMeta.sha);
+    if(!opts.silent) toast('Saved to your file in the world.');
+  }catch(e){ if(!opts.silent) toast('Sync failed: '+e.message); }
+  finally{ syncing=false; }
+}
+function stripForBackup(db){ const d=Object.assign({}, db); if(d.github){ d.github=Object.assign({}, d.github); delete d.github.token; } return d; } // never write the token into the repo
+async function loadFromRepo(){ if(!ghReady()){ toast('Connect to GitHub first.'); return; }
+  const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
+  try{ const meta=await ghMeta(cfg, `${base}/${stem}.json`); if(!meta){ toast('No saved file found yet.'); return; }
+    const raw=await (await fetch(meta.download_url)).text(); const inc=JSON.parse(raw);
+    const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(!have.has(c.id)) DB.creations.push(c); });
+    DB.roots=Object.assign({}, inc.roots, DB.roots); DB.counters=Object.assign({}, inc.counters, DB.counters);
+    DB.elements=mergeBy(DB.elements, inc.elements, 'key'); DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
+    save(); toast('Loaded from your file.'); render();
+  }catch(e){ toast('Load failed: '+e.message); }
+}
+function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
+function renderJournalMarkdown(){
+  const name=(DB.github&&DB.github.displayName)||''; const out=[`# ${name? name+'’s ':''}Field Journal`, '', '*Made in the Vael Field Journal kit — a corner of the Godling Universe.*', ''];
+  ['field','world'].forEach(kit=>{ const items=DB.creations.filter(c=>c.kit===kit); if(!items.length) return;
+    out.push(`## ${kit==='field'?'The Field Journal':"The Worldmaker's Pages"}`, ''); items.forEach(c=> out.push(...creationMarkdown(c))); });
+  out.push('_Same trunk, different branches._'); return out.join('\n');
+}
+function creationMarkdown(c){
+  const w=WS[c.worksheetId], f=c.fields||{}; const L=[`### ${creationTitle(c)} — _${w.title}_`, ''];
+  if(c.worksheetId==='specimens'){ (c.slots||[]).forEach(s=>{ if(s.caption||s.image) L.push(`- **${s.label}:** ${s.caption||'[picture]'}`); }); L.push(''); return L; }
+  if(c.worksheetId==='warmth'){ ['what','who','fiber','palette'].forEach(k=>{ if(f[k]) L.push(`- **${k}:** ${f[k]}`); }); if(c.colors) L.push(`- **colorway:** ${c.colors.join(', ')}`); L.push(''); return L; }
+  (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) L.push(`- **Element:** ${elementLabelOf(f.element)}${f.expression?' · '+expressionLabelOf(f.expression):''}`); return; } const v=(f[fld.key]||'').trim(); if(v) L.push(`- **${fld.cardLabel||fld.label}:** ${v}`); });
+  if(c.specimenNo) L.push(`- **${w.specimen}** ${c.specimenNo}`);
+  if(c.image||c.importedImage) L.push('- _[has a drawing]_');
+  L.push(''); return L;
+}
+function showModalNode(title, note, node){
+  const bg=h('div',{class:'modal-bg', onclick:e=>{ if(e.target===bg) bg.remove(); }},
+    h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
+  document.body.append(bg); return bg;
+}
+function openGitHubPanel(){
+  const g=Object.assign({owner:'Dracanman', repo:'godling-universe-canon-workbench', branch:'main', path:'kit/journal/', token:'', displayName:'', makerStem:'field-journal'}, DB.github||{});
+  const nameIn=h('input',{value:g.displayName, placeholder:'your name (names your file)'});
+  const tokenIn=h('input',{type:'password', value:g.token, placeholder:'fine-grained token — Contents: read & write'});
+  const ownerIn=h('input',{value:g.owner}), repoIn=h('input',{value:g.repo}), branchIn=h('input',{value:g.branch}), pathIn=h('input',{value:g.path});
+  const makerIn=h('input',{value:g.makerStem, placeholder:'field-journal'});
+  const status=h('div',{class:'hint', style:{marginTop:'10px'}});
+  function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal' }; }
+  function persist(){ DB.github=collect(); save(); }
+  const panel=h('div',{class:'gh'},
+    h('p',{class:'hint'},'Save your whole journal to your own file in the world, so it’s safe and you can open it on any device.'),
+    h('label',null,'Your name'), nameIn,
+    h('label',null,'Access token'), tokenIn,
+    h('div',{class:'twocol'}, h('div',null,h('label',null,'Owner'),ownerIn), h('div',null,h('label',null,'Repo'),repoIn)),
+    h('div',{class:'twocol'}, h('div',null,h('label',null,'Branch'),branchIn), h('div',null,h('label',null,'Folder'),pathIn)),
+    h('div',{class:'world-only'}, h('label',null,'Her journal file name (for the Inbox)'), makerIn),
+    h('div',{class:'warn'},'Your token is a key. Use a fine-grained token limited to just this one repo (Contents: read & write). It’s kept only on this device, never written into the repo, and you can revoke it on GitHub any time.'),
+    status,
+    h('div',{class:'toolrow', style:{marginTop:'14px'}},
+      h('button',{class:'navbtn', onclick:async()=>{ persist(); status.textContent='Checking…'; try{ const me=await ghTest(collect()); status.textContent='Connected ✓ ('+(me.full_name||'ok')+')'; }catch(e){ status.textContent='Could not connect: '+e.message; } }}, 'Test connection'),
+      h('button',{class:'navbtn primary', onclick:async()=>{ persist(); status.textContent='Saving…'; await syncToRepo(); status.textContent='Saved.'; }}, 'Save to my file now'),
+      h('button',{class:'navbtn', onclick:async()=>{ persist(); status.textContent='Loading…'; await loadFromRepo(); status.textContent='Loaded.'; }}, 'Load from my file'),
+    ),
+  );
+  showModalNode('My file in the world', null, panel);
+}
+
+/* ========================================================================== *
+   THE VAEL NAMING TREE — an illustrated plate (ported faithfully from the
+   Claude-Design artifact in kit/source/naming-tree/, vanilla, no DCLogic).
+   Trunk = Vaelrith; 12 element branches; lineage-suffix chips; crown buds.
+   Maker sees a read-only plate + tweaks; Worldbuilder can assign suffix<->element
+   (druun/thari locked canon; maren/aeryn & co. shown as DRAFT) and draft a Canon Card.
+ * ========================================================================== */
+const NT_LEVELS = [
+  { y:880, left:'Earth', right:'Wood' }, { y:770, left:'Water', right:'Air' },
+  { y:662, left:'Fire', right:'Ice' },   { y:556, left:'Light', right:'Shadow' },
+  { y:454, left:'Metal', right:'Lightning' }, { y:360, left:'Crystal', right:'Life' },
+];
+const NT_ED = {
+  Earth:{dark:'#574433',light:'#80664a',fol:'stone',orig:true}, Wood:{dark:'#566c3c',light:'#84995b',fol:'leaf',orig:true},
+  Water:{dark:'#4f7390',light:'#7ea2b9',fol:'drop',orig:true},  Air:{dark:'#7f8d95',light:'#b6c1c8',fol:'wisp',orig:true},
+  Fire:{dark:'#a85f3e',light:'#c6855c',fol:'ember'}, Ice:{dark:'#6f99a1',light:'#a6c6cc',fol:'drop'},
+  Light:{dark:'#bb9f49',light:'#dcc578',fol:'ember'}, Shadow:{dark:'#5e576b',light:'#837c8d',fol:'leaf'},
+  Metal:{dark:'#7c848d',light:'#a7adb4',fol:'wisp'}, Lightning:{dark:'#a98f32',light:'#d0b755',fol:'wisp'},
+  Crystal:{dark:'#8b83a0',light:'#b3abc6',fol:'drop'}, Life:{dark:'#6f9356',light:'#8aab6e',fol:'leaf'},
+};
+const NT_ORDER = ['Earth','Wood','Water','Air','Fire','Ice','Light','Shadow','Metal','Lightning','Crystal','Life'];
+const f1 = n => (+n).toFixed(1);
+function ntRnd(n){ const x=Math.sin(n*127.1+311.7)*43758.5453; return x-Math.floor(x); }
+function ntTrunkHalf(y){ const t=Math.max(0,Math.min(1,(y-360)/540)); return 28+24*t; }
+function ntEll(cx,cy,rx,ry,rot,fill,op){ let a='<ellipse cx="'+f1(cx)+'" cy="'+f1(cy)+'" rx="'+f1(rx)+'" ry="'+f1(ry)+'"'; if(rot) a+=' transform="rotate('+rot+' '+f1(cx)+' '+f1(cy)+')"'; a+=' fill="'+fill+'"'; if(op!=null) a+=' opacity="'+op+'"'; return a+'/>'; }
+function ntSampleCubic(P0,P1,P2,P3,t){ const u=1-t;
+  const x=u*u*u*P0[0]+3*u*u*t*P1[0]+3*u*t*t*P2[0]+t*t*t*P3[0];
+  const y=u*u*u*P0[1]+3*u*u*t*P1[1]+3*u*t*t*P2[1]+t*t*t*P3[1];
+  const dx=3*u*u*(P1[0]-P0[0])+6*u*t*(P2[0]-P1[0])+3*t*t*(P3[0]-P2[0]);
+  const dy=3*u*u*(P1[1]-P0[1])+6*u*t*(P2[1]-P1[1])+3*t*t*(P3[1]-P2[1]);
+  const len=Math.hypot(dx,dy)||1; return {x,y,nx:-dy/len,ny:dx/len}; }
+function ntBranch(P0,P1,P2,P3,color,w0,w1){ const N=22,L=[],R=[];
+  for(let k=0;k<=N;k++){ const t=k/N,s=ntSampleCubic(P0,P1,P2,P3,t),w=(w0*Math.pow(1-t,1.15)+w1)/2; L.push([s.x+s.nx*w,s.y+s.ny*w]); R.push([s.x-s.nx*w,s.y-s.ny*w]); }
+  let d='M '+f1(L[0][0])+' '+f1(L[0][1]); for(let k=1;k<=N;k++) d+=' L '+f1(L[k][0])+' '+f1(L[k][1]);
+  for(let k=N;k>=0;k--) d+=' L '+f1(R[k][0])+' '+f1(R[k][1]); d+=' Z'; return '<path d="'+d+'" fill="'+color+'"/>'; }
+function ntFoliage(type,x,y,dark,light,big){ const m=big?1:0.84;
+  const uL=type==='stone'?'#a8a196':light, uD=type==='stone'?'#8a847a':dark;
+  const out=[ntEll(x+2,y+4,38*m,30*m,0,uL,0.4),ntEll(x-19,y+13,27*m,22*m,0,uD,0.26),ntEll(x+21,y-7,25*m,20*m,0,uL,0.3)];
+  let arr=[];
+  if(type==='leaf') arr=[ntEll(x,y-4,16,9,20,dark),ntEll(x-21,y+6,15,9,-12,light),ntEll(x+19,y+9,14,8,42,dark),ntEll(x-8,y+19,13,8,8,light),ntEll(x+11,y-16,13,8,-30,dark),ntEll(x-2,y+3,12,7,15,light)];
+  else if(type==='drop') arr=[ntEll(x,y-2,12,16,0,dark),ntEll(x-19,y+9,10,13,0,light),ntEll(x+18,y+11,9,12,0,dark),ntEll(x-5,y-16,9,12,0,light),ntEll(x+11,y-6,8,10,0,dark),ntEll(x+3,y+5,8,11,0,light)];
+  else if(type==='wisp') arr=[ntEll(x,y-3,18,9,15,light),ntEll(x-23,y+4,16,8,-8,dark),ntEll(x+21,y+7,15,8,30,light),ntEll(x-9,y+13,13,7,10,dark),ntEll(x+9,y-14,12,7,-20,light),ntEll(x+2,y+3,12,6,5,dark)];
+  else if(type==='ember') arr=[ntEll(x,y-1,12,13,0,dark),ntEll(x-19,y+6,10,11,0,light),ntEll(x+18,y+9,9,10,0,dark),ntEll(x-5,y-13,9,10,0,light),ntEll(x+12,y-4,8,9,0,light),ntEll(x+3,y+4,9,10,0,dark)];
+  else if(type==='stone') arr=[ntEll(x,y+2,19,14,0,'#9c958b'),ntEll(x-22,y-2,14,11,0,'#878176'),ntEll(x+20,y+6,13,10,0,'#8d877c'),ntEll(x-2,y-13,12,9,0,'#7f8567'),ntEll(x+13,y-9,9,7,0,'#909679'),ntEll(x-12,y+13,10,8,0,'#878176')];
+  return out.concat(arr); }
+function ntTuft(x,y,dark,light){ return [ntEll(x,y,17,14,0,light,0.5),ntEll(x-9,y+5,9,7,0,dark),ntEll(x+9,y+4,9,7,0,light),ntEll(x,y-7,8,7,0,dark)]; }
+function ntTier(naming, element){ const s=(naming.established||{})[element]; if(!s) return {suffix:null,tier:'awaiting'}; return {suffix:s, tier:(naming.locked||[]).includes(s)?'locked':'draft'}; }
+
+function buildNamingStage(){
+  const naming=DB.naming||namingDefault(); const tw=naming.tweaks||{};
+  const atm=tw.atmosphere||'Cloud-sea';
+  let plateBg,cloudFill;
+  if(atm==='Golden vellum'){ plateBg='linear-gradient(180deg,#f7f0de 0%,#f2e8d0 50%,#ece0c2 100%)'; cloudFill='#fff7e6'; }
+  else if(atm==='Dusk'){ plateBg='linear-gradient(180deg,#dde4ea 0%,#d2dbe2 48%,#c6cfd7 100%)'; cloudFill='#eef4f8'; }
+  else { plateBg='linear-gradient(180deg,#eef4f7 0%,#e9eff2 42%,#e7ece9 68%,#e3e8e2 100%)'; cloudFill='#ffffff'; }
+  const ap=tw.awaitingPresence||'Stirring';
+  let twigOpacity,budOpacity,awText,awChip,awBorder;
+  if(ap==='Whisper'){ twigOpacity=0.4; budOpacity=0.5; awText='#aab4bb'; awChip='#a1afb6'; awBorder='#c4cdd2'; }
+  else if(ap==='Marked'){ twigOpacity=0.85; budOpacity=1; awText='#6f8490'; awChip='#5f7682'; awBorder='#89a0aa'; }
+  else { twigOpacity=0.62; budOpacity=0.9; awText='#8a98a1'; awChip='#7d8b94'; awBorder='#a6b3ba'; }
+  const illum=(tw.ornament||'Illuminated plate')==='Illuminated plate';
+  const ff="'EB Garamond',Georgia,serif", cg="'Cormorant Garamond',Georgia,serif", cx=750;
+  const svg=[], ov=[];
+
+  // clouds + ground + roots + trunk + bark + crown
+  [[750,168,260,30,0.40],[300,250,180,32,0.48],[1180,300,190,34,0.44],[980,520,160,26,0.34],[380,560,150,24,0.30]]
+    .forEach(c=> svg.push(ntEll(c[0],c[1],c[2],c[3],0,cloudFill,c[4])));
+  svg.push('<ellipse cx="750" cy="1320" rx="920" ry="172" fill="url(#ntGround)" opacity="0.95"/>');
+  svg.push('<path d="M 690 1070 C 642 1130 582 1182 538 1250 C 604 1208 664 1168 706 1110 Z" fill="url(#ntTrunk)"/>');
+  svg.push('<path d="M 810 1070 C 858 1130 918 1182 962 1250 C 896 1208 836 1168 794 1110 Z" fill="url(#ntTrunk)"/>');
+  svg.push('<g fill="none" stroke="url(#ntTrunk)" stroke-linecap="round"><path d="M 540 1248 C 500 1274 468 1290 432 1306" stroke-width="11"/><path d="M 960 1248 C 1000 1274 1032 1290 1068 1306" stroke-width="11"/><path d="M 712 1222 C 708 1258 704 1288 698 1322" stroke-width="10"/><path d="M 788 1222 C 792 1258 796 1288 802 1322" stroke-width="10"/></g>');
+  svg.push('<path d="M 645 1200 C 656 1130 678 1075 686 1050 C 695 990 700 945 698 900 C 703 800 705 720 708 660 C 712 600 716 510 719 454 C 721 410 726 380 722 360 C 726 335 728 316 734 303 Q 750 293 766 303 C 772 316 774 335 778 360 C 774 380 779 410 781 454 C 784 510 788 600 792 660 C 795 720 797 800 802 900 C 800 945 805 990 814 1050 C 822 1075 844 1130 855 1200 C 790 1232 710 1232 645 1200 Z" fill="url(#ntTrunk)"/>');
+  svg.push('<g fill="none" stroke="#3f2f20" stroke-linecap="round"><path d="M 748 1120 C 750 860 752 560 750 360" stroke-width="3" opacity="0.18"/><path d="M 716 1090 C 720 840 730 560 738 384" stroke-width="2.5" opacity="0.14"/><path d="M 784 1090 C 780 840 770 560 762 384" stroke-width="2.5" opacity="0.14"/><path d="M 700 1150 C 690 1095 690 1050 700 1008" stroke-width="2" opacity="0.12"/><path d="M 800 1150 C 810 1095 810 1050 800 1008" stroke-width="2" opacity="0.12"/></g>');
+  svg.push('<g fill="none" stroke="url(#ntTrunk)" stroke-linecap="round"><path d="M 748 328 C 730 306 706 280 686 260" stroke-width="8"/><path d="M 750 324 C 750 296 750 268 750 248" stroke-width="8"/><path d="M 752 328 C 770 306 794 280 814 260" stroke-width="8"/></g>');
+  svg.push(ntEll(750,336,210,106,0,'#8fa069',0.16));
+  const crownPts=[]; for(let q=0;q<22;q++){ const a=ntRnd(q*3+1)*Math.PI*2, rr=Math.sqrt(ntRnd(q*3+2)); crownPts.push([750+Math.cos(a)*(190*rr),336+Math.sin(a)*(92*rr),q]); }
+  crownPts.sort((p,q)=>p[1]-q[1]); crownPts.forEach(p=>{ const dk=p[2]%3===0?'#5d7644':'#6f8350', lt=p[2]%3===0?'#8aa063':'#94a46e'; ntTuft(p[0],p[1],dk,lt).forEach(e=>svg.push(e)); });
+
+  // branches + element boxes + suffix chips
+  function box(left,top,side,extra){ return Object.assign({position:'absolute',left:left+'px',top:top+'px',transform:side<0?'translate(-100%,-50%)':'translate(0,-50%)'}, extra||{}); }
+  NT_LEVELS.forEach((lv,i)=>{ [[-1,lv.left],[1,lv.right]].forEach(tr=>{ const side=tr[0], name=tr[1], info=NT_ED[name];
+    const ay=lv.y, ax=cx+side*ntTrunkHalf(ay), seed=i*2+(side<0?0:1), jx=ntRnd(seed+13)*2-1;
+    const lenJit=ntRnd(seed+30)*82, riseJit=ntRnd(seed+41)*38;
+    let tx=cx+side*(320+i*30+lenJit)+jx*8; tx=Math.max(170,Math.min(1330,tx));
+    let ty=lv.y-(100+i*24+riseJit)+(side>0?-16:12);
+    if(side<0&&i===5) ty=226; if(side<0&&i===4) ty=300;
+    const w0=info.orig?33:25, axb=cx+side*(ntTrunkHalf(ay)-16);
+    const P0=[axb,ay],P1=[axb+side*58,ay-84],P2=[tx-side*50,ty+38],P3=[tx,ty];
+    svg.push(ntBranch(P0,P1,P2,P3,info.dark,w0,3));
+    const forkSpec=[[0.46,60,70,13],[0.68,42,96,10]]; if(!info.orig) forkSpec.pop();
+    forkSpec.forEach(fk=>{ const fp=ntSampleCubic(P0,P1,P2,P3,fk[0]), stx=fp.x+side*fk[1], sty=fp.y-fk[2];
+      svg.push(ntBranch([fp.x,fp.y],[fp.x+side*20,fp.y-46],[stx-side*14,sty+16],[stx,sty],info.dark,fk[3],2.5));
+      ntFoliage(info.fol,stx,sty,info.dark,info.light,false).forEach(e=>svg.push(e)); });
+    ntFoliage(info.fol,tx,ty,info.dark,info.light,info.orig).forEach(e=>svg.push(e));
+    // element box
+    ov.push(h('div',{style:box(side<0?tx-36:tx+36,ty,side,{textAlign:'center',background:info.orig?'#efe6d2':'rgba(247,243,233,0.95)',border:'1px solid '+info.dark,borderRadius:'6px',padding:'7px 15px',boxShadow:'0 2px 7px rgba(60,44,26,0.16)',whiteSpace:'nowrap',fontFamily:ff})},
+      h('div',{style:{fontFamily:cg,fontWeight:'600',fontSize:'21px',letterSpacing:'0.15em',color:info.dark}}, name.toUpperCase()),
+      h('div',{style:{display:'flex',alignItems:'center',gap:'6px',justifyContent:'center',marginTop:'2px'}}, h('span',{style:{display:'inline-block',width:'7px',height:'7px',borderRadius:'50%',background:'#3a2f22'}}), h('span',{style:{fontFamily:ff,fontSize:'12px',letterSpacing:'0.05em',color:'#7a6a4f'}},'established'))));
+    // suffix twig + chip
+    const sp=ntSampleCubic(P0,P1,P2,P3,0.6), sx=sp.x, sy=sp.y, ex=sx+side*34, ey=sy-56;
+    const {suffix,tier}=ntTier(naming,name);
+    if(suffix){ svg.push('<path d="M '+f1(sx)+' '+f1(sy)+' Q '+f1(sx+side*26)+' '+f1(sy-32)+' '+f1(ex)+' '+f1(ey)+'" fill="none" stroke="'+info.dark+'" stroke-width="10" stroke-linecap="round"/>');
+      const draft=tier==='draft';
+      ov.push(h('div',{style:box(ex,ey,side,{background:'#efe6d2',border:'1.5px solid '+(draft?'#b0863f':info.dark),borderRadius:'15px',padding:'4px 13px',fontFamily:ff,fontStyle:'italic',fontSize:'19px',color:'#3a2f22',whiteSpace:'nowrap',boxShadow:'0 2px 6px rgba(60,44,26,0.16)'})},
+        suffix, draft? h('span',{style:{fontStyle:'normal',fontSize:'10px',letterSpacing:'0.12em',textTransform:'uppercase',color:'#b0863f',marginLeft:'6px'}},'draft') : null)); }
+    else { svg.push('<path d="M '+f1(sx)+' '+f1(sy)+' Q '+f1(sx+side*26)+' '+f1(sy-32)+' '+f1(ex)+' '+f1(ey)+'" fill="none" stroke="#aeb6bb" stroke-width="8" stroke-linecap="round" stroke-dasharray="2 7" opacity="'+twigOpacity+'"/>');
+      ov.push(h('div',{style:box(ex,ey,side,{background:'rgba(255,255,255,0.62)',border:'1.5px dashed '+awBorder,borderRadius:'15px',padding:'3px 11px',fontFamily:ff,fontStyle:'italic',fontSize:'15px',color:awChip,whiteSpace:'nowrap'})},'awaiting suffix')); }
+  }); });
+
+  // graft arch + medallion (Vaeldruunthari)
+  svg.push('<path d="M 590 850 C 668 800 706 790 750 790 C 794 790 832 800 910 850" fill="none" stroke="url(#ntGraft)" stroke-width="20" stroke-linecap="round"/>');
+  svg.push('<g stroke="#efe6d2" stroke-width="2" opacity="0.55" stroke-linecap="round"><path d="M 726 786 l 6 8 M 750 784 l 0 10 M 774 786 l -6 8"/></g>');
+  svg.push('<circle cx="750" cy="790" r="11" fill="#efe6d2" stroke="#b0863f" stroke-width="2.4"/><circle cx="750" cy="790" r="4" fill="#6c6442"/>');
+  if(illum) svg.push('<path d="M 750 752 l 4 5 -4 5 -4 -5 z" fill="#bf964a" opacity="0.9"/>');
+
+  // crown buds (open roots awaiting an element)
+  const open=(naming.openRoots||[]); const n=open.length;
+  open.forEach((nm,idx)=>{ const bx = n===1?750 : 682+(818-682)*(idx/Math.max(1,n-1)); const by=idx%2? 240:236, rot=(idx-(n-1)/2)*12;
+    svg.push('<ellipse cx="'+f1(bx)+'" cy="'+f1(by)+'" rx="13" ry="21" transform="rotate('+rot+' '+f1(bx)+' '+f1(by)+')" fill="url(#ntBud)" stroke="#9fb0b8" stroke-width="1.5" opacity="'+budOpacity+'"/>');
+    svg.push('<path d="M '+f1(bx)+' '+f1(by+16)+' q 8 8 4 18 M '+f1(bx)+' '+f1(by+16)+' q -8 8 -4 18" fill="none" stroke="#a7b6bd" stroke-width="1.4" stroke-linecap="round" opacity="'+budOpacity+'"/>');
+    ov.push(h('div',{style:{position:'absolute',left:bx+'px',top:(by-34)+'px',transform:'translate(-50%,-100%)',background:'rgba(255,255,255,0.62)',border:'1.5px dashed '+awBorder,borderRadius:'15px',padding:'3px 11px',fontFamily:ff,fontStyle:'italic',fontSize:'15px',color:awChip,whiteSpace:'nowrap'}}, nm)); });
+  ov.push(h('div',{style:{position:'absolute',left:'750px',top:'288px',transform:'translateX(-50%)',fontFamily:ff,fontStyle:'italic',fontSize:'14px',color:awText,whiteSpace:'nowrap'}},'suffixes awaiting an element'));
+
+  // assemble
+  const defs='<defs><linearGradient id="ntTrunk" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7c6349"/><stop offset="1" stop-color="#4f3c2a"/></linearGradient><linearGradient id="ntGraft" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#6a5036"/><stop offset="0.5" stop-color="#6c6442"/><stop offset="1" stop-color="#566c3c"/></linearGradient><linearGradient id="ntGround" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cabd9f"/><stop offset="1" stop-color="#a3946f"/></linearGradient><radialGradient id="ntBud" cx="0.4" cy="0.34" r="0.85"><stop offset="0" stop-color="#f1f5f6"/><stop offset="1" stop-color="#bfccd3"/></radialGradient></defs>';
+  const stage=h('div',{class:'plate-stage', style:{background:plateBg}});
+  const svgWrap=h('div',{style:{position:'absolute',inset:'0'}});
+  svgWrap.innerHTML='<svg width="1500" height="1480" viewBox="0 0 1500 1480" style="position:absolute;inset:0;display:block">'+defs+svg.join('')+'</svg>';
+  stage.append(svgWrap);
+  stage.append(ntStaticPanels(illum));
+  ov.forEach(o=> stage.append(o));
+  return stage;
+}
+function ntStaticPanels(illum){
+  const wrap=h('div',{style:{position:'absolute',inset:'0',pointerEvents:'none'}});
+  const fd=illum?'block':'none';
+  wrap.innerHTML = `
+    <div style="display:${fd};position:absolute;inset:18px;border:1.5px solid rgba(176,134,63,0.5);"></div>
+    <div style="display:${fd};position:absolute;inset:25px;border:1px solid rgba(176,134,63,0.32);"></div>
+    <div style="position:absolute;left:50px;top:48px;">
+      <div style="font-family:'EB Garamond';font-size:13px;letter-spacing:0.28em;text-transform:uppercase;color:#b0863f;">A Field Primer &middot; Plate I</div>
+      <div style="font-family:'Cormorant Garamond';font-weight:600;font-size:44px;line-height:1.04;color:#2f2820;margin-top:4px;">The Vael Naming Tree</div>
+      <div style="width:320px;height:1px;background:linear-gradient(90deg,#b0863f,rgba(176,134,63,0));margin-top:10px;"></div>
+      <div style="font-family:'EB Garamond';font-style:italic;font-size:16px;color:#6f675c;margin-top:8px;max-width:340px;">Trunk &rarr; people &middot; branches &rarr; elements &middot; twigs &rarr; lineage-suffixes</div>
+    </div>
+    <div style="position:absolute;left:50px;bottom:172px;background:rgba(252,250,244,0.85);border:1px solid rgba(176,134,63,0.4);border-radius:8px;padding:14px 18px;font-family:'EB Garamond';color:#4a4036;display:flex;flex-direction:column;gap:9px;width:280px;">
+      <div style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#b0863f;">Key</div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:15px;"><span style="display:inline-block;width:34px;border-top:2px solid #6e5232;"></span><span>established suffix &middot; canon</span></div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:15px;"><span style="display:inline-block;width:34px;border-top:2px solid #b0863f;"></span><span>proposed suffix &middot; <i>draft</i></span></div>
+      <div style="display:flex;align-items:center;gap:10px;font-size:15px;color:#7d8b94;"><span style="display:inline-block;width:34px;border-top:2px dashed #9fb0b8;"></span><span>suffix awaiting</span></div>
+      <div style="border-top:1px solid rgba(176,134,63,0.25);padding-top:8px;font-style:italic;font-size:14px;color:#6f675c;">Each branch has room to grow more suffix-twigs.</div>
+    </div>
+    <div style="position:absolute;right:50px;bottom:172px;width:352px;background:rgba(252,250,244,0.88);border:1px solid rgba(176,134,63,0.4);border-radius:8px;padding:15px 18px;font-family:'EB Garamond';color:#4a4036;display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#b0863f;">The Register &middot; reading a name</div>
+      <div style="font-style:italic;font-size:14px;line-height:1.35;color:#6f675c;">Vael leads &mdash; the short name of Vaelrith. The dominant suffix comes first; the rest follow.</div>
+      <div style="height:1px;background:rgba(176,134,63,0.22);"></div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;"><span style="font-size:14px;">Common &middot; person to person</span><span style="font-size:12px;font-style:italic;color:#8a7d68;">&le; 2 suffixes</span></div>
+      <div style="display:flex;gap:4px;">
+        <span style="font-family:'Cormorant Garamond';font-weight:600;font-size:22px;color:#efe6d2;background:#2f2820;padding:4px 12px;border-radius:14px;">Vael</span>
+        <span style="font-family:'Cormorant Garamond';font-weight:600;font-size:22px;color:#3a2f22;background:#efe6d2;border:1.5px solid #6e5232;padding:4px 12px;border-radius:14px;">druun</span>
+        <span style="font-family:'Cormorant Garamond';font-weight:600;font-size:22px;color:#3a2f22;background:#efe6d2;border:1.5px solid #4f6b35;padding:4px 12px;border-radius:14px;">thari</span>
+      </div>
+      <div style="display:flex;align-items:baseline;justify-content:space-between;margin-top:2px;"><span style="font-size:14px;">Official &middot; formal events</span><span style="font-size:12px;font-style:italic;color:#8a7d68;">full stack &middot; 3&ndash;4</span></div>
+      <div style="font-style:italic;font-size:13px;color:#6f675c;">Stacked suffixes mark fused branches &mdash; e.g. the grafted Vaeldruunthari.</div>
+    </div>
+    <div style="position:absolute;left:750px;top:1064px;transform:translateX(-50%);text-align:center;background:#efe6d2;border:1px solid #b0863f;border-radius:7px;padding:11px 24px;box-shadow:0 3px 10px rgba(60,44,26,0.28);">
+      <div style="font-family:'Cormorant Garamond';font-weight:600;font-size:30px;letter-spacing:0.14em;color:#2f2820;">VAELRITH</div>
+      <div style="font-family:'EB Garamond';font-style:italic;font-size:15px;color:#7a6a4f;margin-top:1px;">the Vael &middot; the people</div>
+    </div>
+    <div style="position:absolute;left:750px;top:700px;transform:translateX(-50%);text-align:center;width:320px;">
+      <div style="font-family:'EB Garamond';font-size:11px;letter-spacing:0.22em;text-transform:uppercase;color:#b0863f;">Grafted branch &middot; established</div>
+      <div style="font-family:'Cormorant Garamond';font-weight:600;font-size:27px;margin-top:2px;"><span style="color:#2f2820;">Vael</span><span style="color:#6e5232;">druun</span><span style="color:#4f6b35;">thari</span></div>
+      <div style="font-family:'EB Garamond';font-style:italic;font-size:15px;color:#6f675c;margin-top:1px;">earth + wood &middot; suffixes may stack</div>
+    </div>
+    <div style="position:absolute;left:25px;right:25px;bottom:25px;height:118px;background:rgba(244,238,224,0.92);border-top:1.5px solid rgba(176,134,63,0.55);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;">
+      <div style="display:flex;align-items:center;gap:18px;">
+        <div style="display:${fd};width:90px;height:1px;background:linear-gradient(90deg,rgba(176,134,63,0),#b0863f);"></div>
+        <div style="font-family:'Cormorant Garamond';font-weight:600;font-style:italic;font-size:31px;color:#2f2820;text-align:center;">Every suffix is memory. Every difference is still kinship.</div>
+        <div style="display:${fd};width:90px;height:1px;background:linear-gradient(90deg,#b0863f,rgba(176,134,63,0));"></div>
+      </div>
+      <div style="font-family:'EB Garamond';font-style:italic;font-size:17px;color:#6f675c;text-align:center;">The body shows where you grew; the name remembers what you carry.</div>
+    </div>`;
+  return wrap;
+}
+function mountScaledPlate(host, stage){
+  const wrap=h('div',{class:'plate-wrap'}); const inner=h('div',{class:'plate-inner'}, stage); wrap.append(inner); host.append(wrap);
+  function fit(){ const w=wrap.clientWidth||Math.min(1500,(window.innerWidth||1500)-40); const s=Math.min(1, w/1500); inner.style.transform='scale('+s+')'; wrap.style.height=(1480*s)+'px'; }
+  if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(wrap); }catch(e){} } else window.addEventListener('resize', fit);
+  setTimeout(fit,0);
+}
+function namingTweaks(){
+  const tw=(DB.naming&&DB.naming.tweaks)||{};
+  function sel(key, opts){ return h('select',{onchange:e=>{ DB.naming.tweaks[key]=e.target.value; save(); go('naming'); }}, ...opts.map(o=>{ const op=h('option',{value:o}, o); if((tw[key]||opts[0])===o) op.selected=true; return op; })); }
+  return h('div',{class:'filter-row', style:{justifyContent:'center'}},
+    h('span',{class:'fhint'},'atmosphere'), sel('atmosphere',['Cloud-sea','Golden vellum','Dusk']),
+    h('span',{class:'fhint'},'awaiting'), sel('awaitingPresence',['Whisper','Stirring','Marked']),
+    h('span',{class:'fhint'},'ornament'), sel('ornament',['Illuminated plate','Clean diagram']));
+}
+function namingEditor(){
+  const naming=DB.naming||namingDefault();
+  const box=h('div',{class:'world-only', style:{maxWidth:'820px',margin:'18px auto 0'}});
+  box.append(h('div',{class:'kicker', style:{marginBottom:'10px'}},'Assign the branches — worldbuilder'),
+    h('p',{class:'hint'},'-druun and -thari are locked canon. -maren and -aeryn are your draft. Assign an open root to an element, then draft a Canon Card to propose it.'));
+  const grid=h('div',{style:{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(250px,1fr))',gap:'10px'}});
+  NT_ORDER.forEach(el=>{ const {suffix,tier}=ntTier(naming,el);
+    const row=h('div',{style:{background:'#fffdf7',border:'1px solid var(--gold-soft)',borderRadius:'8px',padding:'9px 12px'}});
+    row.append(h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'baseline'}},
+      h('b',null, el), h('span',{class:'hint'}, suffix? (suffix+(tier==='locked'?' · canon':' · draft')) : 'awaiting')));
+    const acts=h('div',{class:'toolrow', style:{marginTop:'6px'}});
+    if(tier==='awaiting'){
+      const opts=(naming.openRoots||[]);
+      const s=h('select',{}, h('option',{value:''},'assign a root…'), ...opts.map(r=>h('option',{value:r}, r)));
+      acts.append(s, h('button',{class:'toolbtn', onclick:()=>{ const v=s.value||prompt('Root suffix (e.g. -karin)'); if(!v) return; const r=v.trim().startsWith('-')?v.trim():'-'+v.trim();
+        DB.naming.established[el]=r; DB.naming.openRoots=(DB.naming.openRoots||[]).filter(x=>x!==r); save(); go('naming'); }}, 'Assign'));
+    } else {
+      acts.append(h('button',{class:'navbtn', onclick:()=>draftNamingCard(el, suffix)}, 'Draft a Canon Card →'));
+      if(tier!=='locked') acts.append(h('button',{class:'toolbtn', onclick:()=>{ delete DB.naming.established[el]; if(!(DB.naming.openRoots||[]).includes(suffix)) (DB.naming.openRoots=DB.naming.openRoots||[]).push(suffix); save(); go('naming'); }}, 'Clear'));
+    }
+    row.append(acts); grid.append(row);
+  });
+  box.append(grid);
+  box.append(h('div',{class:'toolrow', style:{marginTop:'10px'}},
+    h('button',{class:'toolbtn', onclick:()=>{ const v=prompt('New open root (a bud), e.g. -velor'); if(!v) return; const r=v.trim().startsWith('-')?v.trim():'-'+v.trim(); if(!(DB.naming.openRoots||[]).includes(r)){ (DB.naming.openRoots=DB.naming.openRoots||[]).push(r); save(); go('naming'); } }}, '+ add an open root'),
+    h('button',{class:'toolbtn', onclick:()=>{ if(confirm('Reset the tree to the original draft?')){ DB.naming=namingDefault(); save(); go('naming'); } }}, 'Reset to draft')));
+  return box;
+}
+function draftNamingCard(element, suffix){
+  const prefill={ tag:'VAE', title:`The suffix ${suffix} marks the ${element} branch`, category:'domains/41_VAEL.md',
+    source:'The Vael Naming Tree (Del draft)',
+    claim:`The lineage-suffix ${suffix} marks the ${element} branch of the Vael naming tree.`,
+    means:`${suffix} aligns with the ${element} element and its expression-cluster.\nIt may stack with other suffixes to mark fused branches (as -druun + -thari → Vaeldruunthari).`,
+    donot:`The five roots (-maren, -aeryn, -karin, -lunai, -sorin) were deliberately OPEN. This proposes one of them; do not treat the others as assigned.\nThe body shows where you grew; the name remembers what you carry.`,
+    notes:'Proposed via the Naming Tree plate.' };
+  go('studio',{tab:'drafter', params:{prefill}});
+}
+function viewNamingTree(){
+  const f=framed('The Vael Naming Tree','trunk → people · branches → elements · twigs → lineage-suffixes','Every suffix is memory. Every difference is still kinship.');
+  const body=f.querySelector('.framed-body');
+  body.append(namingTweaks());
+  const host=h('div',null); body.append(host);
+  mountScaledPlate(host, buildNamingStage());
+  body.append(namingEditor());
+  body.append(h('div',{class:'toolrow', style:{justifyContent:'center', marginTop:'18px'}},
+    h('button',{class:'navbtn', onclick:()=>go('worksheet',{id:'namekeeper'})}, 'The Name-Keeper ledger'),
+    h('button',{class:'navbtn', onclick:()=>go('home')}, 'Back')));
+  return f;
+}
+
+/* ========================================================================== *
+   CANON STUDIO (Worldbuilder profile) — browse canon, an inbox of her work,
+   a Canon Card drafter (+ auto ID), and a promotion board. All repo-backed
+   through the existing GitHub token. Writes only to the workshop files
+   (02_PROMOTION_QUEUE.md, 01_CANON_INDEX.md) as Draft — never to domains/.
+ * ========================================================================== */
+const DOMAIN_FILES = [
+  {topic:'Cosmology — Cloudsea, fragments, portals', file:'domains/10_COSMOLOGY.md'},
+  {topic:'Gods & Divinity — the three tiers, Ancients', file:'domains/20_GODS_AND_DIVINITY.md'},
+  {topic:'The Unmaking Choir — the great enemy', file:'domains/21_UNMAKING_CHOIR.md'},
+  {topic:'The God Games — the pact, the arena worlds', file:'domains/22_GOD_GAMES.md'},
+  {topic:'Godlings & System — ladder, cores, strain', file:'domains/30_GODLINGS_AND_SYSTEM.md'},
+  {topic:'Peoples & Races (general)', file:'domains/40_PEOPLES_AND_RACES.md'},
+  {topic:'The Vael — naming, factions, embodiments', file:'domains/41_VAEL.md'},
+  {topic:'Arkborne & Seeds', file:'domains/50_ARKBORNE_AND_SEEDS.md'},
+  {topic:'Magic, Elements & Domains', file:'domains/60_MAGIC_ELEMENTS_AND_DOMAINS.md'},
+];
+const CANON_TAGS = ['COS','GOD','GLG','SYS','VAE','PEO','ARK','SED','MAG','PLC','HIS'];
+const QUEUE_PATH = '02_PROMOTION_QUEUE.md', INDEX_PATH = '01_CANON_INDEX.md';
+
+function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function inlineMd(s){ return escapeHtml(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'); }
+function mdToHtml(md){
+  const lines=String(md).split('\n'); let html='', i=0, inList=false;
+  const closeList=()=>{ if(inList){ html+='</ul>'; inList=false; } };
+  while(i<lines.length){ const ln=lines[i];
+    if(/^```/.test(ln)){ closeList(); i++; let buf=''; while(i<lines.length && !/^```/.test(lines[i])){ buf+=lines[i]+'\n'; i++; } i++; html+='<pre>'+escapeHtml(buf)+'</pre>'; continue; }
+    if(/^###\s/.test(ln)){ closeList(); html+='<h4>'+inlineMd(ln.replace(/^###\s/,''))+'</h4>'; i++; continue; }
+    if(/^##\s/.test(ln)){ closeList(); html+='<h3>'+inlineMd(ln.replace(/^##\s/,''))+'</h3>'; i++; continue; }
+    if(/^#\s/.test(ln)){ closeList(); html+='<h2>'+inlineMd(ln.replace(/^#\s/,''))+'</h2>'; i++; continue; }
+    if(/^[-*]\s/.test(ln)){ if(!inList){ html+='<ul>'; inList=true; } html+='<li>'+inlineMd(ln.replace(/^[-*]\s/,''))+'</li>'; i++; continue; }
+    if(/^>\s?/.test(ln)){ closeList(); html+='<p class="hint">'+inlineMd(ln.replace(/^>\s?/,''))+'</p>'; i++; continue; }
+    if(ln.trim()===''){ closeList(); i++; continue; }
+    closeList(); html+='<p>'+inlineMd(ln)+'</p>'; i++;
+  }
+  closeList(); return html;
+}
+function pad3(n){ return String(n).padStart(3,'0'); }
+function parseHighest(indexText, tag){ const m=new RegExp('\\*\\*Highest assigned:\\*\\*\\s*'+tag+'-(\\d+)','i').exec(indexText); return m? parseInt(m[1],10) : 0; }
+function insertUnderSection(text, header, block){
+  const lines=text.split('\n'); const hi=lines.findIndex(l=>l.trim()===header);
+  if(hi<0) return text.replace(/\s*$/,'')+'\n\n'+header+'\n\n'+block.trim()+'\n';
+  let ni=lines.length; for(let i=hi+1;i<lines.length;i++){ if(/^#\s/.test(lines[i])){ ni=i; break; } }
+  lines.splice(ni, 0, '', block.trim(), '', '---', ''); return lines.join('\n');
+}
+function bumpIndex(text, tag, id, title){
+  const lines=text.split('\n'); const si=lines.findIndex(l=>new RegExp('^##\\s+'+tag+'\\b').test(l));
+  if(si<0) return text;
+  let end=lines.length; for(let i=si+1;i<lines.length;i++){ if(/^##\s/.test(lines[i])){ end=i; break; } }
+  for(let i=si+1;i<end;i++){ if(/\*\*Highest assigned:\*\*/.test(lines[i])){ lines[i]=lines[i].replace(new RegExp(tag+'-\\d+'), id); break; } }
+  const bullet='- '+id+' — '+(title||'(untitled)')+' — *drafted in Studio* (Draft; not yet promoted)';
+  let np=-1; for(let i=si+1;i<end;i++){ if(/\(none promoted\)/.test(lines[i])){ np=i; break; } }
+  if(np>=0) lines[np]=bullet; else lines.splice(end,0,bullet,'');
+  return lines.join('\n');
+}
+function canonCardMarkdown(d){
+  const bullets=(s,fb)=>{ const a=String(s||'').split('\n').map(x=>x.trim().replace(/^[-*]\s*/,'')).filter(Boolean); return a.length? a.map(x=>'- '+x) : ['- '+fb]; };
+  return [
+    `## ${d.id} — ${(d.title||'Untitled').trim()}`, '',
+    `**Status:** ${d.status||'Draft'}`,
+    `**Source:** ${d.source||'Field Journal Studio'}`,
+    `**Category:** ${d.category||''}`, '',
+    '### Canon Claim', '', (d.claim||'').trim()||'[one declarative sentence of canon]', '',
+    '### What This Means', '', ...bullets(d.means,'[consequence or implication]'), '',
+    '### Do Not Contradict', '', ...bullets(d.donot,'[boundary that must hold]'), '',
+    '### Promotion Requirements', '',
+    '- [ ] Does not contradict any promoted domain file',
+    '- [ ] Has clear limits',
+    '- [ ] Has immediate story, setting, or game usefulness',
+    '- [ ] Does not make existing canon pointless',
+    '- [ ] Can be explained simply to a fresh reader', '',
+    '### Notes', '', `- ${new Date().toISOString().slice(0,10)} — drafted in the Field Journal Studio.${d.notes? ' '+d.notes:''}`,
+  ].join('\n');
+}
+function tagFromCategory(cat){ cat=String(cat||''); if(/41_VAEL/.test(cat))return 'VAE'; if(/40_PEOPLES/.test(cat))return 'PEO'; if(/50_ARKBORNE/.test(cat))return 'SED'; if(/10_COSMOLOGY/.test(cat))return 'PLC'; if(/30_GODLING/.test(cat))return 'GLG'; if(/60_MAGIC/.test(cat))return 'MAG'; return 'PEO'; }
+
+function viewStudio(tab, params){
+  tab = tab || 'browse';
+  const f = framed('Canon Studio', 'browse, draft, and triage your canon', 'nothing becomes canon until it is carded, checked, and promoted');
+  const body = f.querySelector('.framed-body');
+  if(!ghReady()){
+    body.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Connect your GitHub file first — the Studio reads your canon and writes Draft cards through it.'),
+      h('div',{class:'toolrow', style:{justifyContent:'center'}}, h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub')));
+    return f;
+  }
+  const tabs=h('div',{class:'studio-tabs'});
+  [['browse','Canon Browser'],['inbox','Inbox'],['drafter','Card Drafter'],['board','Promotion Board']].forEach(([k,label])=>
+    tabs.append(h('button',{class:'tab'+(tab===k?' on':''), onclick:()=>go('studio',{tab:k})}, label)));
+  body.append(tabs);
+  const host=h('div',null); body.append(host);
+  if(tab==='browse') studioBrowse(host);
+  else if(tab==='inbox') studioInbox(host);
+  else if(tab==='drafter') studioDrafter(host, params&&params.prefill);
+  else if(tab==='board') studioBoard(host);
+  return f;
+}
+function studioBrowse(host){
+  const cfg=ghCfg();
+  const search=h('input',{placeholder:'search all canon…', onkeydown:e=>{ if(e.key==='Enter') runSearch(); }});
+  host.append(h('div',{class:'search-row'}, search, h('button',{class:'navbtn', onclick:()=>runSearch()}, 'Search')));
+  const results=h('div',null); host.append(results);
+  const list=h('div',{class:'canon-list'});
+  DOMAIN_FILES.forEach(d=> list.append(h('button',{class:'pick', onclick:()=>openDomain(d)},
+    h('div',{class:'ribbon', style:{background:ACCENTS.gold}}), h('b',null, d.file.replace('domains/','')), h('small',null, d.topic))));
+  host.append(list);
+  const docHost=h('div',{style:{marginTop:'16px'}}); host.append(docHost);
+  async function openDomain(d){ docHost.replaceChildren(h('p',{class:'hint'}, 'Loading '+d.file+'…'));
+    try{ const r=await ghGetText(cfg, d.file); if(!r){ docHost.replaceChildren(h('p',{class:'hint'},'Not found.')); return; }
+      const doc=h('div',{class:'canon-doc'}); doc.innerHTML=mdToHtml(r.text);
+      docHost.replaceChildren(h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:()=>{ const raw=h('div',{class:'canon-doc'}, h('pre',null,r.text)); docHost.replaceChildren(raw); }}, 'View raw')), doc);
+    }catch(e){ docHost.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
+  async function runSearch(){ const q=search.value.trim().toLowerCase(); if(!q) return; docHost.replaceChildren(); results.replaceChildren(h('p',{class:'hint'},'Searching…'));
+    try{ const hits=[]; for(const d of DOMAIN_FILES){ const r=await ghGetText(cfg, d.file); if(!r) continue; r.text.split('\n').forEach((ln,idx)=>{ if(ln.toLowerCase().includes(q)) hits.push({file:d.file, ln:ln.trim(), n:idx+1}); }); }
+      results.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}}, hits.length+' match'+(hits.length===1?'':'es')));
+      hits.slice(0,250).forEach(ht=> results.append(h('div',{class:'search-hit'}, h('b',null, ht.file.replace('domains/','')+' :'+ht.n+'  '), h('span',{class:'ln'}, ht.ln))));
+    }catch(e){ results.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
+}
+function studioInbox(host){
+  const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=cfg.makerStem||'field-journal';
+  const raw=h('textarea',{placeholder:'a quick raw idea for the queue…', style:{width:'100%', minHeight:'70px', border:'1.5px solid var(--gold-soft)', borderRadius:'8px', padding:'10px', fontFamily:'inherit', fontSize:'15px', background:'#fffdf7', color:'var(--ink-soft)'}});
+  host.append(h('div',{class:'drafter'}, h('label',null,'Raw dump → the queue'), raw,
+    h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:async()=>{ const t=raw.value.trim(); if(!t) return; try{ await appendRawDump(t); raw.value=''; toast('Added to the Raw Dump Inbox.'); }catch(e){ toast('Failed: '+e.message); } }}, 'Add raw idea'))));
+  host.append(h('div',{class:'kicker', style:{margin:'20px 0 8px'}}, 'Her creations — pick one to draft a card'));
+  const listHost=h('div',null); host.append(listHost); listHost.append(h('p',{class:'hint'},'Loading her journal…'));
+  (async()=>{ try{ const r=await ghGetText(cfg, `${base}/${stem}.json`);
+    if(!r){ listHost.replaceChildren(h('p',{class:'hint'}, `No journal found at ${base}/${stem}.json yet (set "Her journal file name" in ☁ My file).`)); return; }
+    const data=JSON.parse(r.text); const items=(data.creations||[]);
+    if(!items.length){ listHost.replaceChildren(h('p',{class:'hint'},'Her journal is empty so far.')); return; }
+    const g=h('div',{class:'gal-grid'}); items.slice().reverse().forEach(c=> g.append(inboxCard(c))); listHost.replaceChildren(g);
+  }catch(e){ listHost.replaceChildren(h('p',{class:'hint'},'Could not read her journal: '+e.message)); } })();
+}
+function inboxCard(c){
+  const w=WS[c.worksheetId]||{title:c.worksheetId}; const thumb=creationThumb(c);
+  return h('div',{class:'gal-card'},
+    h('div',{class:'thumb'}, thumb? h('img',{src:thumb, alt:''}) : h('span',{class:'none'}, w.title)),
+    h('div',{class:'meta'}, h('b',null, creationTitle(c)), h('small',null, w.title)),
+    h('div',{class:'acts'}, h('button',{onclick:()=>go('studio',{tab:'drafter', params:{prefill:creationToCard(c)}})}, 'Draft a Canon Card →')));
+}
+function creationToCard(c){
+  const w=WS[c.worksheetId]||{fields:[]}; const f=c.fields||{}; const title=creationTitle(c);
+  const cat=DOMAIN_HINT[c.worksheetId]||''; const tag=tagFromCategory(cat);
+  const bullets=[]; (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) bullets.push('Element: '+elementLabelOf(f.element)); return; } const v=(f[fld.key]||'').trim(); if(v) bullets.push((fld.cardLabel||fld.label)+': '+v); });
+  return { tag, title, category:cat, source:'Made by '+((DB.github&&DB.github.makerStem)||'the maker')+' in the Field Journal kit', claim:title+(bullets[0]? ' — '+bullets[0].replace(/^[^:]+:\s*/,''):''), means:bullets.join('\n'), donot:'', notes:'From her journal.' };
+}
+async function appendRawDump(text){ const cfg=ghCfg(); const r=await ghGetText(cfg, QUEUE_PATH); if(!r) throw new Error('queue not found');
+  const block='> '+new Date().toISOString().slice(0,10)+' — Studio raw dump\n\n'+text;
+  await ghPut(cfg, QUEUE_PATH, insertUnderSection(r.text, '# RAW DUMP INBOX', block), 'Raw dump via Studio', r.sha); }
+function studioDrafter(host, prefill){
+  const cfg=ghCfg(); const d=Object.assign({tag:'VAE', title:'', category:'', source:'Field Journal Studio', claim:'', means:'', donot:'', notes:''}, prefill||{});
+  const highest={};
+  const tagSel=h('select', null, ...CANON_TAGS.map(t=>h('option',{value:t}, t))); tagSel.value=d.tag;
+  const titleIn=h('input',{value:d.title, placeholder:'Descriptive title'});
+  const catIn=h('input',{value:d.category, placeholder:'domain file / topic'});
+  const claimIn=h('textarea',{value:d.claim, placeholder:'One declarative sentence of canon.'});
+  const meansIn=h('textarea',{value:d.means, placeholder:'What this means (one per line).'});
+  const donotIn=h('textarea',{value:d.donot, placeholder:'Do not contradict (one per line).'});
+  const notesIn=h('input',{value:d.notes, placeholder:'notes (optional)'});
+  const idLine=h('span',{class:'idline'},'…'); const preview=h('div',{class:'preview'}); const status=h('div',{class:'hint'});
+  const curId=()=>{ const t=tagSel.value; return t+'-'+pad3((highest[t]||0)+1); };
+  const curCard=()=>canonCardMarkdown({ id:curId(), title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
+  function refresh(){ idLine.textContent=curId(); preview.textContent=curCard(); }
+  [tagSel,titleIn,catIn,claimIn,meansIn,donotIn,notesIn].forEach(el=> el.addEventListener('input', refresh));
+  host.append(h('div',{class:'drafter'},
+    h('div',{class:'twocol'}, h('div',null, h('label',null,'Tag'), tagSel), h('div',null, h('label',null,'Next ID'), h('div',{style:{padding:'9px 0'}}, idLine))),
+    h('label',null,'Title'), titleIn,
+    h('label',null,'Category (domain file / topic)'), catIn,
+    h('label',null,'Canon Claim'), claimIn,
+    h('label',null,'What This Means (one per line)'), meansIn,
+    h('label',null,'Do Not Contradict (one per line)'), donotIn,
+    h('label',null,'Notes'), notesIn,
+    h('label',null,'Preview — Canon Card'), preview, status,
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>appendCard()}, 'Append to Promotion Queue'),
+      h('button',{class:'navbtn', onclick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(curCard()); toast('Copied card markdown.'); }}, 'Copy markdown'),
+      h('button',{class:'navbtn', onclick:()=>go('studio',{tab:'inbox'})}, 'Back to Inbox'),
+    )));
+  (async()=>{ try{ const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t)); }catch(e){} refresh(); })();
+  async function appendCard(){ status.textContent='Saving…';
+    try{ const id=curId();
+      const q=await ghGetText(cfg, QUEUE_PATH); if(!q) throw new Error('queue not found');
+      const card=canonCardMarkdown({ id, title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
+      await ghPut(cfg, QUEUE_PATH, insertUnderSection(q.text, '# ACTIVE CANON CARDS', card), 'Draft '+id+' via Studio', q.sha);
+      const ix=await ghGetText(cfg, INDEX_PATH); if(ix){ const next=bumpIndex(ix.text, tagSel.value, id, titleIn.value); if(next!==ix.text) await ghPut(cfg, INDEX_PATH, next, 'Reserve '+id+' via Studio', ix.sha); }
+      highest[tagSel.value]=parseInt(id.split('-')[1],10);
+      status.textContent='Appended '+id+' to the queue and reserved the ID.'; toast(id+' drafted to the queue.'); refresh();
+    }catch(e){ status.textContent='Failed: '+e.message; }
+  }
+}
+function studioBoard(host){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the queue…'));
+  (async()=>{ try{ const r=await ghGetText(cfg, QUEUE_PATH); if(!r){ host.replaceChildren(h('p',{class:'hint'},'Queue not found.')); return; }
+    const cards=parseQueueCards(r.text);
+    const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
+    const board=h('div',{class:'board'});
+    cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
+      items.forEach(c=> col.append(h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null))); board.append(col); });
+    host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}}, 'From 02_PROMOTION_QUEUE.md — '+cards.length+' cards'), board);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
+}
+function parseQueueCards(text){
+  const lines=text.split('\n'); const cards=[]; let cur=null, section='';
+  for(const ln of lines){ const hm=/^#\s+(.*)/.exec(ln); if(hm) section=hm[1].trim();
+    const cm=/^##\s+(.*)/.exec(ln); if(cm){ if(cur) cards.push(cur); cur={title:cm[1].trim(), status:'', section}; continue; }
+    const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
+  if(cur) cards.push(cur);
+  cards.forEach(c=> c.col=statusToCol(c.status, c.section)); return cards;
+}
+function statusToCol(status, section){ const s=(status||'').toLowerCase();
+  if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
+  if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
+
+/* ---------- boot ----------------------------------------------------------- */
+applyMode();
+render();
+showIntro(false);
+if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+</script>
+</body>
+</html>
