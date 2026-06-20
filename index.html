@@ -2157,7 +2157,9 @@ function studioBoard(host){
     const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
     const board=h('div',{class:'board'});
     cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
-      items.forEach(c=> col.append(h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null))); board.append(col); });
+      items.forEach(c=>{ const tile=h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null);
+        const cid=cardId(c.title); if(cid && c.col!=='Promoted' && c.col!=='Raw') tile.append(h('button',{class:'navbtn', style:{marginTop:'7px', fontSize:'12px', padding:'4px 9px'}, onclick:()=>promoteCardModal(cid.id)}, 'Promote →'));
+        col.append(tile); }); board.append(col); });
     const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : h('p',{class:'hint', style:{textAlign:'center'}},'(couldn’t read 01_CANON_INDEX.md to cross-check IDs)');
     host.replaceChildren(banner, h('p',{class:'hint', style:{textAlign:'center'}}, 'From 02_PROMOTION_QUEUE.md — '+cards.length+' cards'), board);
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
@@ -2185,6 +2187,103 @@ function consistencyBanner(issues){
   warns.forEach(i=> ul.append(h('li',{style:{color:'#9a5b1c', margin:'2px 0'}}, i.msg)));
   infos.forEach(i=> ul.append(h('li',{style:{color:'var(--ink-soft)', margin:'2px 0'}}, i.msg)));
   box.append(ul); return box;
+}
+/* ============================ Promote a card to canon ======================= *
+   The guarded hand-off (per 00_CANON_HOME.md → Promotion Rules / Queue Hygiene):
+   append the card's canon to the chosen domains/ file, mark the queue card
+   PROMOTED and slim it to a lean marker, update the index bullet, and log a
+   changelog line. Every write is sha-checked and the queue write is assertQueue-
+   guarded. Pure builders below are unit-testable without touching GitHub.        */
+function getQueueCard(text, id){
+  const lines=text.split('\n');
+  let s=-1; for(let i=0;i<lines.length;i++){ if(new RegExp('^##\\s+'+id+'\\b').test(lines[i])){ s=i; break; } }
+  if(s<0) return null;
+  let e=lines.length; for(let i=s+1;i<lines.length;i++){ if(/^#{1,2}\s/.test(lines[i])){ e=i; break; } }   // card ends at next # / ## heading (### subsections stay in)
+  const block=lines.slice(s,e);
+  const title=((/^##\s+(.*)/.exec(lines[s])||[])[1]||id).trim();
+  const desc=title.replace(/^[A-Z]{3}-\d{3}\s*[—-]\s*/,'');
+  const oneLine=re=>{ const l=block.find(x=>re.test(x)); return l? l.replace(re,'').trim() : ''; };
+  const sect=name=>{ const i=block.findIndex(l=>new RegExp('^###\\s+'+name,'i').test(l)); if(i<0) return [];
+    const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
+  const destFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(oneLine(/^\*\*Category:\*\*\s*/))||[])[0]||'';
+  return { id, title, desc, status:oneLine(/^\*\*Status:\*\*\s*/), destFile, s, e,
+    claim:sect('Canon Claim').join(' '),
+    means:sect('What This Means').map(x=>x.replace(/^[-*]\s*/,'')),
+    donot:sect('Do Not Contradict').map(x=>x.replace(/^[-*]\s*/,'')),
+    reqs:sect('Promotion Requirements').map(x=>x.replace(/^[-*]\s*\[[ xX]?\]\s*/,'')).filter(Boolean) };
+}
+function buildDomainBlock(card, date){
+  const L=['---','', '## '+card.title, '', card.claim||'[canon claim]'];
+  if(card.means.length){ L.push('', '**What this means**', '', ...card.means.map(x=>'- '+x)); }
+  if(card.donot.length){ L.push('', '**Do not contradict**', '', ...card.donot.map(x=>'- '+x)); }
+  L.push('', '*Promoted from the Promotion Queue on '+date+' ('+card.id+').*');
+  return L.join('\n');
+}
+function leanQueueMarker(card, destFile, date){ return ['## '+card.title, '', '**Status:** PROMOTED — '+card.id+' → '+destFile+' ('+date+')'].join('\n'); }
+function promoteInQueue(text, id, destFile, date){
+  const c=getQueueCard(text, id); if(!c) return text; const lines=text.split('\n');
+  lines.splice(c.s, c.e-c.s, leanQueueMarker(c, destFile, date), '', '---', '');
+  return lines.join('\n');
+}
+function markIndexPromoted(text, id, desc, destFile, date){
+  const lines=text.split('\n'); const bullet='- '+id+' — '+desc+' → '+destFile+' (promoted '+date+')';
+  for(let i=0;i<lines.length;i++){ if(new RegExp('^-\\s+'+id+'\\b').test(lines[i].trim())){ lines[i]=bullet; return lines.join('\n'); } }
+  const tag=id.split('-')[0]; const si=lines.findIndex(l=>new RegExp('^##\\s+'+tag+'\\b').test(l)); if(si<0) return text;
+  let end=lines.length, hi=-1; for(let i=si+1;i<lines.length;i++){ if(/^##\s/.test(lines[i])){ end=i; break; } if(/Highest assigned/.test(lines[i])) hi=i; }
+  let np=-1; for(let i=si+1;i<end;i++){ if(/\(none promoted\)/.test(lines[i])){ np=i; break; } }
+  if(np>=0) lines[np]=bullet; else lines.splice(hi>=0? hi+1 : si+1, 0, '', bullet);
+  return lines.join('\n');
+}
+function promoteCardModal(id){
+  const cfg=ghCfg(); const date=new Date().toISOString().slice(0,10);
+  const PRE={whiteSpace:'pre-wrap', background:'#fbf6ea', border:'1px solid var(--gold-soft)', borderRadius:'8px', padding:'9px 11px', fontSize:'12.5px', maxHeight:'190px', overflow:'auto', margin:'4px 0 10px'};
+  openOverlay(close=>{
+    const wrap=h('div',{class:'modal', style:{maxWidth:'720px'}}, h('h2',{class:'display'}, 'Promote '+id+' to canon'));
+    const body=h('div',null, h('p',{class:'hint'},'Loading the card…')); wrap.append(body);
+    (async()=>{ try{
+      const q=await ghGetText(cfg, QUEUE_PATH); assertQueue(q.text);
+      const card=getQueueCard(q.text, id); if(!card){ body.replaceChildren(h('p',{class:'hint'},'That card isn’t in the queue anymore.')); return; }
+      const sel=h('select',null, ...DOMAIN_FILES.map(d=>h('option',{value:d.file}, d.file.replace('domains/','')))); if(card.destFile) sel.value=card.destFile;
+      const statusNote = /candidate|ready/i.test(card.status)? null : h('div',{class:'warn'}, 'This card’s status is “'+(card.status||'—')+'”, not Candidate/Ready — the rules ask for Candidate first. You can still promote.');
+      const reqWrap=h('div',null); const checks=[];
+      (card.reqs.length? card.reqs : ['I’ve reviewed this card and it’s ready for canon']).forEach(req=>{ const cb=h('input',{type:'checkbox'}); checks.push(cb);
+        reqWrap.append(h('label',{style:{display:'flex', gap:'8px', alignItems:'flex-start', margin:'4px 0', textTransform:'none', letterSpacing:'0', fontSize:'14px', color:'var(--ink-soft)'}}, cb, h('span',null,req))); });
+      const prev=h('div',null), status=h('div',{class:'hint'});
+      const btn=h('button',{class:'navbtn primary'}, 'Promote to canon'); btn.disabled=true;
+      const sync=()=>{ btn.disabled=!checks.every(c=>c.checked); }; checks.forEach(c=>c.onchange=sync);
+      async function buildPreview(){ prev.replaceChildren(h('p',{class:'hint'},'Building preview…'));
+        const destFile=sel.value; let warn='';
+        try{ const dom=await ghGetText(cfg, destFile); if(!dom) warn=' (not found — it would be created)'; }catch(e){ warn=' (couldn’t read it: '+e.message+')'; }
+        prev.replaceChildren(
+          h('p',{class:'kicker'}, 'Append to '+destFile.replace('domains/','')+warn),     h('pre',{style:PRE}, buildDomainBlock(card, date)),
+          h('p',{class:'kicker'}, 'Queue — the card collapses to a lean marker'),          h('pre',{style:PRE}, leanQueueMarker(card, destFile, date)),
+          h('p',{class:'kicker'}, 'Index — the '+id.split('-')[0]+' bullet becomes'),       h('pre',{style:PRE}, '- '+id+' — '+card.desc+' → '+destFile+' (promoted '+date+')'),
+          h('p',{class:'hint'}, 'Also logs one line to legacy/99_CHANGELOG.md.'));
+      }
+      sel.onchange=buildPreview;
+      body.replaceChildren(statusNote,
+        h('label',null,'Destination domain file'), sel,
+        h('label',{style:{marginTop:'10px'}},'Promotion requirements — tick all to enable'), reqWrap,
+        h('label',{style:{marginTop:'10px'}},'Preview — exactly what will change'), prev, status,
+        h('div',{class:'toolrow', style:{marginTop:'12px'}}, btn, h('button',{class:'navbtn', onclick:close}, 'Cancel')));
+      sync(); buildPreview();
+      btn.onclick=async()=>{ btn.disabled=true; status.textContent='Promoting…';
+        try{
+          const destFile=sel.value;
+          const qf=await ghGetText(cfg, QUEUE_PATH); assertQueue(qf.text);
+          const c=getQueueCard(qf.text, id); if(!c) throw new Error('card no longer in the queue');
+          const dom=await ghGetText(cfg, destFile); if(dom && !/^#\s/m.test(dom.text)) throw new Error('that domain file doesn’t look right — aborting');
+          const ix=await ghGetText(cfg, INDEX_PATH);
+          const newDom=(dom? dom.text.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n';
+          await ghPut(cfg, destFile, newDom, 'Promote '+id+' → '+destFile, dom&&dom.sha);
+          if(ix){ const ni=markIndexPromoted(ix.text, id, c.desc, destFile, date); if(ni!==ix.text) await ghPut(cfg, INDEX_PATH, ni, 'Mark '+id+' promoted in the index', ix.sha); }
+          const nq=promoteInQueue(qf.text, id, destFile, date); assertQueue(nq); await ghPut(cfg, QUEUE_PATH, nq, 'Queue hygiene: '+id+' promoted', qf.sha);
+          try{ const cl=await ghGetText(cfg, 'legacy/99_CHANGELOG.md'); if(cl) await ghPut(cfg, 'legacy/99_CHANGELOG.md', cl.text.replace(/\s*$/,'')+'\n- '+date+' — PROMOTED '+id+' — '+c.desc+' → '+destFile+'.\n', 'Log '+id+' promotion', cl.sha); }catch(e){}
+          toast(id+' promoted to canon.'); close(); go('studio',{tab:'board'});
+        }catch(e){ status.textContent='Failed: '+e.message; btn.disabled=false; } };
+    }catch(e){ body.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
+    return wrap;
+  });
 }
 function parseQueueCards(text){
   const lines=text.split('\n'); const cards=[]; let cur=null, section='';
