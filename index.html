@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+<!-- GENERATED from kit/src/ by build.mjs — do not hand-edit; edit kit/src/ and rerun build.mjs -->
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -684,16 +685,20 @@ function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; retur
 let VIEW = { name:'home' };
 function go(name, params){ VIEW = Object.assign({name}, params); window.scrollTo(0,0); render(); }
 
+// view registry — register(name, fn(VIEW)->node). Adding a screen is one call; no
+// edits to render(). Builders run lazily, so the view fns may be defined in later modules.
+const VIEWS = {};
+function registerView(name, fn){ VIEWS[name] = fn; }
+registerView('home', () => viewHome());
+registerView('tour', () => viewTour());
+registerView('gallery', () => viewGallery());
+registerView('worksheet', (v) => viewWorksheet(v.id, v.editId));
+registerView('studio', (v) => viewStudio(v.tab, v.params));
+registerView('naming', () => viewNamingTree());
+
 function render(){
   $app.replaceChildren(topbar());
-  const v = VIEW.name;
-  if (v==='home') $app.append(viewHome());
-  else if (v==='tour') $app.append(viewTour());
-  else if (v==='gallery') $app.append(viewGallery());
-  else if (v==='worksheet') $app.append(viewWorksheet(VIEW.id, VIEW.editId));
-  else if (v==='studio') $app.append(viewStudio(VIEW.tab, VIEW.params));
-  else if (v==='naming') $app.append(viewNamingTree());
-  else $app.append(viewHome());
+  $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW));
 }
 
 function topbar(){
@@ -1354,6 +1359,9 @@ function showModal(title, note, text){
       h('button',{class:'navbtn', onclick:()=>close()}, 'Close'),
     )));
 }
+function showModalNode(title, note, node){
+  return openOverlay(close=> h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
+}
 
 /* ---------- toast ---------------------------------------------------------- */
 let toastT=null;
@@ -1611,9 +1619,6 @@ function creationMarkdown(c){
   if(c.specimenNo) L.push(`- **${w.specimen}** ${c.specimenNo}`);
   if(c.image||c.importedImage) L.push('- _[has a drawing]_');
   L.push(''); return L;
-}
-function showModalNode(title, note, node){
-  return openOverlay(close=> h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
 }
 function openGitHubPanel(){
   const g=Object.assign({owner:'Dracanman', repo:'godling-universe-canon-workbench', branch:'main', path:'kit/journal/', token:'', displayName:'', makerStem:'field-journal'}, DB.github||{});
@@ -1901,10 +1906,10 @@ function viewNamingTree(){
 }
 
 /* ========================================================================== *
-   CANON STUDIO (Worldbuilder profile) — browse canon, an inbox of her work,
-   a Canon Card drafter (+ auto ID), and a promotion board. All repo-backed
-   through the existing GitHub token. Writes only to the workshop files
-   (02_PROMOTION_QUEUE.md, 01_CANON_INDEX.md) as Draft — never to domains/.
+   CANON FORMAT + PARSE — the single source of truth for how the workbench's
+   markdown is read and written (queue, index, domain files, cards, threads).
+   Pure functions only (no DOM, no network) so they're unit-testable; the Studio
+   UI in studio.js / threads-board.js / promote.js builds on top of these.
  * ========================================================================== */
 const DOMAIN_FILES = [
   {topic:'Cosmology — Cloudsea, fragments, portals', file:'domains/10_COSMOLOGY.md'},
@@ -1919,7 +1924,9 @@ const DOMAIN_FILES = [
 ];
 const CANON_TAGS = ['COS','GOD','GLG','SYS','VAE','PEO','ARK','SED','MAG','PLC','HIS'];
 const QUEUE_PATH = '02_PROMOTION_QUEUE.md', INDEX_PATH = '01_CANON_INDEX.md';
+const THREAD_RE=/^\[(OPEN|DESTINATION|UNAUDITED|QUESTION)\]\s*(.*)$/;
 
+/* ---- markdown -> safe html (for the Canon Browser) ---- */
 function escapeHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function inlineMd(s){ return escapeHtml(s).replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>'); }
 function mdToHtml(md){
@@ -1937,8 +1944,15 @@ function mdToHtml(md){
   }
   closeList(); return html;
 }
+
+/* ---- ids & the index ---- */
 function pad3(n){ return String(n).padStart(3,'0'); }
 function parseHighest(indexText, tag){ const m=new RegExp('\\*\\*Highest assigned:\\*\\*\\s*'+tag+'-(\\d+)','i').exec(indexText); return m? parseInt(m[1],10) : 0; }
+function cardId(title){ const m=/^([A-Z]{3})-(\d{3})\b/.exec(String(title||'')); return m? {tag:m[1], num:parseInt(m[2],10), id:m[1]+'-'+m[2]} : null; }
+function indexReservedIds(indexText){ const ids=[]; String(indexText).split('\n').forEach(l=>{ const m=/^-\s+([A-Z]{3}-\d{3})\b/.exec(l.trim()); if(m) ids.push(m[1]); }); return ids; }
+function tagFromCategory(cat){ cat=String(cat||''); if(/41_VAEL/.test(cat))return 'VAE'; if(/40_PEOPLES/.test(cat))return 'PEO'; if(/50_ARKBORNE/.test(cat))return 'SED'; if(/10_COSMOLOGY/.test(cat))return 'PLC'; if(/30_GODLING/.test(cat))return 'GLG'; if(/60_MAGIC/.test(cat))return 'MAG'; return 'PEO'; }
+
+/* ---- queue read/write helpers ---- */
 // guard a write: refuse to touch the queue unless the text we read back really is the queue.
 // (A stale "404: Not Found" body once slipped through and got written over the whole file.)
 function assertQueue(text){ if(!/^#\s+02_PROMOTION_QUEUE\.md/m.test(text) || !/^#\s+RAW DUMP INBOX/m.test(text)) throw new Error('refusing to write — the file I read back isn’t the queue (try again in a moment)'); return text; }
@@ -1958,6 +1972,8 @@ function bumpIndex(text, tag, id, title){
   if(np>=0) lines[np]=bullet; else lines.splice(end,0,bullet,'');
   return lines.join('\n');
 }
+
+/* ---- cards: serialize + parse ---- */
 function canonCardMarkdown(d){
   const bullets=(s,fb)=>{ const a=String(s||'').split('\n').map(x=>x.trim().replace(/^[-*]\s*/,'')).filter(Boolean); return a.length? a.map(x=>'- '+x) : ['- '+fb]; };
   return [
@@ -1977,7 +1993,129 @@ function canonCardMarkdown(d){
     '### Notes', '', `- ${new Date().toISOString().slice(0,10)} — drafted in the Field Journal Studio.${d.notes? ' '+d.notes:''}`,
   ].join('\n');
 }
-function tagFromCategory(cat){ cat=String(cat||''); if(/41_VAEL/.test(cat))return 'VAE'; if(/40_PEOPLES/.test(cat))return 'PEO'; if(/50_ARKBORNE/.test(cat))return 'SED'; if(/10_COSMOLOGY/.test(cat))return 'PLC'; if(/30_GODLING/.test(cat))return 'GLG'; if(/60_MAGIC/.test(cat))return 'MAG'; return 'PEO'; }
+function parseQueueCards(text){
+  const lines=text.split('\n'); const cards=[]; let cur=null, section='';
+  for(const ln of lines){ const hm=/^#\s+(.*)/.exec(ln); if(hm) section=hm[1].trim();
+    const cm=/^##\s+(.*)/.exec(ln); if(cm){ if(cur) cards.push(cur); cur={title:cm[1].trim(), status:'', section}; continue; }
+    const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
+  if(cur) cards.push(cur);
+  // keep only real cards — a ## heading counts only if it has a Status line or an ID-style
+  // title (TAG-000). Drops the queue's structural headings (Purpose, Rules, section dividers).
+  const real=cards.filter(c=> c.status || /^[A-Z]{3}-\d{3}\b/.test(c.title));
+  real.forEach(c=> c.col=statusToCol(c.status, c.section)); return real;
+}
+// Raw ideas live in the RAW DUMP INBOX as a "> date — …" stamp + a paragraph, not as
+// ## cards, so parseQueueCards never saw them. Pull each one out as a Raw-column entry.
+function parseRawIdeas(text){
+  const lines=text.split('\n'); const out=[]; let inRaw=false, cur=null;
+  const flush=()=>{ if(cur){ const body=cur.body.join(' ').replace(/\s+/g,' ').trim();
+    if(body) out.push({ title: body.length>90? body.slice(0,90)+'…' : body, status: cur.label, col:'Raw', section:'RAW DUMP INBOX' }); } cur=null; };
+  for(const ln of lines){
+    const hm=/^#\s+(.*)/.exec(ln); if(hm){ flush(); inRaw=/raw dump/i.test(hm[1]); continue; }
+    if(!inRaw) continue;
+    if(/^---\s*$/.test(ln)){ flush(); continue; }
+    const q=/^>\s?(.*)/.exec(ln); if(q){ flush(); cur={ label:q[1].trim(), body:[] }; continue; }
+    if(cur && ln.trim()) cur.body.push(ln.trim());
+  }
+  flush(); return out;
+}
+function statusToCol(status, section){ const s=(status||'').toLowerCase();
+  if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
+  if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
+
+/* ---- open threads in the domains ---- */
+function findOpenThreads(text, file){
+  const lines=text.split('\n'); const out=[]; let heading='';
+  for(let i=0;i<lines.length;i++){ const ln=lines[i];
+    const hm=/^#{1,4}\s+(.*)/.exec(ln); if(hm){ heading=hm[1].trim(); continue; }
+    const mm=THREAD_RE.exec(ln.trim()); if(!mm) continue;
+    const body=[mm[2]]; let j=i+1;
+    while(j<lines.length && lines[j].trim() && !/^#{1,4}\s/.test(lines[j]) && !/^---\s*$/.test(lines[j]) && !THREAD_RE.test(lines[j].trim())){ body.push(lines[j].trim()); j++; }
+    out.push({ file, line:i+1, type:mm[1], heading, text:body.join(' ').replace(/\s+/g,' ').trim() }); i=j-1; }
+  return out;
+}
+function openThreadHandoff(t){
+  return [
+    `# Open canon question — ${t.file.replace('domains/','')}${t.heading? ' › '+t.heading:''}`, '',
+    `I'm building the Godling Universe. Below is an **[${t.type}]** thread I left unaudited in my canon — a question I haven't resolved yet. Help me work it out.`, '',
+    '## The open question', '', '> '+(t.text||'(see the file section — the marker had no inline text)'), '',
+    '## Ground rules for any answer', '',
+    '- Must not contradict already-promoted canon.',
+    '- Must have clear limits (say what it does NOT cover).',
+    '- Must be useful to story, setting, or game.',
+    '- Should not make existing canon pointless.', '',
+    '## What I want back', '',
+    '- 2–3 concrete options, with the trade-offs of each.',
+    '- A recommendation.',
+    '- One declarative **Canon Claim** sentence I could promote as-is.', '',
+    `_Source: ${t.file}, line ${t.line}._`,
+  ].join('\n');
+}
+function threadToCard(t){ return { tag:tagFromCategory(t.file), title:(t.heading||t.text||'Open thread').slice(0,60), category:t.file,
+  source:'Resolving an open thread in '+t.file, claim:'', means:'', donot:'',
+  notes:'From a ['+t.type+'] thread at '+t.file.replace('domains/','')+':'+t.line+(t.text? ' — '+t.text:'') }; }
+
+/* ---- promotion builders (used by promoteCardModal) ---- */
+function getQueueCard(text, id){
+  const lines=text.split('\n');
+  let s=-1; for(let i=0;i<lines.length;i++){ if(new RegExp('^##\\s+'+id+'\\b').test(lines[i])){ s=i; break; } }
+  if(s<0) return null;
+  let e=lines.length; for(let i=s+1;i<lines.length;i++){ if(/^#{1,2}\s/.test(lines[i])){ e=i; break; } }   // card ends at next # / ## heading (### subsections stay in)
+  const block=lines.slice(s,e);
+  const title=((/^##\s+(.*)/.exec(lines[s])||[])[1]||id).trim();
+  const desc=title.replace(/^[A-Z]{3}-\d{3}\s*[—-]\s*/,'');
+  const oneLine=re=>{ const l=block.find(x=>re.test(x)); return l? l.replace(re,'').trim() : ''; };
+  const sect=name=>{ const i=block.findIndex(l=>new RegExp('^###\\s+'+name,'i').test(l)); if(i<0) return [];
+    const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
+  const destFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(oneLine(/^\*\*Category:\*\*\s*/))||[])[0]||'';
+  return { id, title, desc, status:oneLine(/^\*\*Status:\*\*\s*/), destFile, s, e,
+    claim:sect('Canon Claim').join(' '),
+    means:sect('What This Means').map(x=>x.replace(/^[-*]\s*/,'')),
+    donot:sect('Do Not Contradict').map(x=>x.replace(/^[-*]\s*/,'')),
+    reqs:sect('Promotion Requirements').map(x=>x.replace(/^[-*]\s*\[[ xX]?\]\s*/,'')).filter(Boolean) };
+}
+function buildDomainBlock(card, date){
+  const L=['---','', '## '+card.title, '', card.claim||'[canon claim]'];
+  if(card.means.length){ L.push('', '**What this means**', '', ...card.means.map(x=>'- '+x)); }
+  if(card.donot.length){ L.push('', '**Do not contradict**', '', ...card.donot.map(x=>'- '+x)); }
+  L.push('', '*Promoted from the Promotion Queue on '+date+' ('+card.id+').*');
+  return L.join('\n');
+}
+function leanQueueMarker(card, destFile, date){ return ['## '+card.title, '', '**Status:** PROMOTED — '+card.id+' → '+destFile+' ('+date+')'].join('\n'); }
+function promoteInQueue(text, id, destFile, date){
+  const c=getQueueCard(text, id); if(!c) return text; const lines=text.split('\n');
+  lines.splice(c.s, c.e-c.s, leanQueueMarker(c, destFile, date), '', '---', '');
+  return lines.join('\n');
+}
+function markIndexPromoted(text, id, desc, destFile, date){
+  const lines=text.split('\n'); const bullet='- '+id+' — '+desc+' → '+destFile+' (promoted '+date+')';
+  for(let i=0;i<lines.length;i++){ if(new RegExp('^-\\s+'+id+'\\b').test(lines[i].trim())){ lines[i]=bullet; return lines.join('\n'); } }
+  const tag=id.split('-')[0]; const si=lines.findIndex(l=>new RegExp('^##\\s+'+tag+'\\b').test(l)); if(si<0) return text;
+  let end=lines.length, hi=-1; for(let i=si+1;i<lines.length;i++){ if(/^##\s/.test(lines[i])){ end=i; break; } if(/Highest assigned/.test(lines[i])) hi=i; }
+  let np=-1; for(let i=si+1;i<end;i++){ if(/\(none promoted\)/.test(lines[i])){ np=i; break; } }
+  if(np>=0) lines[np]=bullet; else lines.splice(hi>=0? hi+1 : si+1, 0, '', bullet);
+  return lines.join('\n');
+}
+
+/* ---- queue <-> index consistency: catch ID drift before it bites the Drafter ---- */
+function checkConsistency(queueText, indexText){
+  const issues=[]; const ids=parseQueueCards(queueText).map(c=>cardId(c.title)).filter(Boolean);
+  const seen={}; ids.forEach(x=>{ seen[x.id]=(seen[x.id]||0)+1; });
+  Object.keys(seen).filter(k=>seen[k]>1).forEach(k=> issues.push({level:'warn', msg:`${k} appears ${seen[k]}× in the queue — duplicate card ID.`}));
+  const reserved=new Set(indexReservedIds(indexText)); const queueSet=new Set(ids.map(x=>x.id));
+  ids.forEach(x=>{ const hi=parseHighest(indexText, x.tag);
+    if(x.num>hi) issues.push({level:'warn', msg:`${x.id} is in the queue but not reserved in the index (highest ${x.tag} is ${x.tag}-${pad3(hi)}). Bump the index, or the Drafter could mint ${x.id} again.`});
+    else if(!reserved.has(x.id)) issues.push({level:'info', msg:`${x.id} is within the reserved range but isn’t listed under ${x.tag} in the index.`}); });
+  reserved.forEach(id=>{ if(!queueSet.has(id)) issues.push({level:'info', msg:`${id} is reserved in the index but has no queue card (likely already promoted, or the card was retired).`}); });
+  return issues;
+}
+/* ========================================================================== *
+   CANON STUDIO (Worldbuilder profile) — browse canon, an inbox of her work,
+   a Canon Card drafter (+ auto ID), and a promotion board. All repo-backed
+   through the existing GitHub token. Writes only to the workshop files
+   (02_PROMOTION_QUEUE.md, 01_CANON_INDEX.md) as Draft — never to domains/.
+   Format/parse helpers live in canon-parse.js; this file is the Studio shell + Browser.
+ * ========================================================================== */
 
 // Studio tabs — [key, label, what-this-is hint]. Keys are stable (other screens
 // link to them); labels/order are plain-language and follow the workflow.
@@ -2032,39 +2170,9 @@ function studioBrowse(host){
       hits.slice(0,250).forEach(ht=> results.append(h('div',{class:'search-hit'}, h('b',null, ht.file.replace('domains/','')+' :'+ht.n+'  '), h('span',{class:'ln'}, ht.ln))));
     }catch(e){ results.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
 }
-/* ---- Open Threads: walk the domains for unaudited [OPEN]/[DESTINATION] questions,
-        and turn each into an AI handoff or a Draft Canon Card. Read-only on canon. ---- */
-const THREAD_RE=/^\[(OPEN|DESTINATION|UNAUDITED|QUESTION)\]\s*(.*)$/;
-function findOpenThreads(text, file){
-  const lines=text.split('\n'); const out=[]; let heading='';
-  for(let i=0;i<lines.length;i++){ const ln=lines[i];
-    const hm=/^#{1,4}\s+(.*)/.exec(ln); if(hm){ heading=hm[1].trim(); continue; }
-    const mm=THREAD_RE.exec(ln.trim()); if(!mm) continue;
-    const body=[mm[2]]; let j=i+1;
-    while(j<lines.length && lines[j].trim() && !/^#{1,4}\s/.test(lines[j]) && !/^---\s*$/.test(lines[j]) && !THREAD_RE.test(lines[j].trim())){ body.push(lines[j].trim()); j++; }
-    out.push({ file, line:i+1, type:mm[1], heading, text:body.join(' ').replace(/\s+/g,' ').trim() }); i=j-1; }
-  return out;
-}
-function openThreadHandoff(t){
-  return [
-    `# Open canon question — ${t.file.replace('domains/','')}${t.heading? ' › '+t.heading:''}`, '',
-    `I'm building the Godling Universe. Below is an **[${t.type}]** thread I left unaudited in my canon — a question I haven't resolved yet. Help me work it out.`, '',
-    '## The open question', '', '> '+(t.text||'(see the file section — the marker had no inline text)'), '',
-    '## Ground rules for any answer', '',
-    '- Must not contradict already-promoted canon.',
-    '- Must have clear limits (say what it does NOT cover).',
-    '- Must be useful to story, setting, or game.',
-    '- Should not make existing canon pointless.', '',
-    '## What I want back', '',
-    '- 2–3 concrete options, with the trade-offs of each.',
-    '- A recommendation.',
-    '- One declarative **Canon Claim** sentence I could promote as-is.', '',
-    `_Source: ${t.file}, line ${t.line}._`,
-  ].join('\n');
-}
-function threadToCard(t){ return { tag:tagFromCategory(t.file), title:(t.heading||t.text||'Open thread').slice(0,60), category:t.file,
-  source:'Resolving an open thread in '+t.file, claim:'', means:'', donot:'',
-  notes:'From a ['+t.type+'] thread at '+t.file.replace('domains/','')+':'+t.line+(t.text? ' — '+t.text:'') }; }
+/* ---- Open Threads, Inbox, Drafter, Board — the Studio's working tabs (DOM).
+        Format/parse helpers (findOpenThreads, parseQueueCards, checkConsistency,
+        canonCardMarkdown, …) live in canon-parse.js. ---- */
 function threadRow(t){
   return h('div',{class:'spark-row', style:{flexDirection:'column', alignItems:'stretch', gap:'8px'}},
     h('div',null, h('b',null,'['+t.type+'] '), h('span',null, t.text||'(see the file section)')),
@@ -2180,20 +2288,6 @@ function studioBoard(host){
     host.replaceChildren(...[banner, h('p',{class:'hint', style:{textAlign:'center'}}, count), board].filter(Boolean));
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
 }
-// ---- queue <-> index consistency: catch ID drift before it bites the Drafter ----
-function cardId(title){ const m=/^([A-Z]{3})-(\d{3})\b/.exec(String(title||'')); return m? {tag:m[1], num:parseInt(m[2],10), id:m[1]+'-'+m[2]} : null; }
-function indexReservedIds(indexText){ const ids=[]; String(indexText).split('\n').forEach(l=>{ const m=/^-\s+([A-Z]{3}-\d{3})\b/.exec(l.trim()); if(m) ids.push(m[1]); }); return ids; }
-function checkConsistency(queueText, indexText){
-  const issues=[]; const ids=parseQueueCards(queueText).map(c=>cardId(c.title)).filter(Boolean);
-  const seen={}; ids.forEach(x=>{ seen[x.id]=(seen[x.id]||0)+1; });
-  Object.keys(seen).filter(k=>seen[k]>1).forEach(k=> issues.push({level:'warn', msg:`${k} appears ${seen[k]}× in the queue — duplicate card ID.`}));
-  const reserved=new Set(indexReservedIds(indexText)); const queueSet=new Set(ids.map(x=>x.id));
-  ids.forEach(x=>{ const hi=parseHighest(indexText, x.tag);
-    if(x.num>hi) issues.push({level:'warn', msg:`${x.id} is in the queue but not reserved in the index (highest ${x.tag} is ${x.tag}-${pad3(hi)}). Bump the index, or the Drafter could mint ${x.id} again.`});
-    else if(!reserved.has(x.id)) issues.push({level:'info', msg:`${x.id} is within the reserved range but isn’t listed under ${x.tag} in the index.`}); });
-  reserved.forEach(id=>{ if(!queueSet.has(id)) issues.push({level:'info', msg:`${id} is reserved in the index but has no queue card (likely already promoted, or the card was retired).`}); });
-  return issues;
-}
 function consistencyBanner(issues){
   const warns=issues.filter(i=>i.level==='warn'), infos=issues.filter(i=>i.level==='info');
   if(!warns.length) return null;   // quiet unless something actually needs reconciling
@@ -2209,47 +2303,8 @@ function consistencyBanner(issues){
    append the card's canon to the chosen domains/ file, mark the queue card
    PROMOTED and slim it to a lean marker, update the index bullet, and log a
    changelog line. Every write is sha-checked and the queue write is assertQueue-
-   guarded. Pure builders below are unit-testable without touching GitHub.        */
-function getQueueCard(text, id){
-  const lines=text.split('\n');
-  let s=-1; for(let i=0;i<lines.length;i++){ if(new RegExp('^##\\s+'+id+'\\b').test(lines[i])){ s=i; break; } }
-  if(s<0) return null;
-  let e=lines.length; for(let i=s+1;i<lines.length;i++){ if(/^#{1,2}\s/.test(lines[i])){ e=i; break; } }   // card ends at next # / ## heading (### subsections stay in)
-  const block=lines.slice(s,e);
-  const title=((/^##\s+(.*)/.exec(lines[s])||[])[1]||id).trim();
-  const desc=title.replace(/^[A-Z]{3}-\d{3}\s*[—-]\s*/,'');
-  const oneLine=re=>{ const l=block.find(x=>re.test(x)); return l? l.replace(re,'').trim() : ''; };
-  const sect=name=>{ const i=block.findIndex(l=>new RegExp('^###\\s+'+name,'i').test(l)); if(i<0) return [];
-    const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
-  const destFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(oneLine(/^\*\*Category:\*\*\s*/))||[])[0]||'';
-  return { id, title, desc, status:oneLine(/^\*\*Status:\*\*\s*/), destFile, s, e,
-    claim:sect('Canon Claim').join(' '),
-    means:sect('What This Means').map(x=>x.replace(/^[-*]\s*/,'')),
-    donot:sect('Do Not Contradict').map(x=>x.replace(/^[-*]\s*/,'')),
-    reqs:sect('Promotion Requirements').map(x=>x.replace(/^[-*]\s*\[[ xX]?\]\s*/,'')).filter(Boolean) };
-}
-function buildDomainBlock(card, date){
-  const L=['---','', '## '+card.title, '', card.claim||'[canon claim]'];
-  if(card.means.length){ L.push('', '**What this means**', '', ...card.means.map(x=>'- '+x)); }
-  if(card.donot.length){ L.push('', '**Do not contradict**', '', ...card.donot.map(x=>'- '+x)); }
-  L.push('', '*Promoted from the Promotion Queue on '+date+' ('+card.id+').*');
-  return L.join('\n');
-}
-function leanQueueMarker(card, destFile, date){ return ['## '+card.title, '', '**Status:** PROMOTED — '+card.id+' → '+destFile+' ('+date+')'].join('\n'); }
-function promoteInQueue(text, id, destFile, date){
-  const c=getQueueCard(text, id); if(!c) return text; const lines=text.split('\n');
-  lines.splice(c.s, c.e-c.s, leanQueueMarker(c, destFile, date), '', '---', '');
-  return lines.join('\n');
-}
-function markIndexPromoted(text, id, desc, destFile, date){
-  const lines=text.split('\n'); const bullet='- '+id+' — '+desc+' → '+destFile+' (promoted '+date+')';
-  for(let i=0;i<lines.length;i++){ if(new RegExp('^-\\s+'+id+'\\b').test(lines[i].trim())){ lines[i]=bullet; return lines.join('\n'); } }
-  const tag=id.split('-')[0]; const si=lines.findIndex(l=>new RegExp('^##\\s+'+tag+'\\b').test(l)); if(si<0) return text;
-  let end=lines.length, hi=-1; for(let i=si+1;i<lines.length;i++){ if(/^##\s/.test(lines[i])){ end=i; break; } if(/Highest assigned/.test(lines[i])) hi=i; }
-  let np=-1; for(let i=si+1;i<end;i++){ if(/\(none promoted\)/.test(lines[i])){ np=i; break; } }
-  if(np>=0) lines[np]=bullet; else lines.splice(hi>=0? hi+1 : si+1, 0, '', bullet);
-  return lines.join('\n');
-}
+   guarded. The pure builders it uses (getQueueCard/buildDomainBlock/promoteInQueue/
+   markIndexPromoted) live in canon-parse.js.                                     */
 function promoteCardModal(id){
   const cfg=ghCfg(); const date=new Date().toISOString().slice(0,10);
   const PRE={whiteSpace:'pre-wrap', background:'#fbf6ea', border:'1px solid var(--gold-soft)', borderRadius:'8px', padding:'9px 11px', fontSize:'12.5px', maxHeight:'190px', overflow:'auto', margin:'4px 0 10px'};
@@ -2301,36 +2356,6 @@ function promoteCardModal(id){
     return wrap;
   });
 }
-function parseQueueCards(text){
-  const lines=text.split('\n'); const cards=[]; let cur=null, section='';
-  for(const ln of lines){ const hm=/^#\s+(.*)/.exec(ln); if(hm) section=hm[1].trim();
-    const cm=/^##\s+(.*)/.exec(ln); if(cm){ if(cur) cards.push(cur); cur={title:cm[1].trim(), status:'', section}; continue; }
-    const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
-  if(cur) cards.push(cur);
-  // keep only real cards — a ## heading counts only if it has a Status line or an ID-style
-  // title (TAG-000). Drops the queue's structural headings (Purpose, Rules, section dividers).
-  const real=cards.filter(c=> c.status || /^[A-Z]{3}-\d{3}\b/.test(c.title));
-  real.forEach(c=> c.col=statusToCol(c.status, c.section)); return real;
-}
-// Raw ideas live in the RAW DUMP INBOX as a "> date — …" stamp + a paragraph, not as
-// ## cards, so parseQueueCards never saw them. Pull each one out as a Raw-column entry.
-function parseRawIdeas(text){
-  const lines=text.split('\n'); const out=[]; let inRaw=false, cur=null;
-  const flush=()=>{ if(cur){ const body=cur.body.join(' ').replace(/\s+/g,' ').trim();
-    if(body) out.push({ title: body.length>90? body.slice(0,90)+'…' : body, status: cur.label, col:'Raw', section:'RAW DUMP INBOX' }); } cur=null; };
-  for(const ln of lines){
-    const hm=/^#\s+(.*)/.exec(ln); if(hm){ flush(); inRaw=/raw dump/i.test(hm[1]); continue; }
-    if(!inRaw) continue;
-    if(/^---\s*$/.test(ln)){ flush(); continue; }
-    const q=/^>\s?(.*)/.exec(ln); if(q){ flush(); cur={ label:q[1].trim(), body:[] }; continue; }
-    if(cur && ln.trim()) cur.body.push(ln.trim());
-  }
-  flush(); return out;
-}
-function statusToCol(status, section){ const s=(status||'').toLowerCase();
-  if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
-  if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
-
 /* ---------- boot ----------------------------------------------------------- */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // flush the in-memory state to IndexedDB when the app is backgrounded/closed
