@@ -2166,7 +2166,10 @@ function parseQueueCards(text){
     const cm=/^##\s+(.*)/.exec(ln); if(cm){ if(cur) cards.push(cur); cur={title:cm[1].trim(), status:'', section}; continue; }
     const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
   if(cur) cards.push(cur);
-  cards.forEach(c=> c.col=statusToCol(c.status, c.section)); return cards;
+  // keep only real cards — a ## heading counts only if it has a Status line or an ID-style
+  // title (TAG-000). Drops the queue's structural headings (Purpose, Rules, section dividers).
+  const real=cards.filter(c=> c.status || /^[A-Z]{3}-\d{3}\b/.test(c.title));
+  real.forEach(c=> c.col=statusToCol(c.status, c.section)); return real;
 }
 // Raw ideas live in the RAW DUMP INBOX as a "> date — …" stamp + a paragraph, not as
 // ## cards, so parseQueueCards never saw them. Pull each one out as a Raw-column entry.
