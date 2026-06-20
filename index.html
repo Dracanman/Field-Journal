@@ -62,13 +62,19 @@
     background:linear-gradient(var(--paper) 78%, transparent);
     padding:10px 4px 14px; margin:-8px -4px 8px;
   }
-  .navmid{ display:flex; flex-wrap:wrap; align-items:center; gap:10px; flex:1 1 auto; min-width:0; }
-  .brand{ display:flex; align-items:center; gap:10px; cursor:pointer; }
+  /* one stable row that scrolls sideways if crowded — so toggling Cozy/Full never
+     changes the bar's height and the page below it never jumps. */
+  .navmid{ display:flex; flex-wrap:nowrap; align-items:center; gap:10px; flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
+  .navmid::-webkit-scrollbar{ display:none; }
+  .navmid .navbtn{ flex:0 0 auto; }
+  /* utility cluster: file / help / mode / side — fixed on the right, always fully visible */
+  .navutil{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+  .brand{ display:flex; align-items:center; gap:10px; cursor:pointer; flex:0 0 auto; }
   .brand .mark{ width:30px; height:30px; color:var(--green); flex:0 0 auto; }
-  .brand b{ font-family:'EB Garamond',serif; font-weight:600; color:var(--ink); font-size:18px; }
+  .brand b{ font-family:'EB Garamond',serif; font-weight:600; color:var(--ink); font-size:18px; white-space:nowrap; }
   .navbtn{
     border:1.5px solid var(--gold-soft); background:#fff8; color:var(--ink-soft);
-    border-radius:999px; padding:7px 15px; font-size:15px;
+    border-radius:999px; padding:7px 15px; font-size:15px; white-space:nowrap;
   }
   .navbtn:hover{ border-color:var(--gold); }
   .navbtn.primary{ background:#eef0e4; border-color:#cdd4b9; color:#4d5a36; }
@@ -653,18 +659,19 @@ function namingDefault(){ return {
 }; }
 function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, naming:namingDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
+function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
   try{
     let d = JSON.parse(localStorage.getItem(KEY));
-    if(!d){ d = JSON.parse(localStorage.getItem('vfj.v3')) || JSON.parse(localStorage.getItem('vfj.v2')) || JSON.parse(localStorage.getItem('vfj.v1')); }  // migrate v3/v2/v1
-    if(d && d.creations) return hydrate(d);
+    if(!validState(d)){ d = JSON.parse(localStorage.getItem('vfj.v3')) || JSON.parse(localStorage.getItem('vfj.v2')) || JSON.parse(localStorage.getItem('vfj.v1')); }  // migrate v3/v2/v1
+    if(validState(d)) return hydrate(d);
   }catch(e){}
   return null;
 }
-// Source of truth is IndexedDB (large quota). On first run there, migrate the
-// existing localStorage journal across so nothing is lost.
+// Source of truth is IndexedDB (large quota). If it's empty or corrupt, recover from
+// the localStorage mirror rather than silently handing back a blank journal.
 async function loadState(){
-  try{ const s=await idbGet(IDB_KEY); if(s && s.creations){ return hydrate(s); } }catch(e){}
+  try{ const s=await idbGet(IDB_KEY); if(validState(s)){ return hydrate(s); } }catch(e){}
   const local=migrateFromLocal();
   if(local){ idbSet(IDB_KEY, local).catch(()=>{}); return local; }
   return defaults();
@@ -675,7 +682,9 @@ function scheduleStateWrite(){ clearTimeout(_stateT); _stateT=setTimeout(flushSt
 function flushState(){ clearTimeout(_stateT); idbSet(IDB_KEY, DB).catch(()=>{ toast('Could not save to storage.'); }); }
 function saveLocal(){
   scheduleStateWrite();                                            // IndexedDB — the real store
-  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}  // best-effort small mirror; fine to skip if too big
+  // best-effort recovery mirror; never let a momentarily-empty journal wipe a non-empty
+  // backup (guards against a transient blank destroying the only local copy).
+  try{ if((DB.creations&&DB.creations.length) || !localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}
 }
 function save(){ saveLocal(); scheduleSync(); }                    // local + a (debounced, de-duped) repo sync
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
@@ -698,24 +707,45 @@ registerView('naming', () => viewNamingTree());
 
 function render(){
   $app.replaceChildren(topbar());
-  $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW));
+  // error boundary: a single view crash shows a gentle recover card, never a blank app.
+  try{ $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW)); }
+  catch(e){ $app.append(errorCard(e)); }
+}
+function errorCard(e){
+  return h('div',{style:{maxWidth:'560px', margin:'48px auto', padding:'24px 26px', border:'1.5px solid var(--gold-soft)', borderRadius:'12px', background:'#fffdf7', textAlign:'center'}},
+    h('h2',{class:'display'}, 'Something hiccuped'),
+    h('p',{class:'hint'}, 'This page hit a snag, but your work is safe on this device. Try going back to the start.'),
+    h('p',{class:'hint', style:{fontSize:'12px', opacity:'0.7', wordBreak:'break-word'}}, String((e&&e.message)||e)),
+    h('div',{class:'toolrow', style:{justifyContent:'center'}},
+      h('button',{class:'navbtn primary', onclick:()=>go(DB.profile==='worldbuilder'?'studio':'home')}, 'Back to start'),
+      h('button',{class:'navbtn', onclick:()=>{ try{ location.reload(); }catch(_){} }}, 'Reload')));
 }
 
 function topbar(){
   const full = DB.mode==='full', world = DB.profile==='worldbuilder';
-  return h('div',{class:'topbar no-print'},
-    h('div',{class:'brand', onclick:()=>go('home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
-    h('div',{class:'navmid'},
-      h('button',{class:'navbtn', onclick:()=>go('tour')}, 'Welcome to the World'),
-      h('button',{class:'navbtn', onclick:()=>go('gallery')}, (world?'My Journal':'My Field Journal')+(DB.creations.length?` (${DB.creations.length})`:'')),
-      h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'),
-      h('button',{class:'navbtn world-only', onclick:()=>go('studio')}, '⚒ Canon Studio'),
-      h('button',{class:'navbtn advanced-only', onclick:()=>openGitHubPanel()}, '☁ My file'),
-      h('button',{class:'navbtn advanced-only', 'aria-label':'how this works', title:'how this works', onclick:()=>showIntro(true)}, '?'),
-    ),
+  const n=DB.creations.length, count=n?` (${n})`:'';
+  // each profile sees only its own actions — the Maker never meets the canon machinery,
+  // the Worldbuilder leads with the Studio. Only the primary nav scrolls; the utility
+  // cluster (file / help / mode / side) is fixed on the right so nothing gets clipped.
+  const nav = world
+    ? h('div',{class:'navmid'},
+        h('button',{class:'navbtn primary', onclick:()=>go('studio')}, '⚒ Canon Studio'),
+        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count),
+        h('button',{class:'navbtn', onclick:()=>go('home')}, 'Make something'))
+    : h('div',{class:'navmid'},
+        h('button',{class:'navbtn', onclick:()=>go('tour')}, 'Welcome to the World'),
+        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Field Journal'+count),
+        h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'));
+  const uCls = world ? 'navbtn' : 'navbtn advanced-only';   // utilities hidden in Maker Cozy, always on for the Worldbuilder
+  const util = h('div',{class:'navutil'},
+    h('button',{class:uCls, onclick:()=>openGitHubPanel()}, '☁ My file'),
+    h('button',{class:uCls, 'aria-label':'how this works', title:'how this works', onclick:()=>showIntro(true)}, '?'),
     world? null : modeSwitch(full),
-    // current side — a deliberate switch (opens a confirm), not a one-tap toggle.
     h('button',{class:'navbtn profile-tag advanced-only', 'aria-label':'switch space', title:'switch space', onclick:()=>switchProfileSheet()}, world?'⚒ Worldbuilder':'✿ Maker'),
+  );
+  return h('div',{class:'topbar no-print'},
+    h('div',{class:'brand', onclick:()=>go(world?'studio':'home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
+    nav, util,
   );
 }
 // Two-part switch: both labels always visible, active one highlighted — so the
@@ -1522,15 +1552,57 @@ function sendToProcreate(w, state, image, opts){
 function ghCfg(){ return DB.github; }
 function ghReady(){ const g=DB.github; return !!(g && g.token && g.owner && g.repo); }
 function ghHeaders(token){ return { 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }; }
+const ghSleep=ms=>new Promise(r=>setTimeout(r,ms));
+// a friendly, typed error for a GitHub response status
+function ghErr(status, body){
+  const m = (status===401||status===403) ? 'GitHub rejected the token — check it’s valid with Contents: read & write.'
+    : status===404 ? 'Not found on GitHub.'
+    : (status===409||status===422) ? 'The file changed on the server since you loaded it.'
+    : status===429 ? 'GitHub is rate-limiting — try again in a moment.'
+    : status>=500 ? 'GitHub is having trouble (server error) — try again shortly.'
+    : status ? ('GitHub error '+status) : 'Could not reach GitHub (check your connection).';
+  const e=new Error(m + (body? ' '+String(body).replace(/\s+/g,' ').slice(0,120):'')); e.status=status||0; return e;
+}
+function isConflict(e){ return !!e && (e.status===409 || e.status===422); }
+// fetch with retry/backoff on transient failures (network, 429, 5xx). Returns the
+// Response (caller checks .ok for non-retryable statuses like 401/404/409); throws a
+// typed ghErr only when transient retries are exhausted or the network is unreachable.
+async function ghFetch(url, opts, tries){
+  tries=tries||3; let last;
+  for(let i=0;i<tries;i++){
+    if(i) await ghSleep(400*Math.pow(2,i-1) + Math.floor(Math.random()*200));
+    let r; try{ r=await fetch(url, opts); }catch(e){ last=ghErr(0); continue; }
+    if(r.status===429 || r.status>=500){ last=ghErr(r.status); continue; }
+    return r;
+  }
+  throw last || ghErr(0);
+}
+function ghUrl(cfg, path){ return `https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`; }
 function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
 function ub64(b64str){ return decodeURIComponent(escape(atob(String(b64str||'').replace(/\s+/g,'')))); }   // base64 (GitHub wraps it at 60 cols) -> UTF-8 text
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')||'field-journal'; }
 function stemOf(cfg){ return cfg.displayName? slug(cfg.displayName) : 'field-journal'; }
-async function ghTest(cfg){ const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {headers:ghHeaders(cfg.token)}); if(!r.ok) throw new Error('GitHub returned '+r.status); return r.json(); }
-async function ghMeta(cfg, path){ const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}?ref=${encodeURIComponent(cfg.branch)}`, {headers:ghHeaders(cfg.token)}); if(r.status===404) return null; if(!r.ok) throw new Error('read '+r.status); return r.json(); }
+async function ghTest(cfg){ const r=await ghFetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {headers:ghHeaders(cfg.token)}); if(!r.ok) throw ghErr(r.status); return r.json(); }
+async function ghMeta(cfg, path){ const r=await ghFetch(ghUrl(cfg,path)+`?ref=${encodeURIComponent(cfg.branch)}`, {headers:ghHeaders(cfg.token)}); if(r.status===404) return null; if(!r.ok) throw ghErr(r.status, await r.text().catch(()=>'')); return r.json(); }
 async function ghPut(cfg, path, content, message, sha){ const body={ message, content:b64(content), branch:cfg.branch }; if(sha) body.sha=sha;
-  const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {method:'PUT', headers:ghHeaders(cfg.token), body:JSON.stringify(body)});
-  if(!r.ok) throw new Error('write '+r.status+' '+(await r.text()).slice(0,140)); return r.json(); }
+  const r=await ghFetch(ghUrl(cfg,path), {method:'PUT', headers:ghHeaders(cfg.token), body:JSON.stringify(body)});
+  if(!r.ok) throw ghErr(r.status, await r.text().catch(()=>'')); return r.json(); }
+// conflict-safe transform write: read -> guard? -> transform(text) -> put; if the file
+// changed underneath us (sha conflict), re-read and re-apply the transform on the fresh
+// text. `transform` must be a pure function of the current text, so re-applying is safe.
+async function ghUpdate(cfg, path, transform, message, opts){
+  opts=opts||{};
+  for(let attempt=0; attempt<3; attempt++){
+    const r=await ghGetText(cfg, path);
+    if(!r && !opts.create) throw new Error(path+' not found');
+    const cur = r ? r.text : '';
+    if(opts.guard) opts.guard(cur);
+    const next = transform(cur);
+    if(r && next===cur) return r;            // nothing to change
+    try{ return await ghPut(cfg, path, next, message, r && r.sha); }
+    catch(e){ if(isConflict(e) && attempt<2) continue; throw e; }
+  }
+}
 // read a repo text file -> { text, sha } (or null if missing). Decodes the authenticated
 // base64 the Contents API already returned — never the raw.githubusercontent CDN, which can
 // serve a stale "404: Not Found" body for private/just-written files (that bogus body once
@@ -1557,10 +1629,12 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
   try{
     const jsonPath=`${base}/${stem}.json`;
-    const jMeta=await ghMeta(cfg, jsonPath); await ghPut(cfg, jsonPath, payload, `Update ${stem} journal`, jMeta&&jMeta.sha);
+    // conflict-safe: if the file moved on the server (another device synced), fold that
+    // remote journal into ours before writing, so a second device never erases the first.
+    await ghUpdate(cfg, jsonPath, remote=>{ if(remote){ try{ mergeIncoming(JSON.parse(remote)); }catch(_){} } return JSON.stringify(syncPayload(), null, 1); }, `Update ${stem} journal`, {create:true});
+    _lastSyncedJSON = JSON.stringify(syncPayload(), null, 1); saveLocal();   // capture any merged-in remote work
     // the human-readable .md only re-renders on an explicit save, so background syncs stay one commit
-    if(!opts.silent){ const mdPath=`${base}/${stem}.md`; const mdMeta=await ghMeta(cfg, mdPath); await ghPut(cfg, mdPath, renderJournalMarkdown(), `Update ${stem} journal (readable)`, mdMeta&&mdMeta.sha); }
-    _lastSyncedJSON = payload;
+    if(!opts.silent){ const mdPath=`${base}/${stem}.md`; await ghUpdate(cfg, mdPath, ()=>renderJournalMarkdown(), `Update ${stem} journal (readable)`, {create:true}); }
     if(!opts.silent) toast('Saved to your file in the world.');
   }catch(e){ if(!opts.silent) toast('Sync failed: '+e.message); }
   finally{ syncing=false; }
@@ -1956,6 +2030,12 @@ function tagFromCategory(cat){ cat=String(cat||''); if(/41_VAEL/.test(cat))retur
 // guard a write: refuse to touch the queue unless the text we read back really is the queue.
 // (A stale "404: Not Found" body once slipped through and got written over the whole file.)
 function assertQueue(text){ if(!/^#\s+02_PROMOTION_QUEUE\.md/m.test(text) || !/^#\s+RAW DUMP INBOX/m.test(text)) throw new Error('refusing to write — the file I read back isn’t the queue (try again in a moment)'); return text; }
+// same guard idea for the other canon files we write — never write back something that
+// isn't the file we think it is (e.g. a stale "404: Not Found" body).
+function assertIndex(text){ if(!/^#\s+01_CANON_INDEX\.md/m.test(text) && !/Canon ID Registry/.test(text)) throw new Error('refusing to write — that file isn’t the canon index'); return text; }
+function assertDomain(text){ if(text && !/^#\s/m.test(text)) throw new Error('refusing to write — that domain file doesn’t look right'); return text; }
+function validCanonId(id){ return /^[A-Z]{3}-\d{3}$/.test(String(id||'')); }
+function validCanonTag(tag){ return CANON_TAGS.indexOf(String(tag)) >= 0; }
 function insertUnderSection(text, header, block){
   const lines=text.split('\n'); const hi=lines.findIndex(l=>l.trim()===header);
   if(hi<0) return text.replace(/\s*$/,'')+'\n\n'+header+'\n\n'+block.trim()+'\n';
@@ -2228,9 +2308,9 @@ function creationToCard(c){
   const bullets=[]; (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) bullets.push('Element: '+elementLabelOf(f.element)); return; } const v=(f[fld.key]||'').trim(); if(v) bullets.push((fld.cardLabel||fld.label)+': '+v); });
   return { tag, title, category:cat, source:'Made by '+((DB.github&&DB.github.makerStem)||'the maker')+' in the Field Journal kit', claim:title+(bullets[0]? ' — '+bullets[0].replace(/^[^:]+:\s*/,''):''), means:bullets.join('\n'), donot:'', notes:'From her journal.' };
 }
-async function appendRawDump(text){ const cfg=ghCfg(); const r=await ghGetText(cfg, QUEUE_PATH); if(!r) throw new Error('queue not found'); assertQueue(r.text);
+async function appendRawDump(text){ const cfg=ghCfg();
   const block='> '+new Date().toISOString().slice(0,10)+' — Studio raw dump\n\n'+text;
-  await ghPut(cfg, QUEUE_PATH, insertUnderSection(r.text, '# RAW DUMP INBOX', block), 'Raw dump via Studio', r.sha); }
+  await ghUpdate(cfg, QUEUE_PATH, q=>insertUnderSection(q, '# RAW DUMP INBOX', block), 'Raw dump via Studio', {guard:assertQueue}); }
 function studioDrafter(host, prefill){
   const cfg=ghCfg(); const d=Object.assign({tag:'VAE', title:'', category:'', source:'Field Journal Studio', claim:'', means:'', donot:'', notes:''}, prefill||{});
   const highest={};
@@ -2263,10 +2343,10 @@ function studioDrafter(host, prefill){
   (async()=>{ try{ const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t)); }catch(e){} refresh(); })();
   async function appendCard(){ status.textContent='Saving…';
     try{ const id=curId();
-      const q=await ghGetText(cfg, QUEUE_PATH); if(!q) throw new Error('queue not found'); assertQueue(q.text);
+      if(!validCanonId(id) || !validCanonTag(tagSel.value)) throw new Error('that id/tag looks wrong ('+id+')');
       const card=canonCardMarkdown({ id, title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
-      await ghPut(cfg, QUEUE_PATH, insertUnderSection(q.text, '# ACTIVE CANON CARDS', card), 'Draft '+id+' via Studio', q.sha);
-      const ix=await ghGetText(cfg, INDEX_PATH); if(ix){ const next=bumpIndex(ix.text, tagSel.value, id, titleIn.value); if(next!==ix.text) await ghPut(cfg, INDEX_PATH, next, 'Reserve '+id+' via Studio', ix.sha); }
+      await ghUpdate(cfg, QUEUE_PATH, q=>insertUnderSection(q, '# ACTIVE CANON CARDS', card), 'Draft '+id+' via Studio', {guard:assertQueue});
+      await ghUpdate(cfg, INDEX_PATH, ix=>bumpIndex(ix, tagSel.value, id, titleIn.value), 'Reserve '+id+' via Studio', {guard:assertIndex});
       highest[tagSel.value]=parseInt(id.split('-')[1],10);
       status.textContent='Appended '+id+' to the queue and reserved the ID.'; toast(id+' drafted to the queue.'); refresh();
     }catch(e){ status.textContent='Failed: '+e.message; }
@@ -2341,15 +2421,16 @@ function promoteCardModal(id){
       btn.onclick=async()=>{ btn.disabled=true; status.textContent='Promoting…';
         try{
           const destFile=sel.value;
+          // re-read the card fresh just before writing
           const qf=await ghGetText(cfg, QUEUE_PATH); assertQueue(qf.text);
           const c=getQueueCard(qf.text, id); if(!c) throw new Error('card no longer in the queue');
-          const dom=await ghGetText(cfg, destFile); if(dom && !/^#\s/m.test(dom.text)) throw new Error('that domain file doesn’t look right — aborting');
-          const ix=await ghGetText(cfg, INDEX_PATH);
-          const newDom=(dom? dom.text.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n';
-          await ghPut(cfg, destFile, newDom, 'Promote '+id+' → '+destFile, dom&&dom.sha);
-          if(ix){ const ni=markIndexPromoted(ix.text, id, c.desc, destFile, date); if(ni!==ix.text) await ghPut(cfg, INDEX_PATH, ni, 'Mark '+id+' promoted in the index', ix.sha); }
-          const nq=promoteInQueue(qf.text, id, destFile, date); assertQueue(nq); await ghPut(cfg, QUEUE_PATH, nq, 'Queue hygiene: '+id+' promoted', qf.sha);
-          try{ const cl=await ghGetText(cfg, 'legacy/99_CHANGELOG.md'); if(cl) await ghPut(cfg, 'legacy/99_CHANGELOG.md', cl.text.replace(/\s*$/,'')+'\n- '+date+' — PROMOTED '+id+' — '+c.desc+' → '+destFile+'.\n', 'Log '+id+' promotion', cl.sha); }catch(e){}
+          if(!validCanonId(id)) throw new Error('that card id looks wrong ('+id+')');
+          // each write is conflict-safe (re-reads + re-applies if the file moved) and guarded
+          status.textContent='Writing canon…';
+          await ghUpdate(cfg, destFile, dom=> (dom? dom.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n', 'Promote '+id+' → '+destFile, {guard:assertDomain, create:true});
+          await ghUpdate(cfg, INDEX_PATH, ix=>markIndexPromoted(ix, id, c.desc, destFile, date), 'Mark '+id+' promoted in the index', {guard:assertIndex});
+          await ghUpdate(cfg, QUEUE_PATH, q=>promoteInQueue(q, id, destFile, date), 'Queue hygiene: '+id+' promoted', {guard:assertQueue});
+          try{ await ghUpdate(cfg, 'legacy/99_CHANGELOG.md', cl=> cl.replace(/\s*$/,'')+'\n- '+date+' — PROMOTED '+id+' — '+c.desc+' → '+destFile+'.\n', 'Log '+id+' promotion'); }catch(e){}
           toast(id+' promoted to canon.'); close(); go('studio',{tab:'board'});
         }catch(e){ status.textContent='Failed: '+e.message; btn.disabled=false; } };
     }catch(e){ body.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
@@ -2365,9 +2446,12 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   try{ DB = await loadState(); }catch(e){ DB = defaults(); }
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
   applyMode();
+  if(DB.profileChosen && DB.profile==='worldbuilder') VIEW={name:'studio'};   // the Worldbuilder lands in the Studio, not the maker home
   render();
   firstRun();
-  if(ghReady() && DB.syncOnOpen) loadFromRepo({silent:true});   // converge devices on open (merge-only)
+  // self-heal: load from the repo on open when asked to converge devices, OR whenever the
+  // local journal came up empty but a repo file exists (recovers from storage eviction).
+  if(ghReady() && (DB.syncOnOpen || !(DB.creations && DB.creations.length))) loadFromRepo({silent:true});
 })();
 </script>
 </body>
