@@ -67,8 +67,12 @@
   .navmid{ display:flex; flex-wrap:nowrap; align-items:center; gap:10px; flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
   .navmid::-webkit-scrollbar{ display:none; }
   .navmid .navbtn{ flex:0 0 auto; }
-  /* utility cluster: file / help / mode / side — fixed on the right, always fully visible */
+  /* utility cluster: mode toggle + the ⋯ More sheet — fixed on the right, always visible */
   .navutil{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
+  .moremenu{ display:flex; flex-direction:column; gap:8px; }
+  .moremenu .navbtn{ width:100%; }
+  /* drop the wordmark when space is tight so the bar fits one line (logo still links home) */
+  @media (max-width:1100px){ .brand b{ display:none; } }
   .brand{ display:flex; align-items:center; gap:10px; cursor:pointer; flex:0 0 auto; }
   .brand .mark{ width:30px; height:30px; color:var(--green); flex:0 0 auto; }
   .brand b{ font-family:'EB Garamond',serif; font-weight:600; color:var(--ink); font-size:18px; white-space:nowrap; }
@@ -736,17 +740,28 @@ function topbar(){
         h('button',{class:'navbtn', onclick:()=>go('tour')}, 'Welcome to the World'),
         h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Field Journal'+count),
         h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'));
-  const uCls = world ? 'navbtn' : 'navbtn advanced-only';   // utilities hidden in Maker Cozy, always on for the Worldbuilder
+  // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
+  // no clip). The Cozy/Full toggle stays out (it's how you toggle). The Maker in Cozy has
+  // no advanced utilities, so no ⋯ shows there.
+  const showMore = world || full;
   const util = h('div',{class:'navutil'},
-    h('button',{class:uCls, onclick:()=>openGitHubPanel()}, '☁ My file'),
-    h('button',{class:uCls, 'aria-label':'how this works', title:'how this works', onclick:()=>showIntro(true)}, '?'),
     world? null : modeSwitch(full),
-    h('button',{class:'navbtn profile-tag advanced-only', 'aria-label':'switch space', title:'switch space', onclick:()=>switchProfileSheet()}, world?'⚒ Worldbuilder':'✿ Maker'),
+    showMore? h('button',{class:'navbtn', 'aria-label':'more', title:'more', onclick:()=>moreMenu()}, '⋯') : null,
   );
   return h('div',{class:'topbar no-print'},
     h('div',{class:'brand', onclick:()=>go(world?'studio':'home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
     nav, util,
   );
+}
+function moreMenu(){
+  const world = DB.profile==='worldbuilder'; let close;
+  const item=(label, fn)=> h('button',{class:'navbtn', style:{justifyContent:'flex-start', textAlign:'left'}, onclick:()=>{ close(); fn(); }}, label);
+  const sheet=h('div',{class:'moremenu'},
+    item('☁ My file', ()=>openGitHubPanel()),
+    item('? How this works', ()=>showIntro(true)),
+    item(world? '✿ Switch to the Maker’s journal' : '⚒ Switch to the Worldbuilder', ()=>switchProfileSheet()),
+  );
+  close=showModalNode('More', null, sheet);
 }
 // Two-part switch: both labels always visible, active one highlighted — so the
 // "Full kit" the intro mentions is always right there to tap.
