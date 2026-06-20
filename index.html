@@ -1511,6 +1511,7 @@ function ghCfg(){ return DB.github; }
 function ghReady(){ const g=DB.github; return !!(g && g.token && g.owner && g.repo); }
 function ghHeaders(token){ return { 'Authorization':'Bearer '+token, 'Accept':'application/vnd.github+json', 'X-GitHub-Api-Version':'2022-11-28' }; }
 function b64(str){ return btoa(unescape(encodeURIComponent(str))); }
+function ub64(b64str){ return decodeURIComponent(escape(atob(String(b64str||'').replace(/\s+/g,'')))); }   // base64 (GitHub wraps it at 60 cols) -> UTF-8 text
 function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')||'field-journal'; }
 function stemOf(cfg){ return cfg.displayName? slug(cfg.displayName) : 'field-journal'; }
 async function ghTest(cfg){ const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {headers:ghHeaders(cfg.token)}); if(!r.ok) throw new Error('GitHub returned '+r.status); return r.json(); }
@@ -1518,9 +1519,18 @@ async function ghMeta(cfg, path){ const r=await fetch(`https://api.github.com/re
 async function ghPut(cfg, path, content, message, sha){ const body={ message, content:b64(content), branch:cfg.branch }; if(sha) body.sha=sha;
   const r=await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path.split('/').map(encodeURIComponent).join('/')}`, {method:'PUT', headers:ghHeaders(cfg.token), body:JSON.stringify(body)});
   if(!r.ok) throw new Error('write '+r.status+' '+(await r.text()).slice(0,140)); return r.json(); }
-// read a repo text file -> { text, sha } (or null if missing). Uses download_url so it
-// works for files over the 1MB contents-API inline limit too.
-async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!meta) return null; const text=await (await fetch(meta.download_url)).text(); return { text, sha:meta.sha }; }
+// read a repo text file -> { text, sha } (or null if missing). Decodes the authenticated
+// base64 the Contents API already returned — never the raw.githubusercontent CDN, which can
+// serve a stale "404: Not Found" body for private/just-written files (that bogus body once
+// got parsed as canon AND written back, clobbering the queue). Only files over the ~1MB
+// inline limit (no inline content) fall back to download_url.
+async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!meta) return null;
+  let text;
+  if(meta.encoding==='base64' && typeof meta.content==='string'){ text=ub64(meta.content); }
+  else if(meta.download_url){ text=await (await fetch(meta.download_url)).text(); }
+  else throw new Error('could not read '+path);
+  text=text.replace(/^﻿/,'');   // strip a UTF-8 BOM if present
+  return { text, sha:meta.sha }; }
 // Only the *shareable* journal travels to the repo — never device-only flags
 // (token, mode, profile, seenIntro, the GitHub config). That way toggling Cozy/Full,
 // dismissing a dialog, or switching sides never makes a commit, and an unchanged
@@ -1557,8 +1567,8 @@ function mergeIncoming(inc){
 }
 async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
-  try{ const meta=await ghMeta(cfg, `${base}/${stem}.json`); if(!meta){ if(!opts.silent) toast('No saved file found yet.'); return; }
-    const raw=await (await fetch(meta.download_url)).text(); mergeIncoming(JSON.parse(raw));
+  try{ const r=await ghGetText(cfg, `${base}/${stem}.json`); if(!r){ if(!opts.silent) toast('No saved file found yet.'); return; }
+    mergeIncoming(JSON.parse(r.text));
     saveLocal(); if(!opts.silent) toast('Loaded from your file.'); render();   // don't echo a sync back out
   }catch(e){ if(!opts.silent) toast('Load failed: '+e.message); }
 }
@@ -1925,6 +1935,9 @@ function mdToHtml(md){
 }
 function pad3(n){ return String(n).padStart(3,'0'); }
 function parseHighest(indexText, tag){ const m=new RegExp('\\*\\*Highest assigned:\\*\\*\\s*'+tag+'-(\\d+)','i').exec(indexText); return m? parseInt(m[1],10) : 0; }
+// guard a write: refuse to touch the queue unless the text we read back really is the queue.
+// (A stale "404: Not Found" body once slipped through and got written over the whole file.)
+function assertQueue(text){ if(!/^#\s+02_PROMOTION_QUEUE\.md/m.test(text) || !/^#\s+RAW DUMP INBOX/m.test(text)) throw new Error('refusing to write — the file I read back isn’t the queue (try again in a moment)'); return text; }
 function insertUnderSection(text, header, block){
   const lines=text.split('\n'); const hi=lines.findIndex(l=>l.trim()===header);
   if(hi<0) return text.replace(/\s*$/,'')+'\n\n'+header+'\n\n'+block.trim()+'\n';
@@ -2039,7 +2052,7 @@ function creationToCard(c){
   const bullets=[]; (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) bullets.push('Element: '+elementLabelOf(f.element)); return; } const v=(f[fld.key]||'').trim(); if(v) bullets.push((fld.cardLabel||fld.label)+': '+v); });
   return { tag, title, category:cat, source:'Made by '+((DB.github&&DB.github.makerStem)||'the maker')+' in the Field Journal kit', claim:title+(bullets[0]? ' — '+bullets[0].replace(/^[^:]+:\s*/,''):''), means:bullets.join('\n'), donot:'', notes:'From her journal.' };
 }
-async function appendRawDump(text){ const cfg=ghCfg(); const r=await ghGetText(cfg, QUEUE_PATH); if(!r) throw new Error('queue not found');
+async function appendRawDump(text){ const cfg=ghCfg(); const r=await ghGetText(cfg, QUEUE_PATH); if(!r) throw new Error('queue not found'); assertQueue(r.text);
   const block='> '+new Date().toISOString().slice(0,10)+' — Studio raw dump\n\n'+text;
   await ghPut(cfg, QUEUE_PATH, insertUnderSection(r.text, '# RAW DUMP INBOX', block), 'Raw dump via Studio', r.sha); }
 function studioDrafter(host, prefill){
@@ -2074,7 +2087,7 @@ function studioDrafter(host, prefill){
   (async()=>{ try{ const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t)); }catch(e){} refresh(); })();
   async function appendCard(){ status.textContent='Saving…';
     try{ const id=curId();
-      const q=await ghGetText(cfg, QUEUE_PATH); if(!q) throw new Error('queue not found');
+      const q=await ghGetText(cfg, QUEUE_PATH); if(!q) throw new Error('queue not found'); assertQueue(q.text);
       const card=canonCardMarkdown({ id, title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
       await ghPut(cfg, QUEUE_PATH, insertUnderSection(q.text, '# ACTIVE CANON CARDS', card), 'Draft '+id+' via Studio', q.sha);
       const ix=await ghGetText(cfg, INDEX_PATH); if(ix){ const next=bumpIndex(ix.text, tagSel.value, id, titleIn.value); if(next!==ix.text) await ghPut(cfg, INDEX_PATH, next, 'Reserve '+id+' via Studio', ix.sha); }
