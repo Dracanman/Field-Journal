@@ -240,11 +240,14 @@
   .studio-tabs .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
   .canon-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
   .canon-list .pick small{ text-transform:none; letter-spacing:0; }
-  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; box-sizing:border-box; overflow-wrap:anywhere; }
-  .canon-doc h2{ font-size:24px; margin:14px 0 6px; overflow-wrap:anywhere; }
+  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; box-sizing:border-box; overflow-wrap:anywhere; overflow-x:hidden; }
+  .canon-doc h2, .canon-doc h4{ overflow-wrap:anywhere; }
+  .canon-doc h2{ font-size:24px; margin:14px 0 6px; }
   .canon-doc h3{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:16px 0 4px; overflow-wrap:anywhere; }
   .canon-doc p, .canon-doc li{ margin:0 0 10px; overflow-wrap:anywhere; }
-  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
+  /* diagram/structured blocks: a self-contained scrollable box — keeps ASCII aligned and never spills the page (iOS pre-wrap is unreliable for wide lines) */
+  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .canon-doc pre.raw{ white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }   /* View raw = prose source: wrap it */
   .canon-doc code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; overflow-wrap:anywhere; }
   .search-row{ display:flex; gap:10px; margin-bottom:16px; max-width:820px; margin-inline:auto; }
   .search-row input{ flex:1; min-width:0; border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
@@ -2020,7 +2023,7 @@ function studioBrowse(host){
   async function openDomain(d){ docHost.replaceChildren(h('p',{class:'hint'}, 'Loading '+d.file+'…'));
     try{ const r=await ghGetText(cfg, d.file); if(!r){ docHost.replaceChildren(h('p',{class:'hint'},'Not found.')); return; }
       const doc=h('div',{class:'canon-doc'}); doc.innerHTML=mdToHtml(r.text);
-      docHost.replaceChildren(h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:()=>{ const raw=h('div',{class:'canon-doc'}, h('pre',null,r.text)); docHost.replaceChildren(raw); }}, 'View raw')), doc);
+      docHost.replaceChildren(h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:()=>{ const raw=h('div',{class:'canon-doc'}, h('pre',{class:'raw'},r.text)); docHost.replaceChildren(raw); }}, 'View raw')), doc);
     }catch(e){ docHost.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
   async function runSearch(){ const q=search.value.trim().toLowerCase(); if(!q) return; docHost.replaceChildren(); results.replaceChildren(h('p',{class:'hint'},'Searching…'));
     try{ const hits=[]; for(const d of DOMAIN_FILES){ const r=await ghGetText(cfg, d.file); if(!r) continue; r.text.split('\n').forEach((ln,idx)=>{ if(ln.toLowerCase().includes(q)) hits.push({file:d.file, ln:ln.trim(), n:idx+1}); }); }
