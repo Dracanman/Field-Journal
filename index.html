@@ -8,7 +8,9 @@
 <meta name="apple-mobile-web-app-title" content="Field Journal">
 <meta name="theme-color" content="#faf4e6">
 <link rel="manifest" href="manifest.webmanifest">
-<link rel="apple-touch-icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
 <title>The Vael Field Journal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -201,6 +203,8 @@
   .gal-card .acts{ display:flex; gap:4px; padding:0 8px 10px; flex-wrap:wrap; }
   .gal-card .acts button{ font-size:13px; border:1px solid var(--gold-soft); background:#fff8; border-radius:6px; padding:4px 9px; color:var(--ink-soft); }
   .empty-note{ color:var(--hint); font-style:italic; padding:18px 2px; }
+  .spark-row{ display:flex; gap:12px; align-items:flex-start; justify-content:space-between; background:var(--paper-card); border:1px solid #e6dcc4; border-radius:8px; padding:10px 13px; margin-bottom:8px; }
+  .spark-text{ white-space:pre-wrap; color:var(--ink-soft); flex:1; }
 
   /* ---------- prose (tour) ---------- */
   .prose{ max-width:760px; margin:0 auto; }
@@ -217,6 +221,7 @@
   .modal h2{ font-size:24px; margin-bottom:6px; }
   .modal textarea{ width:100%; min-height:240px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; border:1px solid var(--gold-soft); border-radius:8px; padding:12px; background:#fffdf7; color:var(--ink-soft); }
   .toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:var(--ink); color:#faf4e6; padding:11px 20px; border-radius:999px; font-size:15px; z-index:80; box-shadow:0 12px 30px -12px #2e2a24aa; }
+  .toast-undo{ background:none; border:none; color:#e7c989; font:inherit; font-size:15px; margin-left:14px; padding:0; text-decoration:underline; cursor:pointer; }
 
   /* ---------- mode gating (Cozy / Full kit) ---------- */
   body.mode-simple .advanced-only{ display:none !important; }
@@ -279,6 +284,11 @@
   .intro p{ margin:0 0 8px; }
   .intro .steps{ text-align:left; margin:12px auto 16px; max-width:330px; color:var(--ink-soft); }
   .intro .steps li{ margin:6px 0; }
+  .intro .profile-pick{ display:flex; flex-direction:column; gap:12px; margin:10px 0 2px; }
+  .ppick{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:14px 16px; border-radius:12px; }
+  .ppick b{ font-size:18px; color:var(--ink); }
+  .ppick small{ color:var(--hint); font-style:italic; line-height:1.3; }
+  .profile-tag{ flex:0 0 auto; color:var(--hint); }
 
   /* ---------- github panel ---------- */
   .gh label{ display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
@@ -508,6 +518,8 @@ const WORKSHEETS = [
     ],
     example:null,
   },
+  { id:'sparks', kit:'field', special:'sparks', accent:'gold', title:'Ideas & Sparks',
+    subtitle:'jot any little spark — random ideas, names, what-ifs, kept in one place' },
 
   /* ===== Kit B — Worldmaker's Pages ===== */
   {
@@ -611,9 +623,22 @@ const SEED_SLOTS = ['A Seed','A Leaf','A Stone','A Flower','A Bark','A Root','A 
 const KNOWN_ROOTS = [ {root:'-druun', meaning:'earth · stone · buried-roots', locked:true}, {root:'-thari', meaning:'wood · grove · sanctuary', locked:true} ];
 const OPEN_ROOTS = ['-maren','-aeryn','-karin','-lunai','-sorin'];
 
-/* ---------- persistence ---------------------------------------------------- */
+/* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
-let DB = load();
+const IDB_NAME='vfj', IDB_STORE='kv', IDB_KEY='state';
+let _idb=null;
+function idbOpen(){
+  if(_idb) return Promise.resolve(_idb);
+  return new Promise((res,rej)=>{
+    let req; try{ req=indexedDB.open(IDB_NAME,1); }catch(e){ rej(e); return; }
+    req.onupgradeneeded=()=>{ const db=req.result; if(!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE); };
+    req.onsuccess=()=>{ _idb=req.result; res(_idb); };
+    req.onerror=()=>rej(req.error||new Error('indexedDB open failed'));
+  });
+}
+function idbGet(key){ return idbOpen().then(db=>new Promise((res,rej)=>{ const r=db.transaction(IDB_STORE,'readonly').objectStore(IDB_STORE).get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); })); }
+function idbSet(key,val){ return idbOpen().then(db=>new Promise((res,rej)=>{ const t=db.transaction(IDB_STORE,'readwrite'); t.objectStore(IDB_STORE).put(val,key); t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); t.onabort=()=>rej(t.error||new Error('write aborted')); })); }
+
 // the Naming Tree's seed state — Del's draft (maren/aeryn proposed; druun/thari locked canon)
 function namingDefault(){ return {
   established: { Earth:'-druun', Wood:'-thari', Water:'-maren', Air:'-aeryn' },
@@ -621,16 +646,33 @@ function namingDefault(){ return {
   openRoots: ['-karin','-lunai','-sorin'],
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
-function defaults(){ return { creations:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', naming:namingDefault() }; }
-function load(){
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, naming:namingDefault() }; }
+function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
+function migrateFromLocal(){
   try{
     let d = JSON.parse(localStorage.getItem(KEY));
     if(!d){ d = JSON.parse(localStorage.getItem('vfj.v3')) || JSON.parse(localStorage.getItem('vfj.v2')) || JSON.parse(localStorage.getItem('vfj.v1')); }  // migrate v3/v2/v1
-    if(d && d.creations){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
+    if(d && d.creations) return hydrate(d);
   }catch(e){}
+  return null;
+}
+// Source of truth is IndexedDB (large quota). On first run there, migrate the
+// existing localStorage journal across so nothing is lost.
+async function loadState(){
+  try{ const s=await idbGet(IDB_KEY); if(s && s.creations){ return hydrate(s); } }catch(e){}
+  const local=migrateFromLocal();
+  if(local){ idbSet(IDB_KEY, local).catch(()=>{}); return local; }
   return defaults();
 }
-function save(){ try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){ toast('Could not save — storage may be full.'); } scheduleSync(); }
+let DB = defaults();   // replaced by loadState() in init() before the first render
+let _stateT=null;
+function scheduleStateWrite(){ clearTimeout(_stateT); _stateT=setTimeout(flushState, 120); }
+function flushState(){ clearTimeout(_stateT); idbSet(IDB_KEY, DB).catch(()=>{ toast('Could not save to storage.'); }); }
+function save(){
+  scheduleStateWrite();                                            // IndexedDB — the real store
+  try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}  // best-effort small mirror; fine to skip if too big
+  scheduleSync();
+}
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; return DB.counters[wsId]; }
 
@@ -660,21 +702,19 @@ function topbar(){
       h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'),
       h('button',{class:'navbtn world-only', onclick:()=>go('studio')}, '⚒ Canon Studio'),
       h('button',{class:'navbtn advanced-only', onclick:()=>openGitHubPanel()}, '☁ My file'),
-      h('button',{class:'navbtn advanced-only', title:'how this works', onclick:()=>showIntro(true)}, '?'),
+      h('button',{class:'navbtn advanced-only', 'aria-label':'how this works', title:'how this works', onclick:()=>showIntro(true)}, '?'),
     ),
     world? null : modeSwitch(full),
-    h('div',{class:'modeswitch advanced-only', title:'who’s using this'},
-      h('button',{class:'seg'+(!world?' on':''), onclick:()=>{ if(world) setProfile('maker'); }}, '✿ Maker'),
-      h('button',{class:'seg'+(world?' on':''), onclick:()=>{ if(!world) setProfile('worldbuilder'); }}, '⚒ Worldbuilder'),
-    ),
+    // current side — a deliberate switch (opens a confirm), not a one-tap toggle.
+    h('button',{class:'navbtn profile-tag advanced-only', 'aria-label':'switch space', title:'switch space', onclick:()=>switchProfileSheet()}, world?'⚒ Worldbuilder':'✿ Maker'),
   );
 }
 // Two-part switch: both labels always visible, active one highlighted — so the
 // "Full kit" the intro mentions is always right there to tap.
 function modeSwitch(full){
-  return h('div',{class:'modeswitch', title:'how much the kit shows'},
-    h('button',{class:'seg'+(!full?' on':''), onclick:()=>{ if(full) setMode('simple'); }}, '✿ Cozy'),
-    h('button',{class:'seg'+(full?' on':''), onclick:()=>{ if(!full) setMode('full'); }}, '✦ Full kit'),
+  return h('div',{class:'modeswitch', role:'group', title:'how much the kit shows'},
+    h('button',{class:'seg'+(!full?' on':''), 'aria-pressed':(!full)?'true':'false', onclick:()=>{ if(full) setMode('simple'); }}, '✿ Cozy'),
+    h('button',{class:'seg'+(full?' on':''), 'aria-pressed':full?'true':'false', onclick:()=>{ if(!full) setMode('full'); }}, '✦ Full kit'),
   );
 }
 function setProfile(p){ DB.profile=p; save(); applyMode(); go(p==='worldbuilder'?'studio':'home'); toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : 'Maker — the journal.'); }
@@ -802,7 +842,7 @@ function Doodle(initial, placeholder){
 
   const el = h('div',{class:'doodle'}, placeholder? h('div',{class:'ph no-print'},placeholder):null, cv, palette);
   function isBlank(){ const d=ctx.getImageData(0,0,cv.width,cv.height).data; for(let i=3;i<d.length;i+=4){ if(d[i]!==0) return false; } return true; }
-  return { el, getData:()=> isBlank()? null : cv.toDataURL('image/png') };
+  return { el, getData:()=> isBlank()? null : shrinkCanvasURL(cv, 1100, 'image/png') };
 }
 
 /* ---------- worksheet editor ----------------------------------------------- */
@@ -811,6 +851,7 @@ function viewWorksheet(id, editId){
   if (w.special==='ledger') return viewLedger();
   if (w.special==='specimens') return viewSpecimens(editId);
   if (w.special==='warmth') return viewWarmth(editId);
+  if (w.special==='sparks') return viewSparks();
   return viewCardEditor(w, editId);
 }
 
@@ -858,7 +899,7 @@ function buildCardEditor(w, existing, state, seedImage){
 
   // full-res import (a photo, or finished art from Procreate)
   const importPreview = h('div',null);
-  const importIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; downscaleToDataURL(file, 1800, 0.86, url=>{ importedImage=url; paintImport(); repaint(); }); }});
+  const importIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; downscaleToDataURL(file, 1400, 0.82, url=>{ importedImage=url; paintImport(); repaint(); }); }});
   function paintImport(){
     importPreview.replaceChildren();
     if (importedImage){
@@ -876,7 +917,7 @@ function buildCardEditor(w, existing, state, seedImage){
 
   // tags (advanced) — for search/filter in the gallery
   const tagWrap=h('div',{class:'taginput'});
-  function paintTags(){ tagWrap.replaceChildren(...tags.map((t,i)=> h('span',{class:'tagchip'}, '#'+t, h('button',{title:'remove', onclick:()=>{ tags.splice(i,1); paintTags(); }}, '×'))),
+  function paintTags(){ tagWrap.replaceChildren(...tags.map((t,i)=> h('span',{class:'tagchip'}, '#'+t, h('button',{title:'remove', 'aria-label':'remove tag', onclick:()=>{ tags.splice(i,1); paintTags(); }}, '×'))),
     (function(){ const ti=h('input',{placeholder:'add a tag…', style:{border:'none',background:'transparent',fontFamily:'inherit',fontSize:'14px',minWidth:'90px'}, onkeydown:e=>{ if(e.key==='Enter'){ e.preventDefault(); const v=e.target.value.trim().toLowerCase().replace(/[^a-z0-9-]+/g,'-').replace(/(^-|-$)/g,''); if(v&&!tags.includes(v)){ tags.push(v); paintTags(); } } }}); return ti; })()); }
   paintTags();
   editor.append(h('div',{class:'field advanced-only'}, h('label',null,'Tags'), h('div',{class:'fhint'},'press Enter after each — for searching later'), tagWrap));
@@ -907,7 +948,7 @@ function elementPicker(state, repaint){
   const box = h('div',null);
   const erow = h('div',{class:'chips'});
   function elChip(e){ const on = state.element===e.key;
-    return h('button',{class:'chip'+(on?' active':''), style:{ borderColor:on?(e.accent||'var(--gold-soft)'):'var(--gold-soft)', background:on?deriveBg(e.accent||ACCENTS.gold):'#fbf8ef' },
+    return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?(e.accent||'var(--gold-soft)'):'var(--gold-soft)', background:on?deriveBg(e.accent||ACCENTS.gold):'#fbf8ef' },
       onclick:()=>{ state.element=e.key; paintEls(); repaint(); }}, h('span',{class:'dot', style:{background:e.accent||'var(--gold-soft)'}}), e.label); }
   function paintEls(){ erow.replaceChildren(...allElements().map(elChip),
     h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push({key,label:n.trim(),accent:ACCENTS.gold,custom:true}); save(); state.element=key; paintEls(); repaint(); } }}, '+ add your own')); }
@@ -917,7 +958,7 @@ function elementPicker(state, repaint){
   const xwrap = h('div',{class:'advanced-only', style:{marginTop:'12px'}}, h('div',{class:'fhint'}, 'their flavor — optional (same element, different skin)'));
   const xrow = h('div',{class:'chips'});
   function xChip(e){ const on = state.expression===e.key;
-    return h('button',{class:'chip'+(on?' active':''), style:{ borderColor:on?'var(--green)':'var(--gold-soft)', background:on?'#eef0e4':'#fbf8ef' },
+    return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?'var(--green)':'var(--gold-soft)', background:on?'#eef0e4':'#fbf8ef' },
       onclick:()=>{ state.expression = on? '' : e.key; paintX(); repaint(); }}, e.label); }
   function paintX(){ xrow.replaceChildren(...allExpressions().map(xChip),
     h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push({key,label:n.trim()}); save(); state.expression=key; paintX(); repaint(); } }}, '+ add a flavor')); }
@@ -937,7 +978,7 @@ function choiceField(fld, state, repaint){
   function promptFor(v){ const o=fld.options.find(x=>x.value===v); return o? o.prompt : (v? 'for example only — if this is '+v+', what would it do?' : ''); }
   function paint(){
     row.replaceChildren(...opts().map(o=>{ const on=state[fld.key]===o.value;
-      return h('button',{class:'chip'+(on?' active':''), style:{borderColor:on?'var(--gold)':'var(--gold-soft)', background:on?'#f4ecd6':'#fbf8ef'},
+      return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{borderColor:on?'var(--gold)':'var(--gold-soft)', background:on?'#f4ecd6':'#fbf8ef'},
         onclick:()=>{ state[fld.key]= on? '' : o.value; paint(); hintEl.textContent=promptFor(state[fld.key]); repaint(); }}, o.value); }),
       h('button',{class:'chip dash', onclick:()=>{ const n=prompt('What kind of Seed?'); if(n&&n.trim()){ state[fld.key]=n.trim(); paint(); hintEl.textContent=promptFor(state[fld.key]); repaint(); } }}, '+ add your own'));
   }
@@ -1072,7 +1113,7 @@ function viewSpecimens(editId){
   slots.forEach((slot,i)=>{
     const circle = h('div',{class:'circle'});
     if (slot.image) circle.append(h('img',{src:slot.image, alt:''})); else circle.append(h('span',null,'draw / photo'));
-    const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>{ slot.image=rd.result; circle.replaceChildren(h('img',{src:rd.result, alt:''})); }; rd.readAsDataURL(file); }});
+    const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const file=e.target.files[0]; if(!file) return; downscaleToDataURL(file, 900, 0.82, url=>{ slot.image=url; circle.replaceChildren(h('img',{src:url, alt:''})); }); }});
     circle.style.cursor='pointer'; circle.addEventListener('click',()=>fileIn.click());
     grid.append(h('div',{class:'specslot'},
       circle, fileIn,
@@ -1127,14 +1168,53 @@ function viewWarmth(editId){
   return f;
 }
 
+/* ---------- ideas & sparks (Maker-side raw capture) ------------------------ */
+// a frictionless running list of little ideas. Lives in DB.sparks, syncs with the
+// journal, and surfaces in the Worldbuilder's Studio Inbox as raw ideas to card.
+function viewSparks(){
+  const f = framed('Ideas & Sparks', 'jot any little spark — no need to finish a thought', 'Little sparks become whole worlds. Keep them all.');
+  const body=f.querySelector('.framed-body');
+  const ta=h('textarea',{placeholder:'a random idea, a name, a what-if…', rows:2,
+    style:{width:'100%',border:'1.5px solid var(--gold-soft)',borderRadius:'8px',padding:'10px',fontFamily:'inherit',fontSize:'17px',background:'#fffdf7',color:'var(--ink-soft)'}});
+  function add(){ const t=ta.value.trim(); if(!t) return; (DB.sparks=DB.sparks||[]).push({id:uid(), text:t, at:Date.now()}); ta.value=''; save(); paint(); ta.focus(); }
+  ta.addEventListener('keydown', e=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); add(); } });
+  body.append(h('div',{class:'field', style:{maxWidth:'640px',margin:'0 auto 6px'}},
+    h('label',null,'A new spark'), ta,
+    h('div',{class:'toolrow'}, h('button',{class:'navbtn primary', onclick:add}, 'Add this spark'),
+      h('span',{class:'hint', style:{alignSelf:'center',fontSize:'13px'}}, 'or press ⌘/Ctrl + Enter'))));
+  const listHost=h('div',{style:{maxWidth:'640px',margin:'0 auto'}}); body.append(listHost);
+  function paint(){
+    const items=(DB.sparks||[]).slice().reverse();
+    if(!items.length){ listHost.replaceChildren(h('p',{class:'empty-note', style:{textAlign:'center'}},'No sparks yet — drop the next little idea here, however small.')); return; }
+    const wrap=h('div',null);
+    items.forEach(s=> wrap.append(h('div',{class:'spark-row'},
+      h('div',{class:'spark-text'}, s.text),
+      h('button',{class:'toolbtn', 'aria-label':'remove spark', title:'remove', onclick:()=>{ DB.sparks=(DB.sparks||[]).filter(x=>x.id!==s.id); save(); paint();
+        undoToast('Spark removed.', ()=>{ (DB.sparks=DB.sparks||[]).push(s); DB.sparks.sort((a,b)=>(a.at||0)-(b.at||0)); save(); paint(); }); }}, 'remove'))));
+    listHost.replaceChildren(h('div',{class:'kicker', style:{margin:'14px 0 8px'}}, items.length+' spark'+(items.length===1?'':'s')), wrap);
+  }
+  paint();
+  body.append(h('div',{class:'toolrow', style:{justifyContent:'center', marginTop:'18px'}},
+    h('button',{class:'navbtn world-only', onclick:()=>go('studio',{tab:'inbox'})}, '⚒ See these in the Studio Inbox'),
+    h('button',{class:'navbtn', onclick:()=>go('home')}, 'Back')));
+  return f;
+}
+
 /* ---------- gallery -------------------------------------------------------- */
+function backupRow(){
+  return h('div',{class:'toolrow', style:{justifyContent:'center', margin:'2px 0 16px', alignItems:'center'}},
+    h('button',{class:'navbtn', onclick:()=>exportBackup()}, '⤓ Keep a backup'),
+    h('button',{class:'navbtn', onclick:()=>pickBackupFile()}, '⤒ Restore from a backup'),
+    h('span',{class:'hint', style:{fontSize:'13px'}}, 'a safety copy, kept on your device'));
+}
 function viewGallery(){
   const wrap = h('div',null);
   wrap.append(h('div',{class:'cover', style:{padding:'10px 0 6px'}},
     h('h1',{class:'display', style:{fontSize:'34px'}}, DB.profile==='worldbuilder'?'My Journal':'My Field Journal'),
     h('div',{class:'tag'},'everything you’ve made — revisit it, change it, print it, or weave it into the world')));
+  wrap.append(backupRow());
   if (!DB.creations.length){
-    wrap.append(h('div',{class:'empty-note'},'Nothing yet — and that’s alright. Pick a page from the home shelf and make a little something.'));
+    wrap.append(h('div',{class:'empty-note'},'Nothing yet — and that’s alright. Pick a page from the home shelf and make a little something. (Already have a backup from another device? Restore it above.)'));
     return wrap;
   }
   const state={ q:'', kit:'', tag:'' };
@@ -1194,7 +1274,7 @@ function creationThumb(c){
   return null;
 }
 function galCard(c){
-  const w=WS[c.worksheetId];
+  const w=WS[c.worksheetId] || {title:'(unknown page)', fields:[]};
   const thumb=creationThumb(c);
   const card=h('div',{class:'gal-card'},
     h('div',{class:'thumb'}, thumb? h('img',{src:thumb, alt:''}) : h('span',{class:'none'}, w.title)),
@@ -1204,7 +1284,8 @@ function galCard(c){
       h('button',{onclick:()=>{ const copy=JSON.parse(JSON.stringify(c)); copy.id=uid(); copy.createdAt=copy.updatedAt=Date.now(); if(w.specimen) copy.specimenNo=nextSpecimen(w.id); DB.creations.push(copy); save(); render(); }}, 'Duplicate'),
       (w.card? h('button',{class:'advanced-only', onclick:()=>sendToProcreate(w, c.fields||{}, creationThumb(c), {specimenNo:c.specimenNo})}, 'Save as image'):null),
       (w.card? h('button',{class:'advanced-only', onclick:()=>shareCreation(c)}, 'Weave into the world →'):null),
-      h('button',{onclick:()=>{ if(confirm('Gently remove this from your journal?')){ DB.creations=DB.creations.filter(x=>x!==c); save(); render(); } }}, 'Remove'),
+      h('button',{onclick:()=>{ const idx=DB.creations.indexOf(c); if(idx<0) return; DB.creations.splice(idx,1); save(); render();
+        undoToast('Removed “'+creationTitle(c)+'.”', ()=>{ DB.creations.splice(Math.min(idx,DB.creations.length),0,c); save(); render(); }); }}, 'Remove'),
     ),
   );
   return card;
@@ -1242,25 +1323,44 @@ function shareCreation(c){
   const md=lines.join('\n');
   showModal('Weave it into the world', 'A clean Draft card for Del’s promotion queue (`02_PROMOTION_QUEUE.md`). Nothing is canon until he audits it — this is just a gentle hand-off.', md);
 }
+// Shared overlay: builds a scrim + inner node, closes on Escape and on scrim-click
+// (unless dismissible:false), and returns focus to the opener. Returns a close fn.
+function openOverlay(buildInner, opts){
+  opts=opts||{};
+  const prev=document.activeElement;
+  const bg=h('div',{class:opts.cls||'modal-bg', role:'dialog', 'aria-modal':'true'});
+  function close(){ if(bg._closed) return; bg._closed=true; document.removeEventListener('keydown', onKey); bg.remove(); try{ prev&&prev.focus&&prev.focus(); }catch(_){}; if(opts.onClose) opts.onClose(); }
+  function onKey(e){ if(e.key==='Escape' && opts.dismissible!==false) close(); }
+  if(opts.dismissible!==false) bg.addEventListener('click', e=>{ if(e.target===bg) close(); });
+  bg.append(buildInner(close));
+  document.addEventListener('keydown', onKey);
+  document.body.append(bg);
+  if(!opts.noAutofocus) setTimeout(()=>{ const f=bg.querySelector('button,[href],input,textarea,select,[tabindex]'); if(f) try{ f.focus(); }catch(_){} }, 0);
+  return close;
+}
 function showModal(title, note, text){
   const ta=h('textarea',{readonly:true}, text);
-  const bg=h('div',{class:'modal-bg', onclick:e=>{ if(e.target===bg) bg.remove(); }},
-    h('div',{class:'modal'},
-      h('h2',{class:'display'},title),
-      h('p',{class:'hint'},note),
-      ta,
-      h('div',{class:'toolrow'},
-        h('button',{class:'navbtn primary', onclick:()=>{ ta.select(); try{ document.execCommand('copy'); }catch(e){} navigator.clipboard&&navigator.clipboard.writeText(text); toast('Copied.'); }}, 'Copy'),
-        h('button',{class:'navbtn', onclick:()=>{ const b=new Blob([text],{type:'text/markdown'}); const a=h('a',{href:URL.createObjectURL(b), download:'field-journal-card.md'}); document.body.append(a); a.click(); a.remove(); }}, 'Download .md'),
-        h('button',{class:'navbtn', onclick:()=>bg.remove()}, 'Close'),
-      ),
-    ));
-  document.body.append(bg);
+  openOverlay(close=> h('div',{class:'modal'},
+    h('h2',{class:'display'},title),
+    h('p',{class:'hint'},note),
+    ta,
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>{ ta.select(); try{ document.execCommand('copy'); }catch(e){} navigator.clipboard&&navigator.clipboard.writeText(text); toast('Copied.'); }}, 'Copy'),
+      h('button',{class:'navbtn', onclick:()=>{ const b=new Blob([text],{type:'text/markdown'}); const a=h('a',{href:URL.createObjectURL(b), download:'field-journal-card.md'}); document.body.append(a); a.click(); a.remove(); }}, 'Download .md'),
+      h('button',{class:'navbtn', onclick:()=>close()}, 'Close'),
+    )));
 }
 
 /* ---------- toast ---------------------------------------------------------- */
 let toastT=null;
 function toast(msg){ const t=h('div',{class:'toast'},msg); document.querySelectorAll('.toast').forEach(x=>x.remove()); document.body.append(t); clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),2600); }
+// a toast with an Undo action — gives a gentle few seconds to take a delete back
+function undoToast(msg, onUndo){
+  document.querySelectorAll('.toast').forEach(x=>x.remove());
+  const t=h('div',{class:'toast'}, msg,
+    h('button',{class:'toast-undo', onclick:()=>{ clearTimeout(toastT); t.remove(); onUndo(); }}, 'Undo'));
+  document.body.append(t); clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),5500);
+}
 
 /* ---------- Cozy / Full kit mode ------------------------------------------- */
 function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world');
@@ -1272,12 +1372,53 @@ function applyMode(){ const b=document.body; b.classList.remove('mode-simple','m
 // and refresh the top bar's label — no view re-render, so in-progress edits are kept.
 function setMode(m){ DB.mode=m; save(); applyMode(); if($app.firstChild) $app.replaceChild(topbar(), $app.firstChild); toast(m==='full'? 'Full kit — everything’s here.' : 'Cozy mode — just the essentials.'); }
 
+/* ---------- first-run flow (profile pick, then the gentle intro) ----------- */
+function firstRun(){ if(!DB.profileChosen){ chooseProfile(); return; } showIntro(false); }
+
+// A deliberate one-time pick — "whose space is this?" — so the Maker's journal and
+// the Worldbuilder's canon studio are genuinely separate, not a one-tap toggle apart.
+function chooseProfile(){
+  openOverlay(close=>{
+    function pick(p){
+      DB.profile=p; DB.profileChosen=true; if(p==='worldbuilder') DB.mode='full';
+      save(); applyMode(); close();
+      if(p==='worldbuilder'){ go('studio'); toast('Welcome, Worldbuilder.'); }
+      else { render(); showIntro(true); }
+    }
+    return h('div',{class:'intro'},
+      svgUse('ic-seedling','em'),
+      h('h2',{class:'display'},'Whose space is this?'),
+      h('p',{class:'hint'},'Pick once to begin. You can change it later, but it takes a deliberate tap — so the two spaces stay their own.'),
+      h('div',{class:'profile-pick'},
+        h('button',{class:'navbtn ppick', onclick:()=>pick('maker')},
+          h('b',null,'✿ The Maker'), h('small',null,'her journal — make Vael folk, places, creatures, and seeds')),
+        h('button',{class:'navbtn ppick', onclick:()=>pick('worldbuilder')},
+          h('b',null,'⚒ The Worldbuilder'), h('small',null,'the canon studio — browse, draft, and triage the world')),
+      ),
+    );
+  }, { cls:'intro-bg', dismissible:false });
+}
+// Switching sides is possible but deliberate: a small current-side button opens this
+// confirm, rather than a bare toggle sitting in the bar.
+function switchProfileSheet(){
+  const world = DB.profile==='worldbuilder', target = world?'maker':'worldbuilder';
+  let close;
+  const body=h('div',null,
+    h('p',{class:'hint'}, world
+      ? 'Leave the Worldbuilder’s canon studio and open the Maker’s journal?'
+      : 'Leave the Maker’s journal and open the Worldbuilder’s canon studio? This is the space for the world’s canon.'),
+    h('div',{class:'toolrow', style:{marginTop:'10px'}},
+      h('button',{class:'navbtn primary', onclick:()=>{ close(); setProfile(target); }},
+        target==='worldbuilder'?'Open the Worldbuilder side':'Open the Maker’s journal'),
+      h('button',{class:'navbtn', onclick:()=>close()}, 'Stay here'),
+    ));
+  close=showModalNode('Switch space', null, body);
+}
+
 /* ---------- one-time gentle intro ------------------------------------------ */
 function showIntro(force){
   if(!force && DB.seenIntro) return;
-  const bg = h('div',{class:'intro-bg', onclick:e=>{ if(e.target===bg) close(); }});
-  function close(){ DB.seenIntro=true; save(); bg.remove(); }
-  bg.append(h('div',{class:'intro'},
+  openOverlay(close=> h('div',{class:'intro'},
     svgUse('ic-seedling','em'),
     h('h2',{class:'display'},'A little door into a world'),
     h('p',{class:'hint'},'This is your space. Nothing here is required, and there’s no wrong way.'),
@@ -1289,10 +1430,9 @@ function showIntro(force){
     ),
     h('p',{class:'hint'},'Start in Cozy mode. When you’re ready for more — elements, sharing, saving to the world — tap “Full kit” up top.'),
     h('div',{class:'toolrow', style:{justifyContent:'center'}},
-      h('button',{class:'navbtn primary', onclick:close}, 'Begin'),
+      h('button',{class:'navbtn primary', onclick:()=>close()}, 'Begin'),
     ),
-  ));
-  document.body.append(bg);
+  ), { cls:'intro-bg', onClose:()=>{ DB.seenIntro=true; save(); } });
 }
 
 /* ---------- Procreate: send a card out as an image ------------------------- */
@@ -1300,6 +1440,15 @@ let _probe;
 function probeCtx(){ if(!_probe) _probe=document.createElement('canvas').getContext('2d'); return _probe; }
 function safeColor(col, fb){ try{ const x=probeCtx(); x.fillStyle='#000000'; x.fillStyle=col; const got=x.fillStyle; return (got==='#000000' && String(col).toLowerCase()!=='#000000')? (fb||'#b98e3c') : col; }catch(e){ return fb||'#b98e3c'; } }
 function loadImg(src){ return new Promise(res=>{ const i=new Image(); i.onload=()=>res(i); i.onerror=()=>res(null); i.src=src; }); }
+// downscale a canvas to a capped dimension and return a data URL (keeps the journal
+// small so it stays well inside storage and syncs fast). PNG keeps transparency.
+function shrinkCanvasURL(cv, maxDim, type, quality){
+  const w=cv.width, hgt=cv.height, m=Math.max(w,hgt);
+  if(m<=maxDim){ try{ return cv.toDataURL(type, quality); }catch(e){ return cv.toDataURL('image/png'); } }
+  const s=maxDim/m, t=document.createElement('canvas'); t.width=Math.max(1,Math.round(w*s)); t.height=Math.max(1,Math.round(hgt*s));
+  t.getContext('2d').drawImage(cv,0,0,t.width,t.height);
+  try{ return t.toDataURL(type, quality); }catch(e){ return t.toDataURL('image/png'); }
+}
 function downscaleToDataURL(file, maxDim, quality, cb){
   const rd=new FileReader();
   rd.onload=()=>{ const img=new Image(); img.onload=()=>{
@@ -1385,25 +1534,53 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
   finally{ syncing=false; }
 }
 function stripForBackup(db){ const d=Object.assign({}, db); if(d.github){ d.github=Object.assign({}, d.github); delete d.github.token; } return d; } // never write the token into the repo
-async function loadFromRepo(){ if(!ghReady()){ toast('Connect to GitHub first.'); return; }
+// merge an incoming journal (from the repo or a backup file) into DB — additive only,
+// never deletes: existing creations win, new ones are appended by id.
+function mergeIncoming(inc){
+  if(!inc || typeof inc!=='object') return;
+  const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(c && c.id && !have.has(c.id)) DB.creations.push(c); });
+  DB.roots=Object.assign({}, inc.roots, DB.roots);
+  DB.counters=Object.assign({}, inc.counters, DB.counters);
+  DB.elements=mergeBy(DB.elements, inc.elements, 'key');
+  DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
+  DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id');
+}
+async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
-  try{ const meta=await ghMeta(cfg, `${base}/${stem}.json`); if(!meta){ toast('No saved file found yet.'); return; }
-    const raw=await (await fetch(meta.download_url)).text(); const inc=JSON.parse(raw);
-    const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(!have.has(c.id)) DB.creations.push(c); });
-    DB.roots=Object.assign({}, inc.roots, DB.roots); DB.counters=Object.assign({}, inc.counters, DB.counters);
-    DB.elements=mergeBy(DB.elements, inc.elements, 'key'); DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
-    save(); toast('Loaded from your file.'); render();
-  }catch(e){ toast('Load failed: '+e.message); }
+  try{ const meta=await ghMeta(cfg, `${base}/${stem}.json`); if(!meta){ if(!opts.silent) toast('No saved file found yet.'); return; }
+    const raw=await (await fetch(meta.download_url)).text(); mergeIncoming(JSON.parse(raw));
+    save(); if(!opts.silent) toast('Loaded from your file.'); render();
+  }catch(e){ if(!opts.silent) toast('Load failed: '+e.message); }
 }
 function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
+
+/* ---------- local backup file (a safety net against data eviction) --------- */
+// the journal travels with its images inline; the token is never written into a backup.
+function exportBackup(){
+  const data=JSON.stringify(stripForBackup(DB), null, 1);
+  const b=new Blob([data],{type:'application/json'});
+  const a=h('a',{href:URL.createObjectURL(b), download:'vael-journal-backup-'+new Date().toISOString().slice(0,10)+'.json'});
+  document.body.append(a); a.click(); a.remove(); toast('Saved a backup file.');
+}
+function importBackupFile(file){
+  const rd=new FileReader();
+  rd.onload=()=>{ try{ const inc=JSON.parse(rd.result); if(!inc || !('creations' in inc)) throw 0; mergeIncoming(inc); save(); toast('Restored from your backup.'); render(); }
+    catch(e){ toast('That file could not be read as a journal backup.'); } };
+  rd.readAsText(file);
+}
+function pickBackupFile(){
+  const fi=h('input',{type:'file', accept:'application/json,.json', style:{display:'none'}, onchange:e=>{ const f=e.target.files[0]; if(f) importBackupFile(f); }});
+  document.body.append(fi); fi.click(); setTimeout(()=>fi.remove(), 0);
+}
 function renderJournalMarkdown(){
   const name=(DB.github&&DB.github.displayName)||''; const out=[`# ${name? name+'’s ':''}Field Journal`, '', '*Made in the Vael Field Journal kit — a corner of the Godling Universe.*', ''];
   ['field','world'].forEach(kit=>{ const items=DB.creations.filter(c=>c.kit===kit); if(!items.length) return;
     out.push(`## ${kit==='field'?'The Field Journal':"The Worldmaker's Pages"}`, ''); items.forEach(c=> out.push(...creationMarkdown(c))); });
+  if((DB.sparks||[]).length){ out.push('## Sparks — raw ideas',''); DB.sparks.forEach(s=> out.push('- '+String(s.text||'').replace(/\s*\n\s*/g,' '))); out.push(''); }
   out.push('_Same trunk, different branches._'); return out.join('\n');
 }
 function creationMarkdown(c){
-  const w=WS[c.worksheetId], f=c.fields||{}; const L=[`### ${creationTitle(c)} — _${w.title}_`, ''];
+  const w=WS[c.worksheetId]||{title:'(unknown page)', fields:[]}, f=c.fields||{}; const L=[`### ${creationTitle(c)} — _${w.title}_`, ''];
   if(c.worksheetId==='specimens'){ (c.slots||[]).forEach(s=>{ if(s.caption||s.image) L.push(`- **${s.label}:** ${s.caption||'[picture]'}`); }); L.push(''); return L; }
   if(c.worksheetId==='warmth'){ ['what','who','fiber','palette'].forEach(k=>{ if(f[k]) L.push(`- **${k}:** ${f[k]}`); }); if(c.colors) L.push(`- **colorway:** ${c.colors.join(', ')}`); L.push(''); return L; }
   (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) L.push(`- **Element:** ${elementLabelOf(f.element)}${f.expression?' · '+expressionLabelOf(f.expression):''}`); return; } const v=(f[fld.key]||'').trim(); if(v) L.push(`- **${fld.cardLabel||fld.label}:** ${v}`); });
@@ -1412,9 +1589,7 @@ function creationMarkdown(c){
   L.push(''); return L;
 }
 function showModalNode(title, note, node){
-  const bg=h('div',{class:'modal-bg', onclick:e=>{ if(e.target===bg) bg.remove(); }},
-    h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
-  document.body.append(bg); return bg;
+  return openOverlay(close=> h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
 }
 function openGitHubPanel(){
   const g=Object.assign({owner:'Dracanman', repo:'godling-universe-canon-workbench', branch:'main', path:'kit/journal/', token:'', displayName:'', makerStem:'field-journal'}, DB.github||{});
@@ -1422,6 +1597,7 @@ function openGitHubPanel(){
   const tokenIn=h('input',{type:'password', value:g.token, placeholder:'fine-grained token — Contents: read & write'});
   const ownerIn=h('input',{value:g.owner}), repoIn=h('input',{value:g.repo}), branchIn=h('input',{value:g.branch}), pathIn=h('input',{value:g.path});
   const makerIn=h('input',{value:g.makerStem, placeholder:'field-journal'});
+  const syncChk=h('input',{type:'checkbox'}); syncChk.checked=!!DB.syncOnOpen; syncChk.onchange=()=>{ DB.syncOnOpen=syncChk.checked; save(); };
   const status=h('div',{class:'hint', style:{marginTop:'10px'}});
   function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal' }; }
   function persist(){ DB.github=collect(); save(); }
@@ -1432,12 +1608,18 @@ function openGitHubPanel(){
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Owner'),ownerIn), h('div',null,h('label',null,'Repo'),repoIn)),
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Branch'),branchIn), h('div',null,h('label',null,'Folder'),pathIn)),
     h('div',{class:'world-only'}, h('label',null,'Her journal file name (for the Inbox)'), makerIn),
+    h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'12px'}}, syncChk, 'Load my file automatically when I open the app'),
     h('div',{class:'warn'},'Your token is a key. Use a fine-grained token limited to just this one repo (Contents: read & write). It’s kept only on this device, never written into the repo, and you can revoke it on GitHub any time.'),
     status,
     h('div',{class:'toolrow', style:{marginTop:'14px'}},
       h('button',{class:'navbtn', onclick:async()=>{ persist(); status.textContent='Checking…'; try{ const me=await ghTest(collect()); status.textContent='Connected ✓ ('+(me.full_name||'ok')+')'; }catch(e){ status.textContent='Could not connect: '+e.message; } }}, 'Test connection'),
       h('button',{class:'navbtn primary', onclick:async()=>{ persist(); status.textContent='Saving…'; await syncToRepo(); status.textContent='Saved.'; }}, 'Save to my file now'),
       h('button',{class:'navbtn', onclick:async()=>{ persist(); status.textContent='Loading…'; await loadFromRepo(); status.textContent='Loaded.'; }}, 'Load from my file'),
+    ),
+    h('div',{class:'toolrow', style:{marginTop:'10px', borderTop:'1px solid var(--gold-soft)', paddingTop:'12px'}},
+      h('button',{class:'navbtn', onclick:()=>exportBackup()}, '⤓ Backup file'),
+      h('button',{class:'navbtn', onclick:()=>pickBackupFile()}, '⤒ Restore file'),
+      h('span',{class:'hint', style:{alignSelf:'center', fontSize:'13px'}}, 'a plain file — works without a token'),
     ),
   );
   showModalNode('My file in the world', null, panel);
@@ -1627,10 +1809,13 @@ function ntStaticPanels(illum){
     </div>`;
   return wrap;
 }
+let _plateRO=null;
 function mountScaledPlate(host, stage){
   const wrap=h('div',{class:'plate-wrap'}); const inner=h('div',{class:'plate-inner'}, stage); wrap.append(inner); host.append(wrap);
   function fit(){ const w=wrap.clientWidth||Math.min(1500,(window.innerWidth||1500)-40); const s=Math.min(1, w/1500); inner.style.transform='scale('+s+')'; wrap.style.height=(1480*s)+'px'; }
-  if(window.ResizeObserver){ try{ new ResizeObserver(fit).observe(wrap); }catch(e){} } else window.addEventListener('resize', fit);
+  // disconnect any observer left over from a previous mount, then observe this one
+  if(_plateRO){ try{ _plateRO.disconnect(); }catch(e){} _plateRO=null; }
+  if(window.ResizeObserver){ try{ _plateRO=new ResizeObserver(fit); _plateRO.observe(wrap); }catch(e){} } else window.addEventListener('resize', fit);
   setTimeout(fit,0);
 }
 function namingTweaks(){
@@ -1778,7 +1963,7 @@ function viewStudio(tab, params){
   }
   const tabs=h('div',{class:'studio-tabs'});
   [['browse','Canon Browser'],['inbox','Inbox'],['drafter','Card Drafter'],['board','Promotion Board']].forEach(([k,label])=>
-    tabs.append(h('button',{class:'tab'+(tab===k?' on':''), onclick:()=>go('studio',{tab:k})}, label)));
+    tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('studio',{tab:k})}, label)));
   body.append(tabs);
   const host=h('div',null); body.append(host);
   if(tab==='browse') studioBrowse(host);
@@ -1813,15 +1998,24 @@ function studioInbox(host){
   const raw=h('textarea',{placeholder:'a quick raw idea for the queue…', style:{width:'100%', minHeight:'70px', border:'1.5px solid var(--gold-soft)', borderRadius:'8px', padding:'10px', fontFamily:'inherit', fontSize:'15px', background:'#fffdf7', color:'var(--ink-soft)'}});
   host.append(h('div',{class:'drafter'}, h('label',null,'Raw dump → the queue'), raw,
     h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:async()=>{ const t=raw.value.trim(); if(!t) return; try{ await appendRawDump(t); raw.value=''; toast('Added to the Raw Dump Inbox.'); }catch(e){ toast('Failed: '+e.message); } }}, 'Add raw idea'))));
-  host.append(h('div',{class:'kicker', style:{margin:'20px 0 8px'}}, 'Her creations — pick one to draft a card'));
-  const listHost=h('div',null); host.append(listHost); listHost.append(h('p',{class:'hint'},'Loading her journal…'));
+  const listHost=h('div',{style:{marginTop:'18px'}}); host.append(listHost); listHost.append(h('p',{class:'hint'},'Loading her journal…'));
   (async()=>{ try{ const r=await ghGetText(cfg, `${base}/${stem}.json`);
     if(!r){ listHost.replaceChildren(h('p',{class:'hint'}, `No journal found at ${base}/${stem}.json yet (set "Her journal file name" in ☁ My file).`)); return; }
-    const data=JSON.parse(r.text); const items=(data.creations||[]);
-    if(!items.length){ listHost.replaceChildren(h('p',{class:'hint'},'Her journal is empty so far.')); return; }
-    const g=h('div',{class:'gal-grid'}); items.slice().reverse().forEach(c=> g.append(inboxCard(c))); listHost.replaceChildren(g);
+    const data=JSON.parse(r.text); const items=(data.creations||[]); const sparks=(data.sparks||[]);
+    if(!items.length && !sparks.length){ listHost.replaceChildren(h('p',{class:'hint'},'Her journal is empty so far.')); return; }
+    const out=h('div',null);
+    if(sparks.length){ out.append(h('div',{class:'kicker', style:{margin:'4px 0 8px'}}, 'Her sparks — raw ideas to card'));
+      sparks.slice().reverse().forEach(s=> out.append(sparkInboxRow(s))); }
+    if(items.length){ out.append(h('div',{class:'kicker', style:{margin:'18px 0 8px'}}, 'Her creations — pick one to draft a card'));
+      const g=h('div',{class:'gal-grid'}); items.slice().reverse().forEach(c=> g.append(inboxCard(c))); out.append(g); }
+    listHost.replaceChildren(out);
   }catch(e){ listHost.replaceChildren(h('p',{class:'hint'},'Could not read her journal: '+e.message)); } })();
 }
+function sparkInboxRow(s){
+  return h('div',{class:'spark-row'}, h('div',{class:'spark-text'}, s.text),
+    h('button',{class:'navbtn', style:{flex:'0 0 auto'}, onclick:()=>go('studio',{tab:'drafter', params:{prefill:sparkToCard(s)}})}, 'Draft a Canon Card →'));
+}
+function sparkToCard(s){ return { tag:'PEO', title:(s.text||'').slice(0,60), category:'', source:'A spark from '+((DB.github&&DB.github.makerStem)||'the maker')+'’s journal', claim:(s.text||'').trim(), means:'', donot:'', notes:'From her sparks.' }; }
 function inboxCard(c){
   const w=WS[c.worksheetId]||{title:c.worksheetId}; const thumb=creationThumb(c);
   return h('div',{class:'gal-card'},
@@ -1903,10 +2097,18 @@ function statusToCol(status, section){ const s=(status||'').toLowerCase();
   if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
 
 /* ---------- boot ----------------------------------------------------------- */
-applyMode();
-render();
-showIntro(false);
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+// flush the in-memory state to IndexedDB when the app is backgrounded/closed
+window.addEventListener('pagehide', flushState);
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushState(); });
+(async function init(){
+  try{ DB = await loadState(); }catch(e){ DB = defaults(); }
+  if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
+  applyMode();
+  render();
+  firstRun();
+  if(ghReady() && DB.syncOnOpen) loadFromRepo({silent:true});   // converge devices on open (merge-only)
+})();
 </script>
 </body>
 </html>
