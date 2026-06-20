@@ -106,12 +106,13 @@
   .pick{
     text-align:left; background:var(--paper-card); border:1.5px solid #e6dcc4; border-radius:10px;
     padding:15px 16px; min-height:104px; display:flex; flex-direction:column; gap:5px;
+    min-width:0; overflow-wrap:anywhere; word-break:break-word;
     transition:transform .08s ease, box-shadow .12s ease, border-color .12s ease;
   }
   .pick:hover{ transform:translateY(-2px); border-color:var(--gold); box-shadow:0 10px 22px -16px rgba(var(--shadow)/.5); }
   .pick .ribbon{ width:34px; height:5px; border-radius:3px; margin-bottom:3px; }
-  .pick b{ color:var(--ink); font-size:18px; font-weight:600; }
-  .pick small{ color:var(--hint); font-style:italic; font-size:14px; line-height:1.35; }
+  .pick b{ color:var(--ink); font-size:18px; font-weight:600; overflow-wrap:anywhere; word-break:break-word; }
+  .pick small{ color:var(--hint); font-style:italic; font-size:14px; line-height:1.35; overflow-wrap:anywhere; }
 
   /* ---------- worksheet editor ---------- */
   .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
