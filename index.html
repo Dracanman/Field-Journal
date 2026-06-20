@@ -668,11 +668,11 @@ let DB = defaults();   // replaced by loadState() in init() before the first ren
 let _stateT=null;
 function scheduleStateWrite(){ clearTimeout(_stateT); _stateT=setTimeout(flushState, 120); }
 function flushState(){ clearTimeout(_stateT); idbSet(IDB_KEY, DB).catch(()=>{ toast('Could not save to storage.'); }); }
-function save(){
+function saveLocal(){
   scheduleStateWrite();                                            // IndexedDB — the real store
   try{ localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}  // best-effort small mirror; fine to skip if too big
-  scheduleSync();
 }
+function save(){ saveLocal(); scheduleSync(); }                    // local + a (debounced, de-duped) repo sync
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
 function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; return DB.counters[wsId]; }
 
@@ -1521,14 +1521,24 @@ async function ghPut(cfg, path, content, message, sha){ const body={ message, co
 // read a repo text file -> { text, sha } (or null if missing). Uses download_url so it
 // works for files over the 1MB contents-API inline limit too.
 async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!meta) return null; const text=await (await fetch(meta.download_url)).text(); return { text, sha:meta.sha }; }
-let syncTimer=null, syncing=false;
-function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 3500); }
-async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return; syncing=true;
+// Only the *shareable* journal travels to the repo — never device-only flags
+// (token, mode, profile, seenIntro, the GitHub config). That way toggling Cozy/Full,
+// dismissing a dialog, or switching sides never makes a commit, and an unchanged
+// journal produces an identical payload we can skip.
+function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], naming:DB.naming||namingDefault() }; }
+let syncTimer=null, syncing=false, _lastSyncedJSON=null;
+function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
+async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return;
+  const payload = JSON.stringify(syncPayload(), null, 1);
+  if(opts.silent && payload===_lastSyncedJSON) return;            // nothing actually changed — don't spam commits
+  syncing=true;
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
   try{
-    const mdPath=`${base}/${stem}.md`, jsonPath=`${base}/${stem}.json`;
-    const mdMeta=await ghMeta(cfg, mdPath); await ghPut(cfg, mdPath, renderJournalMarkdown(), `Update ${stem} journal`, mdMeta&&mdMeta.sha);
-    const jMeta=await ghMeta(cfg, jsonPath); await ghPut(cfg, jsonPath, JSON.stringify(stripForBackup(DB),null,1), `Update ${stem} journal data`, jMeta&&jMeta.sha);
+    const jsonPath=`${base}/${stem}.json`;
+    const jMeta=await ghMeta(cfg, jsonPath); await ghPut(cfg, jsonPath, payload, `Update ${stem} journal`, jMeta&&jMeta.sha);
+    // the human-readable .md only re-renders on an explicit save, so background syncs stay one commit
+    if(!opts.silent){ const mdPath=`${base}/${stem}.md`; const mdMeta=await ghMeta(cfg, mdPath); await ghPut(cfg, mdPath, renderJournalMarkdown(), `Update ${stem} journal (readable)`, mdMeta&&mdMeta.sha); }
+    _lastSyncedJSON = payload;
     if(!opts.silent) toast('Saved to your file in the world.');
   }catch(e){ if(!opts.silent) toast('Sync failed: '+e.message); }
   finally{ syncing=false; }
@@ -1549,7 +1559,7 @@ async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silen
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
   try{ const meta=await ghMeta(cfg, `${base}/${stem}.json`); if(!meta){ if(!opts.silent) toast('No saved file found yet.'); return; }
     const raw=await (await fetch(meta.download_url)).text(); mergeIncoming(JSON.parse(raw));
-    save(); if(!opts.silent) toast('Loaded from your file.'); render();
+    saveLocal(); if(!opts.silent) toast('Loaded from your file.'); render();   // don't echo a sync back out
   }catch(e){ if(!opts.silent) toast('Load failed: '+e.message); }
 }
 function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
@@ -2100,7 +2110,7 @@ function statusToCol(status, section){ const s=(status||'').toLowerCase();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // flush the in-memory state to IndexedDB when the app is backgrounded/closed
 window.addEventListener('pagehide', flushState);
-document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') flushState(); });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ flushState(); if(ghReady()){ clearTimeout(syncTimer); syncToRepo({silent:true}); } } });   // push any pending change on backgrounding (no-op if nothing changed)
 (async function init(){
   try{ DB = await loadState(); }catch(e){ DB = defaults(); }
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
