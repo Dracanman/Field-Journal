@@ -240,16 +240,16 @@
   .studio-tabs .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
   .canon-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
   .canon-list .pick small{ text-transform:none; letter-spacing:0; }
-  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; }
-  .canon-doc h2{ font-size:24px; margin:14px 0 6px; }
-  .canon-doc h3{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:16px 0 4px; }
-  .canon-doc p{ margin:0 0 10px; }
-  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; }
-  .canon-doc code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; }
+  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; box-sizing:border-box; overflow-wrap:anywhere; }
+  .canon-doc h2{ font-size:24px; margin:14px 0 6px; overflow-wrap:anywhere; }
+  .canon-doc h3{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:16px 0 4px; overflow-wrap:anywhere; }
+  .canon-doc p, .canon-doc li{ margin:0 0 10px; overflow-wrap:anywhere; }
+  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; overflow:auto; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }
+  .canon-doc code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; overflow-wrap:anywhere; }
   .search-row{ display:flex; gap:10px; margin-bottom:16px; max-width:820px; margin-inline:auto; }
-  .search-row input{ flex:1; border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
-  .search-hit{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; }
-  .search-hit b{ color:var(--green); } .search-hit .ln{ color:var(--ink-soft); font-size:14px; }
+  .search-row input{ flex:1; min-width:0; border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
+  .search-hit{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; box-sizing:border-box; overflow-wrap:anywhere; }
+  .search-hit b{ color:var(--green); } .search-hit .ln{ color:var(--ink-soft); font-size:14px; overflow-wrap:anywhere; word-break:break-word; }
   .board{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
   .board .col{ background:#faf4e6; border:1px solid var(--gold-soft); border-radius:10px; padding:10px; }
   .board .col h4{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; text-align:center; }
@@ -1975,19 +1975,30 @@ function canonCardMarkdown(d){
 }
 function tagFromCategory(cat){ cat=String(cat||''); if(/41_VAEL/.test(cat))return 'VAE'; if(/40_PEOPLES/.test(cat))return 'PEO'; if(/50_ARKBORNE/.test(cat))return 'SED'; if(/10_COSMOLOGY/.test(cat))return 'PLC'; if(/30_GODLING/.test(cat))return 'GLG'; if(/60_MAGIC/.test(cat))return 'MAG'; return 'PEO'; }
 
+// Studio tabs — [key, label, what-this-is hint]. Keys are stable (other screens
+// link to them); labels/order are plain-language and follow the workflow.
+const STUDIO_TABS=[
+  ['board','The board','Where every card stands, by stage. Promote a finished card into its domain file from here.'],
+  ['threads','Open questions','Unaudited [OPEN] threads in your canon — copy one as an AI handoff, or draft it into a card. A good place to start.'],
+  ['inbox','In-tray','Raw ideas and the maker’s creations, waiting to be turned into Canon Cards.'],
+  ['drafter','Draft a card','Turn an idea into a Canon Card (Draft) — it lands in the queue with its own reserved ID.'],
+  ['browse','Look up','Read and search your promoted canon. Reference only — nothing here changes canon.'],
+];
 function viewStudio(tab, params){
-  tab = tab || 'browse';
-  const f = framed('Canon Studio', 'browse, draft, and triage your canon', 'nothing becomes canon until it is carded, checked, and promoted');
+  tab = tab || 'board';
+  const f = framed('Canon Studio', 'idea → Canon Card → triage → promoted into a domain', 'nothing becomes canon until it is carded, checked, and promoted');
   const body = f.querySelector('.framed-body');
   if(!ghReady()){
     body.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Connect your GitHub file first — the Studio reads your canon and writes Draft cards through it.'),
       h('div',{class:'toolrow', style:{justifyContent:'center'}}, h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub')));
     return f;
   }
+  const cur=STUDIO_TABS.find(t=>t[0]===tab)||STUDIO_TABS[0];
   const tabs=h('div',{class:'studio-tabs'});
-  [['browse','Canon Browser'],['threads','Open Threads'],['inbox','Inbox'],['drafter','Card Drafter'],['board','Promotion Board']].forEach(([k,label])=>
+  STUDIO_TABS.forEach(([k,label])=>
     tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('studio',{tab:k})}, label)));
   body.append(tabs);
+  body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
   const host=h('div',null); body.append(host);
   if(tab==='browse') studioBrowse(host);
   else if(tab==='threads') studioThreads(host);
@@ -2160,8 +2171,9 @@ function studioBoard(host){
       items.forEach(c=>{ const tile=h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null);
         const cid=cardId(c.title); if(cid && c.col!=='Promoted' && c.col!=='Raw') tile.append(h('button',{class:'navbtn', style:{marginTop:'7px', fontSize:'12px', padding:'4px 9px'}, onclick:()=>promoteCardModal(cid.id)}, 'Promote →'));
         col.append(tile); }); board.append(col); });
-    const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : h('p',{class:'hint', style:{textAlign:'center'}},'(couldn’t read 01_CANON_INDEX.md to cross-check IDs)');
-    host.replaceChildren(banner, h('p',{class:'hint', style:{textAlign:'center'}}, 'From 02_PROMOTION_QUEUE.md — '+cards.length+' cards'), board);
+    const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : null;
+    const count = cards.length+(cards.length===1?' card':' cards')+' in the queue';
+    host.replaceChildren(...[banner, h('p',{class:'hint', style:{textAlign:'center'}}, count), board].filter(Boolean));
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
 }
 // ---- queue <-> index consistency: catch ID drift before it bites the Drafter ----
@@ -2180,8 +2192,8 @@ function checkConsistency(queueText, indexText){
 }
 function consistencyBanner(issues){
   const warns=issues.filter(i=>i.level==='warn'), infos=issues.filter(i=>i.level==='info');
-  if(!warns.length && !infos.length) return h('div',{style:{textAlign:'center', color:'#7a6a2f', fontSize:'14px', margin:'2px 0 10px'}}, '✓ Queue and index agree — every card ID is reserved.');
-  const box=h('div',{style:{border:'1.5px solid '+(warns.length?'#c08a3e':'var(--gold-soft)'), background:'#fffaf0', borderRadius:'10px', padding:'10px 14px', margin:'2px 0 12px'}});
+  if(!warns.length) return null;   // quiet unless something actually needs reconciling
+  const box=h('div',{style:{border:'1.5px solid #c08a3e', background:'#fffaf0', borderRadius:'10px', padding:'10px 14px', margin:'2px 0 12px'}});
   box.append(h('b',null, warns.length? '⚠ '+warns.length+' to reconcile'+(infos.length?' · '+infos.length+' note'+(infos.length===1?'':'s'):'') : infos.length+' note'+(infos.length===1?'':'s')));
   const ul=h('ul',{style:{margin:'6px 0 0', paddingLeft:'18px', fontSize:'14px'}});
   warns.forEach(i=> ul.append(h('li',{style:{color:'#9a5b1c', margin:'2px 0'}}, i.msg)));
