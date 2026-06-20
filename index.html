@@ -299,8 +299,9 @@
   .intro p{ margin:0 0 8px; }
   .intro .steps{ text-align:left; margin:12px auto 16px; max-width:330px; color:var(--ink-soft); }
   .intro .steps li{ margin:6px 0; }
-  .intro .profile-pick{ display:flex; flex-direction:column; gap:12px; margin:10px 0 2px; }
-  .ppick{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:14px 16px; border-radius:12px; }
+  /* used by the first-run intro AND the Switch-space modal — keep it unscoped so both lay out */
+  .profile-pick{ display:flex; flex-direction:column; gap:12px; margin:10px 0 2px; }
+  .ppick{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:14px 16px; border-radius:12px; white-space:normal; }
   .ppick b{ font-size:18px; color:var(--ink); }
   .ppick small{ color:var(--hint); font-style:italic; line-height:1.3; }
   .profile-tag{ flex:0 0 auto; color:var(--hint); }
@@ -1274,7 +1275,7 @@ function backupRow(){
 function viewGallery(){
   const wrap = h('div',null);
   wrap.append(h('div',{class:'cover', style:{padding:'10px 0 6px'}},
-    h('h1',{class:'display', style:{fontSize:'34px'}}, DB.profile==='worldbuilder'?'My Journal':'My Field Journal'),
+    h('h1',{class:'display', style:{fontSize:'34px'}}, DB.profile==='maker'?'My Field Journal':'My Journal'),
     h('div',{class:'tag'},'everything you’ve made — revisit it, change it, print it, or weave it into the world')));
   wrap.append(backupRow());
   if (!DB.creations.length){
