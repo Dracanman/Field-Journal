@@ -2152,13 +2152,39 @@ function studioDrafter(host, prefill){
 function studioBoard(host){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the queue…'));
   (async()=>{ try{ const r=await ghGetText(cfg, QUEUE_PATH); if(!r){ host.replaceChildren(h('p',{class:'hint'},'Queue not found.')); return; }
+    let ix=null; try{ ix=await ghGetText(cfg, INDEX_PATH); }catch(e){}
     const cards=parseQueueCards(r.text).concat(parseRawIdeas(r.text));
     const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
     const board=h('div',{class:'board'});
     cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
       items.forEach(c=> col.append(h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null))); board.append(col); });
-    host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}}, 'From 02_PROMOTION_QUEUE.md — '+cards.length+' cards'), board);
+    const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : h('p',{class:'hint', style:{textAlign:'center'}},'(couldn’t read 01_CANON_INDEX.md to cross-check IDs)');
+    host.replaceChildren(banner, h('p',{class:'hint', style:{textAlign:'center'}}, 'From 02_PROMOTION_QUEUE.md — '+cards.length+' cards'), board);
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
+}
+// ---- queue <-> index consistency: catch ID drift before it bites the Drafter ----
+function cardId(title){ const m=/^([A-Z]{3})-(\d{3})\b/.exec(String(title||'')); return m? {tag:m[1], num:parseInt(m[2],10), id:m[1]+'-'+m[2]} : null; }
+function indexReservedIds(indexText){ const ids=[]; String(indexText).split('\n').forEach(l=>{ const m=/^-\s+([A-Z]{3}-\d{3})\b/.exec(l.trim()); if(m) ids.push(m[1]); }); return ids; }
+function checkConsistency(queueText, indexText){
+  const issues=[]; const ids=parseQueueCards(queueText).map(c=>cardId(c.title)).filter(Boolean);
+  const seen={}; ids.forEach(x=>{ seen[x.id]=(seen[x.id]||0)+1; });
+  Object.keys(seen).filter(k=>seen[k]>1).forEach(k=> issues.push({level:'warn', msg:`${k} appears ${seen[k]}× in the queue — duplicate card ID.`}));
+  const reserved=new Set(indexReservedIds(indexText)); const queueSet=new Set(ids.map(x=>x.id));
+  ids.forEach(x=>{ const hi=parseHighest(indexText, x.tag);
+    if(x.num>hi) issues.push({level:'warn', msg:`${x.id} is in the queue but not reserved in the index (highest ${x.tag} is ${x.tag}-${pad3(hi)}). Bump the index, or the Drafter could mint ${x.id} again.`});
+    else if(!reserved.has(x.id)) issues.push({level:'info', msg:`${x.id} is within the reserved range but isn’t listed under ${x.tag} in the index.`}); });
+  reserved.forEach(id=>{ if(!queueSet.has(id)) issues.push({level:'info', msg:`${id} is reserved in the index but has no queue card (likely already promoted, or the card was retired).`}); });
+  return issues;
+}
+function consistencyBanner(issues){
+  const warns=issues.filter(i=>i.level==='warn'), infos=issues.filter(i=>i.level==='info');
+  if(!warns.length && !infos.length) return h('div',{style:{textAlign:'center', color:'#7a6a2f', fontSize:'14px', margin:'2px 0 10px'}}, '✓ Queue and index agree — every card ID is reserved.');
+  const box=h('div',{style:{border:'1.5px solid '+(warns.length?'#c08a3e':'var(--gold-soft)'), background:'#fffaf0', borderRadius:'10px', padding:'10px 14px', margin:'2px 0 12px'}});
+  box.append(h('b',null, warns.length? '⚠ '+warns.length+' to reconcile'+(infos.length?' · '+infos.length+' note'+(infos.length===1?'':'s'):'') : infos.length+' note'+(infos.length===1?'':'s')));
+  const ul=h('ul',{style:{margin:'6px 0 0', paddingLeft:'18px', fontSize:'14px'}});
+  warns.forEach(i=> ul.append(h('li',{style:{color:'#9a5b1c', margin:'2px 0'}}, i.msg)));
+  infos.forEach(i=> ul.append(h('li',{style:{color:'var(--ink-soft)', margin:'2px 0'}}, i.msg)));
+  box.append(ul); return box;
 }
 function parseQueueCards(text){
   const lines=text.split('\n'); const cards=[]; let cur=null, section='';
