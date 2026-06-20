@@ -311,6 +311,8 @@
   .gh .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .gh .warn{ font-size:13px; color:#9a7b3a; background:#f6edd6; border-radius:8px; padding:9px 12px; margin-top:14px; }
 
+  /* ---------- Game space (campaigns) — reuses studio/board/canon-doc styles ---------- */
+  .profile-game .maker-only{ display:none !important; }
   /* ---------- print ---------- */
   .book-stage{ display:none; }
   .book-cover{ text-align:center; }
@@ -708,6 +710,8 @@ registerView('gallery', () => viewGallery());
 registerView('worksheet', (v) => viewWorksheet(v.id, v.editId));
 registerView('studio', (v) => viewStudio(v.tab, v.params));
 registerView('naming', () => viewNamingTree());
+registerView('campaigns', () => viewCampaigns());
+registerView('campaign', (v) => viewCampaign(v.name, v.tab));
 
 function render(){
   $app.replaceChildren(topbar());
@@ -726,12 +730,16 @@ function errorCard(e){
 }
 
 function topbar(){
-  const full = DB.mode==='full', world = DB.profile==='worldbuilder';
+  const full = DB.mode==='full', world = DB.profile==='worldbuilder', game = DB.profile==='game';
   const n=DB.creations.length, count=n?` (${n})`:'';
   // each profile sees only its own actions — the Maker never meets the canon machinery,
-  // the Worldbuilder leads with the Studio. Only the primary nav scrolls; the utility
-  // cluster (file / help / mode / side) is fixed on the right so nothing gets clipped.
-  const nav = world
+  // the Worldbuilder leads with the Studio, the Game leads with Campaigns. Only the primary
+  // nav scrolls; the utility cluster (mode / ⋯) is fixed on the right so nothing gets clipped.
+  const nav = game
+    ? h('div',{class:'navmid'},
+        h('button',{class:'navbtn primary', onclick:()=>go('campaigns')}, '♟ Campaigns'),
+        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count))
+    : world
     ? h('div',{class:'navmid'},
         h('button',{class:'navbtn primary', onclick:()=>go('studio')}, '⚒ Canon Studio'),
         h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count),
@@ -743,23 +751,23 @@ function topbar(){
   // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
   // no clip). The Cozy/Full toggle stays out (it's how you toggle). The Maker in Cozy has
   // no advanced utilities, so no ⋯ shows there.
-  const showMore = world || full;
+  const showMore = world || game || full;
   const util = h('div',{class:'navutil'},
-    world? null : modeSwitch(full),
+    (world||game)? null : modeSwitch(full),
     showMore? h('button',{class:'navbtn', 'aria-label':'more', title:'more', onclick:()=>moreMenu()}, '⋯') : null,
   );
   return h('div',{class:'topbar no-print'},
-    h('div',{class:'brand', onclick:()=>go(world?'studio':'home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
+    h('div',{class:'brand', onclick:()=>go(world?'studio':game?'campaigns':'home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
     nav, util,
   );
 }
 function moreMenu(){
-  const world = DB.profile==='worldbuilder'; let close;
+  let close;
   const item=(label, fn)=> h('button',{class:'navbtn', style:{justifyContent:'flex-start', textAlign:'left'}, onclick:()=>{ close(); fn(); }}, label);
   const sheet=h('div',{class:'moremenu'},
     item('☁ My file', ()=>openGitHubPanel()),
     item('? How this works', ()=>showIntro(true)),
-    item(world? '✿ Switch to the Maker’s journal' : '⚒ Switch to the Worldbuilder', ()=>switchProfileSheet()),
+    item('⇄ Switch space', ()=>switchProfileSheet()),
   );
   close=showModalNode('More', null, sheet);
 }
@@ -771,7 +779,9 @@ function modeSwitch(full){
     h('button',{class:'seg'+(full?' on':''), 'aria-pressed':full?'true':'false', onclick:()=>{ if(!full) setMode('full'); }}, '✦ Full kit'),
   );
 }
-function setProfile(p){ DB.profile=p; save(); applyMode(); go(p==='worldbuilder'?'studio':'home'); toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : 'Maker — the journal.'); }
+function profileLanding(p){ return p==='worldbuilder'?'studio' : p==='game'?'campaigns' : 'home'; }
+function setProfile(p){ DB.profile=p; if(p!=='maker') DB.mode='full'; save(); applyMode(); go(profileLanding(p));
+  toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : p==='game'? 'The Game — your campaigns.' : 'Maker — the journal.'); }
 
 /* ---------- home ----------------------------------------------------------- */
 function viewHome(){
@@ -1420,10 +1430,11 @@ function undoToast(msg, onUndo){
 }
 
 /* ---------- Cozy / Full kit mode ------------------------------------------- */
-function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world');
-  const world = DB.profile==='worldbuilder';
-  b.classList.add(world?'profile-world':'profile-maker');
-  b.classList.add((world || DB.mode==='full')?'mode-full':'mode-simple');   // worldbuilder always sees the full toolset
+function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game');
+  const cls = DB.profile==='worldbuilder'?'profile-world' : DB.profile==='game'?'profile-game' : 'profile-maker';
+  b.classList.add(cls);
+  const advanced = DB.profile!=='maker';   // worldbuilder + game always see the full toolset
+  b.classList.add((advanced || DB.mode==='full')?'mode-full':'mode-simple');
 }
 // Gating is pure CSS on the body class, so a mode switch only needs to flip the class
 // and refresh the top bar's label — no view re-render, so in-progress edits are kept.
@@ -1437,20 +1448,22 @@ function firstRun(){ if(!DB.profileChosen){ chooseProfile(); return; } showIntro
 function chooseProfile(){
   openOverlay(close=>{
     function pick(p){
-      DB.profile=p; DB.profileChosen=true; if(p==='worldbuilder') DB.mode='full';
+      DB.profile=p; DB.profileChosen=true; if(p!=='maker') DB.mode='full';
       save(); applyMode(); close();
-      if(p==='worldbuilder'){ go('studio'); toast('Welcome, Worldbuilder.'); }
-      else { render(); showIntro(true); }
+      if(p==='maker'){ render(); showIntro(true); }
+      else { go(p==='worldbuilder'?'studio':'campaigns'); toast(p==='worldbuilder'? 'Welcome, Worldbuilder.' : 'Welcome to the Game.'); }
     }
     return h('div',{class:'intro'},
       svgUse('ic-seedling','em'),
       h('h2',{class:'display'},'Whose space is this?'),
-      h('p',{class:'hint'},'Pick once to begin. You can change it later, but it takes a deliberate tap — so the two spaces stay their own.'),
+      h('p',{class:'hint'},'Pick once to begin. You can change it later, but it takes a deliberate tap — so the spaces stay their own.'),
       h('div',{class:'profile-pick'},
         h('button',{class:'navbtn ppick', onclick:()=>pick('maker')},
           h('b',null,'✿ The Maker'), h('small',null,'her journal — make Vael folk, places, creatures, and seeds')),
         h('button',{class:'navbtn ppick', onclick:()=>pick('worldbuilder')},
           h('b',null,'⚒ The Worldbuilder'), h('small',null,'the canon studio — browse, draft, and triage the world')),
+        h('button',{class:'navbtn ppick', onclick:()=>pick('game')},
+          h('b',null,'♟ The Game'), h('small',null,'run a campaign — resume, ledger, threads, AI handoffs')),
       ),
     );
   }, { cls:'intro-bg', dismissible:false });
@@ -1458,18 +1471,14 @@ function chooseProfile(){
 // Switching sides is possible but deliberate: a small current-side button opens this
 // confirm, rather than a bare toggle sitting in the bar.
 function switchProfileSheet(){
-  const world = DB.profile==='worldbuilder', target = world?'maker':'worldbuilder';
-  let close;
-  const body=h('div',null,
-    h('p',{class:'hint'}, world
-      ? 'Leave the Worldbuilder’s canon studio and open the Maker’s journal?'
-      : 'Leave the Maker’s journal and open the Worldbuilder’s canon studio? This is the space for the world’s canon.'),
-    h('div',{class:'toolrow', style:{marginTop:'10px'}},
-      h('button',{class:'navbtn primary', onclick:()=>{ close(); setProfile(target); }},
-        target==='worldbuilder'?'Open the Worldbuilder side':'Open the Maker’s journal'),
-      h('button',{class:'navbtn', onclick:()=>close()}, 'Stay here'),
-    ));
-  close=showModalNode('Switch space', null, body);
+  const cur=DB.profile; let close;
+  const opt=(p, label, desc)=> p===cur? null : h('button',{class:'navbtn ppick', onclick:()=>{ close(); setProfile(p); }}, h('b',null,label), h('small',null,desc));
+  const body=h('div',{class:'profile-pick'},
+    opt('maker','✿ The Maker','her journal'),
+    opt('worldbuilder','⚒ The Worldbuilder','the canon studio'),
+    opt('game','♟ The Game','run a campaign'),
+  );
+  close=showModalNode('Switch space', 'Open another space. Your work stays where it is.', body);
 }
 
 /* ---------- one-time gentle intro ------------------------------------------ */
@@ -1599,6 +1608,8 @@ function slug(s){ return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').
 function stemOf(cfg){ return cfg.displayName? slug(cfg.displayName) : 'field-journal'; }
 async function ghTest(cfg){ const r=await ghFetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}`, {headers:ghHeaders(cfg.token)}); if(!r.ok) throw ghErr(r.status); return r.json(); }
 async function ghMeta(cfg, path){ const r=await ghFetch(ghUrl(cfg,path)+`?ref=${encodeURIComponent(cfg.branch)}`, {headers:ghHeaders(cfg.token)}); if(r.status===404) return null; if(!r.ok) throw ghErr(r.status, await r.text().catch(()=>'')); return r.json(); }
+// list a directory -> [{name,type,path},…] (the Contents API returns an array for a dir); [] if missing
+async function ghList(cfg, path){ const r=await ghFetch(ghUrl(cfg,path)+`?ref=${encodeURIComponent(cfg.branch)}`, {headers:ghHeaders(cfg.token)}); if(r.status===404) return []; if(!r.ok) throw ghErr(r.status, await r.text().catch(()=>'')); const a=await r.json(); return Array.isArray(a)? a : []; }
 async function ghPut(cfg, path, content, message, sha){ const body={ message, content:b64(content), branch:cfg.branch }; if(sha) body.sha=sha;
   const r=await ghFetch(ghUrl(cfg,path), {method:'PUT', headers:ghHeaders(cfg.token), body:JSON.stringify(body)});
   if(!r.ok) throw ghErr(r.status, await r.text().catch(()=>'')); return r.json(); }
@@ -2452,6 +2463,324 @@ function promoteCardModal(id){
     return wrap;
   });
 }
+/* ========================================================================== *
+   CAMPAIGN FORMAT + PARSE — the single source of truth for the campaign files
+   (state tracker, threads, ledger) the Game space reads and writes. Pure (no DOM,
+   no network) so it's unit-testable; campaign.js builds the UI on top. Mirrors
+   canon-parse.js. See templates/ and campaign/<Name>/ for the on-disk formats.
+ * ========================================================================== */
+
+// ---- state tracker (the save file): pull a glanceable resume ----
+function parseTracker(text){
+  const t=String(text||'');
+  const one=re=>{ const m=re.exec(t); return m? m[1].trim() : ''; };
+  const gauge=name=>{ const m=new RegExp('^[\\-\\s]*'+name+':\\s*(.+)$','mi').exec(t); return m? m[1].trim() : ''; };
+  return {
+    status: one(/^Status:\s*(.+)$/m),
+    scene: one(/^Scene:\s*(.+)$/m),
+    summary: one(/^>\s*Current:\s*(.+)$/m),
+    day: one(/^In-world day:\s*(.+)$/m),
+    location: one(/^Location:\s*(.+)$/m),
+    runtime: {
+      personalMana: gauge('Personal Mana'),
+      divineMana: gauge('Divine Mana'),
+      divineHunger: gauge('Divine Hunger'),
+      strain: gauge('Strain'),
+      core: one(/(?:Gem \(core display\)|Core[ /]+Spark display|Core display)[^:\n]*:\s*(.+)/i),
+      body: one(/^Body:\s*(.+)$/m),
+    },
+  };
+}
+// a campaign is "archived/closed" if its tracker status says so, else current
+function trackerIsArchived(status){ return /\b(archiv|closed|complete|done|ended|retired)\b/i.test(String(status||'')); }
+
+// ---- threads (the quest log): bucket open threads by status ----
+const THREAD_BUCKETS = ['LIVE','WARMING','DISTANT','WAITING','BLOCKED','CLOSED'];
+function parseThreads(text){
+  const lines=String(text||'').split('\n'); const out={}; let cur=null;
+  for(const ln of lines){
+    const h=/^##\s+([A-Za-z]+)/.exec(ln.trim());
+    if(h){ const key=h[1].toUpperCase(); if(THREAD_BUCKETS.includes(key)){ cur=key; out[cur]=out[cur]||[]; } else cur=null; continue; }
+    if(!cur) continue;
+    const s=ln.trim(); if(!s || /^\(none/i.test(s)) continue;           // skip blanks + "(none…)" placeholders
+    out[cur].push(s.replace(/^[-*]\s+/,''));
+  }
+  return out;
+}
+
+// ---- ledger (append-only capture): GL-#### entries inside the ## ENTRIES code block ----
+function ledgerEntriesBlock(text){
+  const hi=String(text).search(/##\s+ENTRIES/i); if(hi<0) return null;
+  const open=text.indexOf('```', hi); if(open<0) return null;
+  const afterOpen=text.indexOf('\n', open)+1;
+  const closeRel=text.slice(afterOpen).indexOf('```'); if(closeRel<0) return null;
+  return { afterOpen, closeAbs: afterOpen+closeRel, inner: text.slice(afterOpen, afterOpen+closeRel) };
+}
+function parseLedger(text){
+  const blk=ledgerEntriesBlock(text); const body=blk? blk.inner : '';
+  const out=[]; let cur=null;
+  const flush=()=>{ if(cur){ cur.body=cur.body.trim(); out.push(cur); cur=null; } };
+  for(const ln of body.split('\n')){
+    const h=/^GL-(\d{3,})\s*\|\s*([^|]*?)\s*\|\s*([^|]*?)\s*\|\s*(.*)$/.exec(ln.trim());
+    if(h){ flush(); cur={ id:'GL-'+h[1], date:h[2].trim(), phase:h[3].trim().replace(/^\[|\]$/g,''), label:h[4].trim().replace(/^\[|\]$/g,''), body:'', status:'' }; continue; }
+    if(!cur) continue;
+    const st=/^Status:\s*(.+)$/i.exec(ln.trim()); if(st){ cur.status=st[1].trim(); continue; }
+    if(ln.trim()) cur.body += (cur.body?' ':'')+ln.trim();
+  }
+  flush(); return out;
+}
+function ledgerNextId(entries){ let max=0; (entries||[]).forEach(e=>{ const n=parseInt(String(e.id).replace(/\D/g,''),10); if(n>max) max=n; }); return 'GL-'+String(max+1).padStart(4,'0'); }
+function addLedgerEntry(text, entry){
+  const blk=ledgerEntriesBlock(text); if(!blk) throw new Error('no ENTRIES code block in the ledger');
+  const id=entry.id||'GL-0001';
+  const block=`${id} | ${entry.date} | [${entry.phase||'session'}] | [${entry.label||'MOMENT'}]\n${String(entry.body||'').trim()}\nStatus: ${entry.status||'CAMPAIGN-ONLY'}`;
+  const placeholder=/\(No entries|\(no entries|No entries yet/i.test(blk.inner);
+  const inner = placeholder ? block+'\n' : blk.inner.replace(/\s*$/,'')+'\n\n'+block+'\n';
+  return text.slice(0, blk.afterOpen) + inner + text.slice(blk.closeAbs);
+}
+
+// ---- threads write: add a thread line under a status bucket ----
+function addThread(text, status, line){
+  const lines=String(text).split('\n');
+  const idx=lines.findIndex(l=> new RegExp('^##\\s+'+status+'\\b','i').test(l.trim()));
+  if(idx<0) throw new Error('no '+status+' section in the threads file');
+  let j=idx+1; while(j<lines.length && !lines[j].trim()) j++;
+  if(j<lines.length && /^\(none/i.test(lines[j].trim())) lines[j]='- '+line;
+  else lines.splice(idx+1, 0, '', '- '+line);
+  return lines.join('\n');
+}
+
+// ---- new campaign: fill the template's [Campaign Name] placeholders ----
+function scaffoldName(templateText, name){ return String(templateText).replace(/\[Campaign Name\]/g, name); }
+
+// ---- write guards (never write back a file that isn't the one we think) ----
+function assertLedger(text){ if(!/Campaign Ledger/i.test(text) || !/##\s+ENTRIES/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign ledger'); return text; }
+function assertThreads(text){ if(!/Campaign Threads/i.test(text)) throw new Error('refusing to write — that file isn’t the threads file'); return text; }
+
+// ---- bridge: a PENDING ledger entry -> a Canon Card prefill (reuses the Drafter) ----
+function ledgerToCard(entry){
+  return { tag:'PEO', title:(entry.body||entry.label||'Campaign idea').slice(0,60), category:'',
+    source:'From campaign play', claim:String(entry.body||'').trim(), means:'', donot:'',
+    notes:'From campaign ledger '+entry.id+' ['+entry.label+'].' };
+}
+
+// ---- AI handoffs: paste-into-Claude prompts (mirror openThreadHandoff) ----
+function resumeHandoff(name, trackerText, threadsText){
+  return [
+    `# Resume campaign — ${name}`, '',
+    `You are the GM for my Godling Universe campaign "${name}". Resume from the save state below: read Where We Are + the runtime state, skim the live threads, confirm canon against the live domain files (via 01_CANON_INDEX.md) only if something seems off, then continue the scene — don't re-litigate settled state. Wait for me to enter play before narrating.`, '',
+    '## STATE TRACKER', '', String(trackerText||'').trim(), '',
+    '## THREADS', '', String(threadsText||'').trim(),
+  ].join('\n');
+}
+function sessionZeroHandoff(name){
+  return [
+    `# Session Zero — ${name}`, '',
+    `You are the GM for a new Godling Universe campaign "${name}". Run Session Zero following the meta-first Creation Flow (domains/30_GODLINGS_AND_SYSTEM.md):`, '',
+    '1. META side FIRST — walk the lottery with me and let me make the picks: personality, background, physical/metaphysical traits, element preferences → race → the questions that weight the Arkborne. Light visual previews are fine.',
+    '2. NARRATIVE side AFTER — only once the meta is finished, generate the story (the last-moments peek, the pull, the in-between dream, arrival), derived from the meta.',
+    '3. HARD RULE — do not begin the story (how I died, the dream) until the meta is complete.',
+    '4. Output — build the character sheet from templates/CHARACTER SHEET TEMPLATE.md; create the state tracker at the first save.', '',
+    'Canon is the live domain files in domains/ (find via 01_CANON_INDEX.md). Begin with the meta lottery.',
+  ].join('\n');
+}
+/* ========================================================================== *
+   THE GAME SPACE — manage campaigns and hand sessions off to the GM. The
+   campaign counterpart to the Canon Studio: a landing that lists your runs, and
+   a per-campaign view (Resume / Ledger / Threads / Character) over the repo files.
+   Format/parse lives in campaign-parse.js. Play happens with the GM (handoffs);
+   the app keeps the save.
+ * ========================================================================== */
+const CAMP_DIR='campaign', CHAR_DIR='characters';
+const CAMP_TABS=[
+  ['resume','Resume','The save file — where the story stands right now. Copy a prompt to resume play.'],
+  ['ledger','Ledger','Everything captured in play, newest first — lore, mechanics, moments, questions.'],
+  ['threads','Threads','Open storylines by heat: live, warming, distant, blocked, closed.'],
+  ['character','Character','The protagonist sheet.'],
+];
+
+async function listCampaigns(cfg){ return (await ghList(cfg, CAMP_DIR)).filter(x=>x.type==='dir').map(x=>x.name).sort(); }
+async function campaignFiles(cfg, name){
+  const inDir=(items,pfx)=> (items.find(x=>x.type==='file' && x.name.toUpperCase().startsWith(pfx))||{}).path;
+  const camp=await ghList(cfg, `${CAMP_DIR}/${name}`);
+  let chars=[]; try{ chars=await ghList(cfg, `${CHAR_DIR}/${name}`); }catch(e){}
+  return {
+    tracker: inDir(camp,'CAMPAIGN STATE TRACKER'),
+    threads: inDir(camp,'CAMPAIGN THREADS'),
+    ledger:  inDir(camp,'CAMPAIGN LEDGER'),
+    character: inDir(chars,'CHARACTER SHEET'),
+  };
+}
+
+function viewCampaigns(){
+  const f=framed('Campaigns', 'your runs — pick up where you left off', 'play happens with the GM; the app keeps the save');
+  const body=f.querySelector('.framed-body');
+  if(!ghReady()){
+    body.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Connect your GitHub file first — the Game space reads and writes your campaign files.'),
+      h('div',{class:'toolrow', style:{justifyContent:'center'}}, h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub')));
+    return f;
+  }
+  const cfg=ghCfg(); const host=h('div',null); body.append(host); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading your campaigns…'));
+  (async()=>{ try{
+    const names=await listCampaigns(cfg); const rows=[];
+    for(const name of names){ let status=''; try{ const files=await campaignFiles(cfg,name); if(files.tracker){ const r=await ghGetText(cfg, files.tracker); if(r) status=parseTracker(r.text).status; } }catch(e){} rows.push({name,status,archived:trackerIsArchived(status)}); }
+    const wrap=h('div',null,
+      h('div',{class:'toolrow', style:{justifyContent:'center', marginBottom:'12px'}}, h('button',{class:'navbtn primary', onclick:()=>startCampaignModal()}, '+ Start a new campaign')));
+    wrap.append(campaignGroup('Current', rows.filter(r=>!r.archived), 'No active campaigns yet — start one above.'));
+    const arch=rows.filter(r=>r.archived); if(arch.length) wrap.append(campaignGroup('Archived', arch, ''));
+    host.replaceChildren(wrap);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
+  return f;
+}
+function campaignGroup(label, rows, empty){
+  const g=h('div',{style:{marginTop:'8px'}}, h('div',{class:'kicker', style:{margin:'12px 0 8px'}}, label));
+  if(!rows.length){ g.append(h('p',{class:'hint'}, empty||'(none)')); return g; }
+  const list=h('div',{class:'canon-list'});
+  rows.forEach(r=> list.append(h('button',{class:'pick', onclick:()=>go('campaign',{name:r.name})},
+    h('div',{class:'ribbon', style:{background:ACCENTS.gold}}), h('b',null, r.name), h('small',null, r.status? r.status.slice(0,90) : 'campaign'))));
+  g.append(list); return g;
+}
+
+function viewCampaign(name, tab){
+  tab=tab||'resume';
+  const f=framed(name, 'idea → ledger → (audit) → canon', 'campaign-only until it’s audited into the queue');
+  const body=f.querySelector('.framed-body');
+  if(!ghReady()){ body.append(h('p',{class:'hint', style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
+  body.append(h('div',{class:'toolrow', style:{marginBottom:'4px'}}, h('button',{class:'navbtn', onclick:()=>go('campaigns')}, '← All campaigns')));
+  const cur=CAMP_TABS.find(x=>x[0]===tab)||CAMP_TABS[0];
+  const tabs=h('div',{class:'studio-tabs'});
+  CAMP_TABS.forEach(([k,label])=> tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('campaign',{name,tab:k})}, label)));
+  body.append(tabs);
+  body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
+  const host=h('div',null); body.append(host);
+  if(tab==='resume') campResume(host, name);
+  else if(tab==='ledger') campLedger(host, name);
+  else if(tab==='threads') campThreads(host, name);
+  else if(tab==='character') campCharacter(host, name);
+  return f;
+}
+
+async function campResume(host, name){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
+  try{ const files=await campaignFiles(cfg,name);
+    const tr=files.tracker? await ghGetText(cfg, files.tracker):null;
+    const th=files.threads? await ghGetText(cfg, files.threads):null;
+    if(!tr){ host.replaceChildren(h('p',{class:'hint'},'No state tracker found for '+name+' yet.')); return; }
+    const t=parseTracker(tr.text), threads= th? parseThreads(th.text):{}; const live=threads.LIVE||[];
+    const row=(k,v)=> v? h('p',{style:{margin:'3px 0'}}, h('b',null, k+': '), v) : null;
+    const card=h('div',{class:'canon-doc'},
+      h('h3',null,'Where we are'),
+      row('Status', t.status), row('Scene', t.scene), row('Now', t.summary), row('Day', t.day), row('Location', t.location),
+      h('h3',null,'Runtime'),
+      row('Personal Mana', t.runtime.personalMana), row('Divine Mana', t.runtime.divineMana), row('Divine Hunger', t.runtime.divineHunger),
+      row('Strain', t.runtime.strain), row('Core', t.runtime.core), row('Body', t.runtime.body),
+      h('h3',null,'Live threads'),
+      live.length? h('ul',null, ...live.map(x=>h('li',null,x))) : h('p',{class:'hint'},'No live threads.'));
+    const acts=h('div',{class:'toolrow', style:{marginBottom:'12px'}},
+      h('button',{class:'navbtn primary', onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(resumeHandoff(name, tr.text, th?th.text:'')); toast('Copied a resume prompt — paste it to the GM.'); }}, 'Copy resume prompt'),
+      h('button',{class:'navbtn', onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(sessionZeroHandoff(name)); toast('Copied a Session Zero prompt.'); }}, 'Copy Session Zero prompt'));
+    host.replaceChildren(acts, card);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+
+const LEDGER_LABELS=['MOMENT','LORE','MECHANIC','CHARACTER','QUESTION','RETCON'];
+async function campLedger(host, name){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the ledger…'));
+  let files;
+  try{ files=await campaignFiles(cfg,name); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+  if(!files.ledger){ host.replaceChildren(h('p',{class:'hint'},'No ledger found for '+name+' yet.')); return; }
+  async function draw(){
+    const r=await ghGetText(cfg, files.ledger); const entries=r? parseLedger(r.text):[];
+    // "mark that" capture form
+    const labelSel=h('select', null, ...LEDGER_LABELS.map(x=>h('option',{value:x},x)));
+    const phaseIn=h('input',{placeholder:'scene / phase (optional)'});
+    const bodyIn=h('textarea',{placeholder:'what happened — one short paragraph'});
+    const st=h('div',{class:'hint'});
+    const addBtn=h('button',{class:'navbtn primary'}, 'Mark it');
+    addBtn.onclick=async()=>{ const body=bodyIn.value.trim(); if(!body){ st.textContent='Write something first.'; return; }
+      addBtn.disabled=true; st.textContent='Saving…';
+      try{ await ghUpdate(cfg, files.ledger, t=>addLedgerEntry(t, { id:ledgerNextId(parseLedger(t)), date:new Date().toISOString().slice(0,10), phase:phaseIn.value.trim()||'session', label:labelSel.value, body, status:'CAMPAIGN-ONLY' }), 'Ledger entry via Game', {guard:assertLedger});
+        toast('Marked it.'); draw();
+      }catch(e){ st.textContent='Failed: '+e.message; addBtn.disabled=false; } };
+    const form=h('div',{class:'drafter'}, h('label',null,'Mark that → ledger'),
+      h('div',{class:'twocol'}, h('div',null, h('label',null,'Label'), labelSel), h('div',null, h('label',null,'Phase'), phaseIn)),
+      h('label',null,'What to capture'), bodyIn, h('div',{class:'toolrow'}, addBtn), st);
+    const list=h('div',{style:{marginTop:'16px'}}, h('p',{class:'hint', style:{textAlign:'center'}}, entries.length+' entr'+(entries.length===1?'y':'ies')));
+    if(!entries.length) list.append(h('p',{class:'hint', style:{textAlign:'center'}},'Nothing captured yet — "mark that" during play lands here.'));
+    entries.slice().reverse().forEach(e=> list.append(h('div',{class:'pcard', style:{marginBottom:'8px'}},
+      h('b',null, e.id+'  '), h('small',null, '['+e.label+'] · '+(e.status||'CAMPAIGN-ONLY')),
+      h('div',{style:{margin:'4px 0'}}, e.body),
+      h('div',{class:'toolrow'}, h('button',{class:'navbtn', style:{fontSize:'12px', padding:'4px 9px'}, onclick:()=>bridgeToCanon(e)}, 'Draft a Canon Card →')))));
+    host.replaceChildren(form, list);
+  }
+  try{ await draw(); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+// hand a captured idea to the canon side: switch to the Worldbuilder and open the Drafter prefilled
+function bridgeToCanon(entry){ DB.profile='worldbuilder'; DB.mode='full'; save(); applyMode(); go('studio',{tab:'drafter', params:{prefill:ledgerToCard(entry)}}); toast('Opened the Card Drafter on the canon side.'); }
+
+async function campThreads(host, name){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the threads…'));
+  let files;
+  try{ files=await campaignFiles(cfg,name); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+  if(!files.threads){ host.replaceChildren(h('p',{class:'hint'},'No threads file found for '+name+' yet.')); return; }
+  async function draw(){
+    const r=await ghGetText(cfg, files.threads); const th= r? parseThreads(r.text):{};
+    const present=THREAD_BUCKETS.filter(k=> k in th);
+    // add-thread form
+    const statusSel=h('select', null, ...(present.length? present : ['LIVE','WARMING','DISTANT','BLOCKED','CLOSED']).map(x=>h('option',{value:x},x)));
+    const lineIn=h('input',{placeholder:'a new open thread…'});
+    const st=h('div',{class:'hint'});
+    const addBtn=h('button',{class:'navbtn primary'}, 'Add thread');
+    addBtn.onclick=async()=>{ const line=lineIn.value.trim(); if(!line){ st.textContent='Write the thread first.'; return; }
+      addBtn.disabled=true; st.textContent='Saving…';
+      try{ await ghUpdate(cfg, files.threads, t=>addThread(t, statusSel.value, line), 'Thread via Game', {guard:assertThreads});
+        toast('Thread added.'); draw();
+      }catch(e){ st.textContent='Failed: '+e.message; addBtn.disabled=false; } };
+    const form=h('div',{class:'drafter'}, h('label',null,'Open a thread'),
+      h('div',{class:'twocol'}, h('div',null, h('label',null,'Status'), statusSel), h('div',null, h('label',null,'Thread'), lineIn)),
+      h('div',{class:'toolrow'}, addBtn), st);
+    const board=h('div',{class:'board'});
+    present.forEach(k=>{ const items=th[k]||[]; const col=h('div',{class:'col'}, h('h4',null, k+' ('+items.length+')'));
+      items.forEach(x=> col.append(h('div',{class:'pcard'}, x))); board.append(col); });
+    host.replaceChildren(form, present.length? board : h('p',{class:'hint', style:{textAlign:'center'}},'No threads yet.'));
+  }
+  try{ await draw(); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+
+async function campCharacter(host, name){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the character…'));
+  try{ const files=await campaignFiles(cfg,name); const r=files.character? await ghGetText(cfg, files.character):null;
+    if(!r){ host.replaceChildren(h('p',{class:'hint'},'No character sheet found for '+name+' yet.')); return; }
+    const doc=h('div',{class:'canon-doc'}); doc.innerHTML=mdToHtml(r.text); host.replaceChildren(doc);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+
+function startCampaignModal(){
+  const cfg=ghCfg(); let close;
+  const nameIn=h('input',{placeholder:'Campaign name (e.g. Earthwood2)'});
+  const status=h('div',{class:'hint'});
+  const create=h('button',{class:'navbtn primary'}, 'Create campaign');
+  create.onclick=async()=>{
+    const name=nameIn.value.trim().replace(/[^A-Za-z0-9 _-]/g,'');
+    if(!name){ status.textContent='Pick a name.'; return; }
+    create.disabled=true; status.textContent='Creating…';
+    try{
+      const T=async p=>{ const r=await ghGetText(cfg, p); if(!r) throw new Error('missing template: '+p); return r.text; };
+      const base=`${CAMP_DIR}/${name}`, cbase=`${CHAR_DIR}/${name}`;
+      if(await ghGetText(cfg, `${base}/CAMPAIGN STATE TRACKER ${name}.md`)) throw new Error('a campaign named "'+name+'" already exists');
+      const ledger=await T('templates/CAMPAIGN LEDGER TEMPLATE.md'), tracker=await T('templates/CAMPAIGN STATE TRACKER TEMPLATE.md'),
+            threads=await T('templates/CAMPAIGN THREADS TEMPLATE.md'), sheet=await T('templates/CHARACTER SHEET TEMPLATE.md');
+      await ghUpdate(cfg, `${base}/CAMPAIGN LEDGER ${name}.md`,        ()=>scaffoldName(ledger,name),  'Start campaign '+name+' (ledger)',    {create:true});
+      await ghUpdate(cfg, `${base}/CAMPAIGN STATE TRACKER ${name}.md`, ()=>scaffoldName(tracker,name), 'Start campaign '+name+' (tracker)',   {create:true});
+      await ghUpdate(cfg, `${base}/CAMPAIGN THREADS ${name}.md`,       ()=>scaffoldName(threads,name), 'Start campaign '+name+' (threads)',   {create:true});
+      await ghUpdate(cfg, `${cbase}/CHARACTER SHEET ${name}.md`,       ()=>scaffoldName(sheet,name),   'Start campaign '+name+' (character)', {create:true});
+      toast('Created '+name+'.'); close(); go('campaign',{name});
+    }catch(e){ status.textContent='Failed: '+e.message; create.disabled=false; }
+  };
+  close=showModalNode('Start a new campaign', 'Scaffolds the ledger, state tracker, threads, and a character sheet from the templates.',
+    h('div',null, h('label',null,'Name'), nameIn,
+      h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
+}
 /* ---------- boot ----------------------------------------------------------- */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // flush the in-memory state to IndexedDB when the app is backgrounded/closed
@@ -2462,6 +2791,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
   applyMode();
   if(DB.profileChosen && DB.profile==='worldbuilder') VIEW={name:'studio'};   // the Worldbuilder lands in the Studio, not the maker home
+  else if(DB.profileChosen && DB.profile==='game') VIEW={name:'campaigns'};   // the Game lands in Campaigns
   render();
   firstRun();
   // self-heal: load from the repo on open when asked to converge devices, OR whenever the
