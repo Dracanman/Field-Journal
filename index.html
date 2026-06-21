@@ -113,9 +113,13 @@
   .cover .tag{ color:var(--hint); font-style:italic; margin-top:16px; }
   .shelf{ margin-top:26px; }
   .shelf h3{ font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid var(--gold-soft); padding-bottom:8px; margin-bottom:16px; }
-  /* warm hand-lettered category label inside a shelf — keeps the browsing playful, not filing-cabinet */
-  .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; }
+  /* warm hand-lettered category label inside a shelf — keeps the browsing playful, not filing-cabinet.
+     Clickable to collapse/expand; collections also carry a × to remove them. */
+  .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
   .shelf-cat:first-of-type{ margin-top:4px; }
+  .shelf-cat .chev{ font-size:13px; color:var(--gold); width:13px; flex:0 0 auto; }
+  .shelf-cat .cat-del{ margin-left:auto; font-family:system-ui,sans-serif; font-size:18px; line-height:1; color:var(--gold-soft); padding:0 6px; }
+  .shelf-cat .cat-del:hover{ color:#b0563f; }
   .grid-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-bottom:6px; }
   .pick{
     position:relative;
@@ -126,11 +130,13 @@
   }
   .pick:hover{ transform:translateY(-2px); border-color:var(--gold); box-shadow:0 10px 22px -16px rgba(var(--shadow)/.5); }
   .pick .ribbon{ width:34px; height:5px; border-radius:3px; margin-bottom:3px; }
-  .pick b{ color:var(--ink); font-size:18px; font-weight:600; overflow-wrap:anywhere; word-break:break-word; padding-right:20px; }
+  .pick b{ color:var(--ink); font-size:18px; font-weight:600; overflow-wrap:anywhere; word-break:break-word; padding-right:42px; }
   .pick small{ color:var(--hint); font-style:italic; font-size:14px; line-height:1.35; overflow-wrap:anywhere; }
-  /* the pin — her little organizing touch; sits in the card's top-right corner */
-  .pick .fav{ position:absolute; top:9px; right:11px; font-size:17px; line-height:1; color:var(--gold-soft); cursor:pointer; user-select:none; }
-  .pick .fav:hover{ color:var(--gold); }
+  /* corner controls — her little organizing touches: ★ pin (favorites) and + (collections) */
+  .pick .fav, .pick .addto{ position:absolute; top:8px; line-height:1; color:var(--gold-soft); cursor:pointer; user-select:none; }
+  .pick .fav{ right:11px; font-size:17px; }
+  .pick .addto{ right:32px; font-size:19px; font-weight:600; }
+  .pick .fav:hover, .pick .addto:hover{ color:var(--gold); }
   .pick .fav.on{ color:var(--gold); }
 
   /* ---------- worksheet editor ---------- */
@@ -672,7 +678,7 @@ function namingDefault(){ return {
   openRoots: ['-karin','-lunai','-sorin'],
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], naming:namingDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], naming:namingDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
@@ -829,29 +835,65 @@ const SHELF_GROUPS = {
   ],
 };
 function shelfItem(id){
-  if(id==='__naming') return { id:'__naming', title:'The Vael Naming Tree',
+  if(id==='__naming') return { id:'__naming', kit:'field', title:'The Vael Naming Tree',
     subtitle:'an illustrated plate — trunk, branches, elements, suffixes', accentColor:'#6e5232', open:()=>go('naming') };
   return WORKSHEETS.find(w=>w.id===id);
 }
+// device-local organizing state (favorites, collections, collapse) — never synced to the repo
 function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); save(); go('home'); }
+function isCollapsed(key){ return (DB.collapsed||[]).includes(key); }
+function toggleCollapse(key){ const a=DB.collapsed=DB.collapsed||[]; const i=a.indexOf(key); if(i<0) a.push(key); else a.splice(i,1); save(); go('home'); }
+function deleteCollection(id){ DB.collections=(DB.collections||[]).filter(c=>c.id!==id); save(); go('home'); }
+// "Organize" sheet — pin to favorites, or add/remove from your own named collections
+function organizeCard(w){
+  const list=h('div',{style:{display:'flex', flexDirection:'column', gap:'8px', marginTop:'4px'}});
+  const favBtn=h('button',{class:'navbtn', style:{justifyContent:'flex-start'}});
+  const paintFav=()=>{ favBtn.textContent=((DB.favorites||[]).includes(w.id)?'★ ':'☆ ')+'Favorite'; };
+  favBtn.onclick=()=>{ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(w.id); if(i<0) f.push(w.id); else f.splice(i,1); save(); paintFav(); };
+  paintFav(); list.append(favBtn);
+  const collRow=(c)=>{ const b=h('button',{class:'navbtn', style:{justifyContent:'flex-start'}});
+    const paint=()=>{ b.textContent=(c.ids.includes(w.id)?'☑ ':'☐ ')+c.name; };
+    b.onclick=()=>{ const i=c.ids.indexOf(w.id); if(i<0) c.ids.push(w.id); else c.ids.splice(i,1); save(); paint(); }; paint(); return b; };
+  (DB.collections||[]).filter(c=>c.kit===w.kit).forEach(c=> list.append(collRow(c)));
+  const nameIn=h('input',{placeholder:'new collection name…', style:{flex:'1', minWidth:'0'}});
+  const mk=()=>{ const n=nameIn.value.trim(); if(!n) return; const c={id:'c'+uid(), kit:w.kit, name:n, ids:[w.id]}; (DB.collections=DB.collections||[]).push(c); save(); nameIn.value=''; list.insertBefore(collRow(c), nameRow); };
+  const nameRow=h('div',{class:'toolrow', style:{marginTop:'4px'}}, nameIn, h('button',{class:'navbtn primary', onclick:mk}, 'Create'));
+  list.append(nameRow);
+  openOverlay((close)=> h('div',{class:'modal', style:{maxWidth:'420px'}},
+    h('h2',{class:'display'}, 'Organize'), h('p',{class:'hint'}, w.title), list,
+    h('div',{class:'toolrow', style:{justifyContent:'flex-end', marginTop:'12px'}}, h('button',{class:'navbtn', onclick:()=>close()}, 'Done'))
+  ), { onClose:()=>go('home') });
+}
 function pickCard(w){
   const fav=(DB.favorites||[]).includes(w.id);
   const star=h('span',{class:'fav'+(fav?' on':''), role:'button', tabindex:'0', 'aria-label':fav?'unpin from favorites':'pin to favorites',
     title:fav?'unpin':'pin to your favorites', onclick:e=>{ e.stopPropagation(); toggleFav(w.id); }}, fav?'★':'☆');
+  const add=h('span',{class:'addto', role:'button', tabindex:'0', 'aria-label':'add to a collection', title:'add to a collection',
+    onclick:e=>{ e.stopPropagation(); organizeCard(w); }}, '+');
   return h('button',{class:'pick', onclick:w.open||(()=>go('worksheet',{id:w.id}))},
     h('div',{class:'ribbon', style:{background:w.accentColor||accentOf(w)}}),
-    h('b',null,w.title), h('small',null,w.subtitle||''), star);
+    h('b',null,w.title), h('small',null,w.subtitle||''), star, add);
+}
+function shelfGroup(s, key, label, ids, opts){
+  opts=opts||{};
+  const items=ids.map(shelfItem).filter(Boolean);
+  if(!items.length && !opts.keepEmpty) return;
+  const collapsed=isCollapsed(key);
+  s.append(h('div',{class:'shelf-cat', role:'button', tabindex:'0', onclick:()=>toggleCollapse(key)},
+    h('span',{class:'chev'}, collapsed?'▸':'▾'), h('span',null, label),
+    opts.onDelete? h('span',{class:'cat-del', title:'remove this collection', onclick:e=>{ e.stopPropagation(); opts.onDelete(); }}, '×') : null));
+  if(collapsed) return;
+  if(items.length){ const g=h('div',{class:'grid-cards'}); items.forEach(w=>g.append(pickCard(w))); s.append(g); }
+  else s.append(h('p',{class:'hint', style:{margin:'0 0 8px'}}, opts.emptyText||'(empty)'));
 }
 function shelf(title, kit){
   const s = h('div',{class:'shelf'}, h('h3',null,title));
-  const groups = SHELF_GROUPS[kit]||[];
-  const known = new Set(groups.flatMap(([,ids])=>ids));
-  const group = (label, ids)=>{ const items=ids.map(shelfItem).filter(Boolean); if(!items.length) return;
-    s.append(h('div',{class:'shelf-cat'}, label));
-    const g=h('div',{class:'grid-cards'}); items.forEach(w=>g.append(pickCard(w))); s.append(g); };
+  (DB.collections||[]).filter(c=>c.kit===kit).forEach(c=>
+    shelfGroup(s, 'coll::'+c.id, '◆ '+c.name, c.ids, { keepEmpty:true, emptyText:'empty — tap + on any card to add it here', onDelete:()=>deleteCollection(c.id) }));
+  const known = new Set((SHELF_GROUPS[kit]||[]).flatMap(([,ids])=>ids));
   const favIds=(DB.favorites||[]).filter(id=>known.has(id));   // her own curated row, first
-  if(favIds.length) group('★ Your favorites', favIds);
-  groups.forEach(([label,ids])=> group(label, ids));
+  if(favIds.length) shelfGroup(s, kit+'::fav', '★ Your favorites', favIds);
+  (SHELF_GROUPS[kit]||[]).forEach(([label,ids])=> shelfGroup(s, kit+'::'+label, label, ids));
   return s;
 }
 function accentOf(w){ return ACCENTS[w.accent]||ACCENTS.gold; }
