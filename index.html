@@ -45,7 +45,9 @@
   }
   h1,h2,h3{ font-weight:600; color:var(--ink); margin:0; }
   ::selection{ background:#e7ddc2; }
-  button{ font-family:inherit; cursor:pointer; }
+  /* touch-action:manipulation — on iPad, stops Safari from holding a tap to see if it's a
+     double-tap-to-zoom, which otherwise delays or swallows quick taps (finicky buttons). */
+  button{ font-family:inherit; cursor:pointer; touch-action:manipulation; }
   a{ color:var(--green); }
 
   /* serif-display fallback: EB Garamond loads if online; system serif otherwise */
@@ -115,7 +117,7 @@
   .shelf h3{ font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid var(--gold-soft); padding-bottom:8px; margin-bottom:16px; }
   /* warm hand-lettered category label inside a shelf — keeps the browsing playful, not filing-cabinet.
      Clickable to collapse/expand; collections also carry a × to remove them. */
-  .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; }
+  .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; touch-action:manipulation; }
   .shelf-cat:first-of-type{ margin-top:4px; }
   .shelf-cat .chev{ font-size:13px; color:var(--gold); width:13px; flex:0 0 auto; }
   .shelf-cat .cat-del{ margin-left:auto; font-family:system-ui,sans-serif; font-size:18px; line-height:1; color:var(--gold-soft); padding:0 6px; }
@@ -125,7 +127,7 @@
     position:relative;
     text-align:left; background:var(--paper-card); border:1.5px solid #e6dcc4; border-radius:10px;
     padding:15px 16px; min-height:104px; display:flex; flex-direction:column; gap:5px;
-    min-width:0; overflow-wrap:anywhere; word-break:break-word;
+    min-width:0; overflow-wrap:anywhere; word-break:break-word; touch-action:manipulation;
     transition:transform .08s ease, box-shadow .12s ease, border-color .12s ease;
   }
   .pick:hover{ transform:translateY(-2px); border-color:var(--gold); box-shadow:0 10px 22px -16px rgba(var(--shadow)/.5); }
@@ -216,6 +218,20 @@
   .palette-grid .pw{ display:flex; flex-direction:column; align-items:center; gap:6px; }
   .palette-grid input[type=color]{ width:46px; height:46px; border:1.5px solid var(--gold-soft); border-radius:8px; background:none; padding:2px; }
   .palette-grid input[type=text]{ width:74px; border:none; border-bottom:1px solid var(--gold-soft); background:transparent; text-align:center; font-family:inherit; font-size:13px; color:var(--ink-soft); }
+
+  /* ---------- touch targets ----------
+     On a finger device the doodle swatches (24px) and the small chips/tool buttons were too
+     small to hit reliably — taps "didn't react." Grow the hit areas only for coarse pointers
+     (iPad/phone), so the desktop layout is untouched. ~44px is Apple's reliable-tap minimum. */
+  @media (pointer:coarse){
+    .swatch{ width:38px; height:38px; }
+    .doodle .palette{ gap:12px; }
+    .toolbtn{ padding:10px 15px; font-size:15px; }
+    .chip{ padding:11px 17px 11px 14px; font-size:17px; }
+    .gal-card .acts button{ padding:9px 13px; font-size:14px; }
+    .tagchip{ padding:7px 12px; font-size:15px; }
+    .tagchip button{ font-size:18px; padding:0 4px; }
+  }
 
   /* ---------- gallery ---------- */
   .gal-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:16px; }
@@ -458,6 +474,13 @@ function findExpression(key){ return allExpressions().find(e=>e.key===key); }
 function elementLabelOf(key){ const e=findElement(key); return e? e.label : (key||''); }
 function expressionLabelOf(key){ const e=findExpression(key); return e? e.label : (key||''); }
 function elementAccentOf(key){ const e=findElement(key); return e&&e.accent? e.accent : ACCENTS.gold; }
+// element/expression on a creation may be one key (legacy saves) or several (multi-select).
+// keyList normalizes either shape to an array; the *LabelsOf helpers join for display, and
+// primaryElementKey picks the card's accent colour from the first chosen element.
+function keyList(v){ return Array.isArray(v) ? v.filter(Boolean) : (v ? [v] : []); }
+function elementLabelsOf(v){ return keyList(v).map(elementLabelOf).join(' · '); }
+function expressionLabelsOf(v){ return keyList(v).map(expressionLabelOf).join(' · '); }
+function primaryElementKey(v){ const k=keyList(v); return k.length ? k[0] : ''; }
 
 /* ---------- worksheet definitions (faithful to the printed pages) ---------- */
 /* field types: short | long | element | word                                  */
@@ -472,7 +495,7 @@ const WORKSHEETS = [
       {key:'name', label:'Their name', hint:"e.g. 'Mosswen'", type:'short'},
       {key:'grew', label:'Where they grew', hint:'swamp? mountain? wood?', type:'short'},
       {key:'body', label:'What their body shows', hint:'bark? moss? stone? glow?', type:'long', row:true},
-      {key:'element', label:'Their element', hint:'pick one — or add your own', type:'element'},
+      {key:'element', label:'Their element', hint:'pick one or more — or add your own', type:'element'},
       {key:'word', label:'A word that fits them', hint:'gentle…', type:'word'},
       {key:'line', label:'A line about them', hint:'a small, true thing only you know', type:'long', quote:true},
     ],
@@ -678,7 +701,7 @@ function namingDefault(){ return {
   openRoots: ['-karin','-lunai','-sorin'],
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], naming:namingDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
@@ -704,11 +727,21 @@ function flushState(){ clearTimeout(_stateT); idbSet(IDB_KEY, DB).catch(()=>{ to
 function saveLocal(){
   scheduleStateWrite();                                            // IndexedDB — the real store
   // best-effort recovery mirror; never let a momentarily-empty journal wipe a non-empty
-  // backup (guards against a transient blank destroying the only local copy).
-  try{ if((DB.creations&&DB.creations.length) || !localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(DB)); }catch(e){}
+  // backup (guards against a transient blank destroying the only local copy). But a real
+  // deletion (a tombstone exists) MUST be mirrored too — otherwise recovering from this
+  // mirror after storage eviction could resurrect something she removed.
+  try{
+    const hasWork = (DB.creations&&DB.creations.length) || (DB.tombstones&&Object.keys(DB.tombstones).length);
+    if(hasWork || !localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(DB));
+  }catch(e){}
 }
 function save(){ saveLocal(); scheduleSync(); }                    // local + a (debounced, de-duped) repo sync
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+// deletion tombstones (id -> deletedAt). A removed creation/spark is recorded here so the
+// additive merge on the next sync — or another device's copy — can't resurrect it. Undo
+// clears the tombstone so the item is allowed back. See mergeIncoming in sync/github.js.
+function tombstone(id){ if(id) (DB.tombstones=DB.tombstones||{})[id]=Date.now(); }
+function untombstone(id){ if(id && DB.tombstones) delete DB.tombstones[id]; }
 function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; return DB.counters[wsId]; }
 
 /* ---------- app state & router -------------------------------------------- */
@@ -839,11 +872,14 @@ function shelfItem(id){
     subtitle:'an illustrated plate — trunk, branches, elements, suffixes', accentColor:'#6e5232', open:()=>go('naming') };
   return WORKSHEETS.find(w=>w.id===id);
 }
-// device-local organizing state (favorites, collections, collapse) — never synced to the repo
-function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); save(); go('home'); }
+// device-local organizing state (favorites, collections, collapse) — never synced to the repo.
+// These re-render in place and KEEP your scroll position — collapsing a category down the page
+// shouldn't fling you back to the top every time. (go('home') always scrolls to 0.)
+function refreshHome(){ const y=window.scrollY||window.pageYOffset||0; render(); window.scrollTo(0,y); }
+function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); save(); refreshHome(); }
 function isCollapsed(key){ return (DB.collapsed||[]).includes(key); }
-function toggleCollapse(key){ const a=DB.collapsed=DB.collapsed||[]; const i=a.indexOf(key); if(i<0) a.push(key); else a.splice(i,1); save(); go('home'); }
-function deleteCollection(id){ DB.collections=(DB.collections||[]).filter(c=>c.id!==id); save(); go('home'); }
+function toggleCollapse(key){ const a=DB.collapsed=DB.collapsed||[]; const i=a.indexOf(key); if(i<0) a.push(key); else a.splice(i,1); save(); refreshHome(); }
+function deleteCollection(id){ DB.collections=(DB.collections||[]).filter(c=>c.id!==id); save(); refreshHome(); }
 // "Organize" sheet — pin to favorites, or add/remove from your own named collections
 function organizeCard(w){
   const list=h('div',{style:{display:'flex', flexDirection:'column', gap:'8px', marginTop:'4px'}});
@@ -943,7 +979,11 @@ function framed(title, subtitle, foot){
 }
 
 /* ---------- doodle component ---------------------------------------------- */
-function Doodle(initial, placeholder){
+// onChange fires only when the *drawing* actually changes (a finished stroke, undo, clear,
+// or a loaded photo) — never on a plain tap of a colour/tool button. That keeps the heavy
+// card repaint (getImageData + toDataURL of the whole canvas) off the per-tap path, so the
+// palette buttons stay responsive on iPad instead of fighting a repaint on every touch.
+function Doodle(initial, placeholder, onChange){
   const W=900, H=680;
   const cv = h('canvas');
   const dpr = Math.min(window.devicePixelRatio||1, 2);
@@ -952,13 +992,14 @@ function Doodle(initial, placeholder){
   ctx.scale(dpr,dpr); ctx.lineCap='round'; ctx.lineJoin='round';
   let color='#4a463b', erasing=false, drawing=false, last=null;
   const undo=[];
+  const fire = ()=>{ try{ onChange&&onChange(); }catch(_){} };
   function snapshot(){ try{ undo.push(cv.toDataURL('image/png')); if(undo.length>14) undo.shift(); }catch(e){} }
-  function loadDataURL(url){ const img=new Image(); img.onload=()=>{ ctx.clearRect(0,0,W,H); const r=Math.min(W/img.width,H/img.height); const w=img.width*r,hh=img.height*r; ctx.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); }; img.src=url; }
+  function loadDataURL(url, after){ const img=new Image(); img.onload=()=>{ ctx.clearRect(0,0,W,H); const r=Math.min(W/img.width,H/img.height); const w=img.width*r,hh=img.height*r; ctx.drawImage(img,(W-w)/2,(H-hh)/2,w,hh); if(after) after(); }; img.src=url; }
   if (initial) loadDataURL(initial);
   function pos(e){ const r=cv.getBoundingClientRect(); return { x:(e.clientX-r.left)*(W/r.width), y:(e.clientY-r.top)*(H/r.height), p:e.pressure&&e.pressure>0?e.pressure:0.5 }; }
   cv.addEventListener('pointerdown', e=>{ e.preventDefault(); cv.setPointerCapture(e.pointerId); snapshot(); drawing=true; last=pos(e); dab(last); });
   cv.addEventListener('pointermove', e=>{ if(!drawing) return; e.preventDefault(); const p=pos(e); stroke(last,p); last=p; });
-  function end(){ drawing=false; last=null; }
+  function end(){ if(!drawing) return; drawing=false; last=null; fire(); }   // a stroke finished — refresh the card once
   cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end); cv.addEventListener('pointerleave', end);
   function setBrush(p){ ctx.globalCompositeOperation = erasing?'destination-out':'source-over'; ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth = (erasing?22:2.2) + (p?.p?p.p*4:2); }
   function dab(p){ setBrush(p); ctx.beginPath(); ctx.arc(p.x,p.y, ctx.lineWidth/2, 0, Math.PI*2); ctx.fill(); }
@@ -972,10 +1013,10 @@ function Doodle(initial, placeholder){
   });
   function refreshSel(){ swatches.forEach(s=> s.classList.toggle('sel', !erasing && s.dataset.c===color)); eraseBtn.classList.toggle('sel', erasing); }
   const eraseBtn = h('button',{class:'swatch', style:{background:'#fff', borderStyle:'dashed'}, title:'eraser', onclick:()=>{ erasing=true; refreshSel(); }}, '');
-  const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ snapshot(); loadDataURL(rd.result); }; rd.readAsDataURL(f); }});
+  const fileIn = h('input',{type:'file', accept:'image/*', style:{display:'none'}, onchange:e=>{ const f=e.target.files[0]; if(!f) return; const rd=new FileReader(); rd.onload=()=>{ snapshot(); loadDataURL(rd.result, fire); }; rd.readAsDataURL(f); }});
   palette.append(...swatches, eraseBtn,
-    h('button',{class:'toolbtn', onclick:()=>{ if(undo.length){ loadDataURL(undo.pop()); } }}, '↶ Undo'),
-    h('button',{class:'toolbtn', onclick:()=>{ snapshot(); ctx.clearRect(0,0,W,H); }}, 'Clear'),
+    h('button',{class:'toolbtn', onclick:()=>{ if(undo.length){ loadDataURL(undo.pop(), fire); } }}, '↶ Undo'),
+    h('button',{class:'toolbtn', onclick:()=>{ snapshot(); ctx.clearRect(0,0,W,H); fire(); }}, 'Clear'),
     h('button',{class:'toolbtn', onclick:()=>fileIn.click()}, '+ Photo'), fileIn,
   );
 
@@ -1008,7 +1049,7 @@ function buildCardEditor(w, existing, state, seedImage){
   const editor = h('div',{class:'editor-col no-print'});
   const cardCol = h('div',{class:'card-col'});
 
-  const doodle = Doodle(seedImage, w.imageHint);
+  const doodle = Doodle(seedImage, w.imageHint, ()=>repaint());
   let importedImage = existing? (existing.importedImage||null) : null;   // full-res photo / Procreate art
   let tags = existing? (existing.tags||[]).slice() : [];
   const currentImage = ()=> importedImage || doodle.getData();
@@ -1033,8 +1074,6 @@ function buildCardEditor(w, existing, state, seedImage){
   });
 
   editor.append(h('div',{class:'field'}, h('label',null,'A doodle — draw with finger or Pencil'), doodle.el));
-  doodle.el.addEventListener('pointerup', ()=> setTimeout(repaint,0));
-  doodle.el.querySelector('.palette').addEventListener('click', ()=> setTimeout(repaint,30));
 
   // full-res import (a photo, or finished art from Procreate)
   const importPreview = h('div',null);
@@ -1082,25 +1121,33 @@ function buildCardEditor(w, existing, state, seedImage){
   return f;
 }
 
-// element picker: the 12 (+ her own); an optional expression "flavor" (advanced).
+// element picker: the 12 (+ her own); optional expression "flavors" (advanced).
+// Both are multi-select — tap to add a second element/flavor, tap again to remove it
+// (a creature can be Water + Air). Stored as arrays; primary element sets the card accent.
+function toggleKey(state, field, key){
+  const cur = keyList(state[field]);
+  const i = cur.indexOf(key);
+  if (i>=0) cur.splice(i,1); else cur.push(key);
+  state[field] = cur;
+}
 function elementPicker(state, repaint){
   const box = h('div',null);
   const erow = h('div',{class:'chips'});
-  function elChip(e){ const on = state.element===e.key;
+  function elChip(e){ const on = keyList(state.element).includes(e.key);
     return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?(e.accent||'var(--gold-soft)'):'var(--gold-soft)', background:on?deriveBg(e.accent||ACCENTS.gold):'#fbf8ef' },
-      onclick:()=>{ state.element=e.key; paintEls(); repaint(); }}, h('span',{class:'dot', style:{background:e.accent||'var(--gold-soft)'}}), e.label); }
+      onclick:()=>{ toggleKey(state,'element',e.key); paintEls(); repaint(); }}, h('span',{class:'dot', style:{background:e.accent||'var(--gold-soft)'}}), e.label); }
   function paintEls(){ erow.replaceChildren(...allElements().map(elChip),
-    h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push({key,label:n.trim(),accent:ACCENTS.gold,custom:true}); save(); state.element=key; paintEls(); repaint(); } }}, '+ add your own')); }
+    h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push({key,label:n.trim(),accent:ACCENTS.gold,custom:true}); save(); toggleKey(state,'element',key); paintEls(); repaint(); } }}, '+ add your own')); }
   paintEls();
   box.append(erow);
 
-  const xwrap = h('div',{class:'advanced-only', style:{marginTop:'12px'}}, h('div',{class:'fhint'}, 'their flavor — optional (same element, different skin)'));
+  const xwrap = h('div',{class:'advanced-only', style:{marginTop:'12px'}}, h('div',{class:'fhint'}, 'their flavor — optional, pick any (same element, different skin)'));
   const xrow = h('div',{class:'chips'});
-  function xChip(e){ const on = state.expression===e.key;
+  function xChip(e){ const on = keyList(state.expression).includes(e.key);
     return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?'var(--green)':'var(--gold-soft)', background:on?'#eef0e4':'#fbf8ef' },
-      onclick:()=>{ state.expression = on? '' : e.key; paintX(); repaint(); }}, e.label); }
+      onclick:()=>{ toggleKey(state,'expression',e.key); paintX(); repaint(); }}, e.label); }
   function paintX(){ xrow.replaceChildren(...allExpressions().map(xChip),
-    h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push({key,label:n.trim()}); save(); state.expression=key; paintX(); repaint(); } }}, '+ add a flavor')); }
+    h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push({key,label:n.trim()}); save(); toggleKey(state,'expression',key); paintX(); repaint(); } }}, '+ add a flavor')); }
   paintX();
   xwrap.append(xrow);
   box.append(xwrap);
@@ -1132,7 +1179,7 @@ function keepsake(w, state, image, opts){
   const c = w.card || {};
   let accent = accentOf(w);
   const hasElement = w.fields && w.fields.some(f=>f.type==='element');
-  if (hasElement && state.element) accent = elementAccentOf(state.element);
+  if (hasElement && primaryElementKey(state.element)) accent = elementAccentOf(primaryElementKey(state.element));
   const cardBg = deriveBg(accent), cardFrame = deriveFrame(accent);
   const nameVal = (state[c.name]||'').trim();
   const wordVal = c.word? (state[c.word]||'').trim():'';
@@ -1165,8 +1212,8 @@ function keepsake(w, state, image, opts){
   (w.fields||[]).forEach(fld=>{
     if (skip.has(fld.key)) return;
     if (fld.type==='element'){
-      if (state.element){ any=true; const lbl=elementLabelOf(state.element)+(state.expression? ' · '+expressionLabelOf(state.expression):'');
-        rows.append(h('div',{class:'rw elt'}, h('span',{class:'dot', style:{background:accent}}), h('span',{class:'rl', style:{margin:0}}, 'Element'), h('span',{class:'rv', style:{fontStyle:'italic'}}, lbl))); }
+      if (keyList(state.element).length){ any=true; const lbl=elementLabelsOf(state.element)+(keyList(state.expression).length? ' · '+expressionLabelsOf(state.expression):'');
+        rows.append(h('div',{class:'rw elt'}, h('span',{class:'dot', style:{background:accent}}), h('span',{class:'rl', style:{margin:0}}, keyList(state.element).length>1?'Elements':'Element'), h('span',{class:'rv', style:{fontStyle:'italic'}}, lbl))); }
       return;
     }
     const v=(state[fld.key]||'').trim(); if(!v) return; any=true;
@@ -1328,8 +1375,8 @@ function viewSparks(){
     const wrap=h('div',null);
     items.forEach(s=> wrap.append(h('div',{class:'spark-row'},
       h('div',{class:'spark-text'}, s.text),
-      h('button',{class:'toolbtn', 'aria-label':'remove spark', title:'remove', onclick:()=>{ DB.sparks=(DB.sparks||[]).filter(x=>x.id!==s.id); save(); paint();
-        undoToast('Spark removed.', ()=>{ (DB.sparks=DB.sparks||[]).push(s); DB.sparks.sort((a,b)=>(a.at||0)-(b.at||0)); save(); paint(); }); }}, 'remove'))));
+      h('button',{class:'toolbtn', 'aria-label':'remove spark', title:'remove', onclick:()=>{ DB.sparks=(DB.sparks||[]).filter(x=>x.id!==s.id); tombstone(s.id); save(); paint();
+        undoToast('Spark removed.', ()=>{ (DB.sparks=DB.sparks||[]).push(s); DB.sparks.sort((a,b)=>(a.at||0)-(b.at||0)); untombstone(s.id); save(); paint(); }); }}, 'remove'))));
     listHost.replaceChildren(h('div',{class:'kicker', style:{margin:'14px 0 8px'}}, items.length+' spark'+(items.length===1?'':'s')), wrap);
   }
   paint();
@@ -1423,8 +1470,8 @@ function galCard(c){
       h('button',{onclick:()=>{ const copy=JSON.parse(JSON.stringify(c)); copy.id=uid(); copy.createdAt=copy.updatedAt=Date.now(); if(w.specimen) copy.specimenNo=nextSpecimen(w.id); DB.creations.push(copy); save(); render(); }}, 'Duplicate'),
       (w.card? h('button',{class:'advanced-only', onclick:()=>sendToProcreate(w, c.fields||{}, creationThumb(c), {specimenNo:c.specimenNo})}, 'Save as image'):null),
       (w.card? h('button',{class:'advanced-only', onclick:()=>shareCreation(c)}, 'Weave into the world →'):null),
-      h('button',{onclick:()=>{ const idx=DB.creations.indexOf(c); if(idx<0) return; DB.creations.splice(idx,1); save(); render();
-        undoToast('Removed “'+creationTitle(c)+'.”', ()=>{ DB.creations.splice(Math.min(idx,DB.creations.length),0,c); save(); render(); }); }}, 'Remove'),
+      h('button',{onclick:()=>{ const idx=DB.creations.indexOf(c); if(idx<0) return; DB.creations.splice(idx,1); tombstone(c.id); save(); render();
+        undoToast('Removed “'+creationTitle(c)+'.”', ()=>{ DB.creations.splice(Math.min(idx,DB.creations.length),0,c); untombstone(c.id); save(); render(); }); }}, 'Remove'),
     ),
   );
   return card;
@@ -1450,7 +1497,7 @@ function shareCreation(c){
     `**Category:** ${DOMAIN_HINT[w.id]||'(Del to file)'}`,'',
     '### What was made','');
   w.fields.forEach(fld=>{
-    if (fld.type==='element'){ if(f.element) lines.push(`- **Element:** ${elementLabelOf(f.element)}${f.expression? ' · '+expressionLabelOf(f.expression):''}`); return; }
+    if (fld.type==='element'){ if(keyList(f.element).length) lines.push(`- **Element${keyList(f.element).length>1?'s':''}:** ${elementLabelsOf(f.element)}${keyList(f.expression).length? ' · '+expressionLabelsOf(f.expression):''}`); return; }
     const v=(f[fld.key]||'').trim(); if(v) lines.push(`- **${fld.cardLabel||fld.label}:** ${v}`);
   });
   if (c.specimenNo) lines.push(`- **${w.specimen}** ${c.specimenNo}`);
@@ -1608,7 +1655,7 @@ function wrapLines(ctx, text, font, maxW){
 }
 async function renderCardCanvas(w, state, image, opts){
   opts=opts||{}; const c=w.card||{}; const W=920, M=58, cw=W-M*2;
-  const accent=(w.fields&&w.fields.some(f=>f.type==='element')&&state.element)? elementAccentOf(state.element) : (ACCENTS[w.accent]||ACCENTS.gold);
+  const accent=(w.fields&&w.fields.some(f=>f.type==='element')&&primaryElementKey(state.element))? elementAccentOf(primaryElementKey(state.element)) : (ACCENTS[w.accent]||ACCENTS.gold);
   const aCol=safeColor(accent,'#b98e3c');
   const img=image? await loadImg(image) : null;
   const ctx0=probeCtx();
@@ -1622,7 +1669,7 @@ async function renderCardCanvas(w, state, image, opts){
   const subV=c.sub?(state[c.sub]||'').trim():''; if(c.sub&&subV){ const sl=wrapLines(ctx0,(c.subPrefix||'')+subV,'italic 22px Georgia,serif',cw); blocks.push({h:sl.length*28+8, draw:(x,y)=>{ x.fillStyle='#9a8f7a'; x.font='italic 22px Georgia,serif'; sl.forEach((ln,i)=>x.fillText(ln,M,y+22+i*28)); }}); }
   const skip=new Set([c.name,c.sub,c.word,c.quote].filter(Boolean));
   (w.fields||[]).forEach(fld=>{ if(skip.has(fld.key))return; let label,val;
-    if(fld.type==='element'){ if(!state.element)return; label='ELEMENT'; val=elementLabelOf(state.element)+(state.expression?' · '+expressionLabelOf(state.expression):''); }
+    if(fld.type==='element'){ if(!keyList(state.element).length)return; label=keyList(state.element).length>1?'ELEMENTS':'ELEMENT'; val=elementLabelsOf(state.element)+(keyList(state.expression).length?' · '+expressionLabelsOf(state.expression):''); }
     else { const v=(state[fld.key]||'').trim(); if(!v)return; label=(fld.cardLabel||fld.label).toUpperCase(); val=v; }
     const vl=wrapLines(ctx0,val,'20px Georgia,serif',cw);
     blocks.push({h:18+vl.length*26+10, draw:(x,y)=>{ x.fillStyle='#a39a80'; x.font='600 12px Georgia,serif'; x.fillText(label,M,y+12); x.fillStyle='#4a463b'; x.font='20px Georgia,serif'; vl.forEach((ln,i)=>x.fillText(ln,M,y+34+i*26)); }}); });
@@ -1720,7 +1767,7 @@ async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!met
 // (token, mode, profile, seenIntro, the GitHub config). That way toggling Cozy/Full,
 // dismissing a dialog, or switching sides never makes a commit, and an unchanged
 // journal produces an identical payload we can skip.
-function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], naming:DB.naming||namingDefault() }; }
+function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault() }; }
 let syncTimer=null, syncing=false, _lastSyncedJSON=null;
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
 async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return;
@@ -1741,16 +1788,21 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
   finally{ syncing=false; }
 }
 function stripForBackup(db){ const d=Object.assign({}, db); if(d.github){ d.github=Object.assign({}, d.github); delete d.github.token; } return d; } // never write the token into the repo
-// merge an incoming journal (from the repo or a backup file) into DB — additive only,
-// never deletes: existing creations win, new ones are appended by id.
+// merge an incoming journal (from the repo or a backup file) into DB. Additive for new
+// work (existing items win, new ones appended by id), but deletions are honored via
+// tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
+// re-adding it from the incoming copy. That's what stops a "Remove" from springing back the
+// next time the repo/backup copy is merged in — on this device or another.
 function mergeIncoming(inc){
   if(!inc || typeof inc!=='object') return;
-  const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(c && c.id && !have.has(c.id)) DB.creations.push(c); });
+  const tomb = DB.tombstones = Object.assign({}, inc.tombstones||{}, DB.tombstones||{});
+  DB.creations = DB.creations.filter(c=>!(c && tomb[c.id]));
+  const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(c && c.id && !have.has(c.id) && !tomb[c.id]) DB.creations.push(c); });
   DB.roots=Object.assign({}, inc.roots, DB.roots);
   DB.counters=Object.assign({}, inc.counters, DB.counters);
   DB.elements=mergeBy(DB.elements, inc.elements, 'key');
   DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
-  DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id');
+  DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id').filter(s=>!(s && tomb[s.id]));
 }
 async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
@@ -1790,7 +1842,7 @@ function creationMarkdown(c){
   const w=WS[c.worksheetId]||{title:'(unknown page)', fields:[]}, f=c.fields||{}; const L=[`### ${creationTitle(c)} — _${w.title}_`, ''];
   if(c.worksheetId==='specimens'){ (c.slots||[]).forEach(s=>{ if(s.caption||s.image) L.push(`- **${s.label}:** ${s.caption||'[picture]'}`); }); L.push(''); return L; }
   if(c.worksheetId==='warmth'){ ['what','who','fiber','palette'].forEach(k=>{ if(f[k]) L.push(`- **${k}:** ${f[k]}`); }); if(c.colors) L.push(`- **colorway:** ${c.colors.join(', ')}`); L.push(''); return L; }
-  (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) L.push(`- **Element:** ${elementLabelOf(f.element)}${f.expression?' · '+expressionLabelOf(f.expression):''}`); return; } const v=(f[fld.key]||'').trim(); if(v) L.push(`- **${fld.cardLabel||fld.label}:** ${v}`); });
+  (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(keyList(f.element).length) L.push(`- **Element${keyList(f.element).length>1?'s':''}:** ${elementLabelsOf(f.element)}${keyList(f.expression).length?' · '+expressionLabelsOf(f.expression):''}`); return; } const v=(f[fld.key]||'').trim(); if(v) L.push(`- **${fld.cardLabel||fld.label}:** ${v}`); });
   if(c.specimenNo) L.push(`- **${w.specimen}** ${c.specimenNo}`);
   if(c.image||c.importedImage) L.push('- _[has a drawing]_');
   L.push(''); return L;
@@ -2406,7 +2458,7 @@ function inboxCard(c){
 function creationToCard(c){
   const w=WS[c.worksheetId]||{fields:[]}; const f=c.fields||{}; const title=creationTitle(c);
   const cat=DOMAIN_HINT[c.worksheetId]||''; const tag=tagFromCategory(cat);
-  const bullets=[]; (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(f.element) bullets.push('Element: '+elementLabelOf(f.element)); return; } const v=(f[fld.key]||'').trim(); if(v) bullets.push((fld.cardLabel||fld.label)+': '+v); });
+  const bullets=[]; (w.fields||[]).forEach(fld=>{ if(fld.type==='element'){ if(keyList(f.element).length) bullets.push('Element'+(keyList(f.element).length>1?'s':'')+': '+elementLabelsOf(f.element)); return; } const v=(f[fld.key]||'').trim(); if(v) bullets.push((fld.cardLabel||fld.label)+': '+v); });
   return { tag, title, category:cat, source:'Made by '+((DB.github&&DB.github.makerStem)||'the maker')+' in the Field Journal kit', claim:title+(bullets[0]? ' — '+bullets[0].replace(/^[^:]+:\s*/,''):''), means:bullets.join('\n'), donot:'', notes:'From her journal.' };
 }
 async function appendRawDump(text){ const cfg=ghCfg();
