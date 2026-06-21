@@ -113,8 +113,12 @@
   .cover .tag{ color:var(--hint); font-style:italic; margin-top:16px; }
   .shelf{ margin-top:26px; }
   .shelf h3{ font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid var(--gold-soft); padding-bottom:8px; margin-bottom:16px; }
-  .grid-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; }
+  /* warm hand-lettered category label inside a shelf — keeps the browsing playful, not filing-cabinet */
+  .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; }
+  .shelf-cat:first-of-type{ margin-top:4px; }
+  .grid-cards{ display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:14px; margin-bottom:6px; }
   .pick{
+    position:relative;
     text-align:left; background:var(--paper-card); border:1.5px solid #e6dcc4; border-radius:10px;
     padding:15px 16px; min-height:104px; display:flex; flex-direction:column; gap:5px;
     min-width:0; overflow-wrap:anywhere; word-break:break-word;
@@ -122,8 +126,12 @@
   }
   .pick:hover{ transform:translateY(-2px); border-color:var(--gold); box-shadow:0 10px 22px -16px rgba(var(--shadow)/.5); }
   .pick .ribbon{ width:34px; height:5px; border-radius:3px; margin-bottom:3px; }
-  .pick b{ color:var(--ink); font-size:18px; font-weight:600; overflow-wrap:anywhere; word-break:break-word; }
+  .pick b{ color:var(--ink); font-size:18px; font-weight:600; overflow-wrap:anywhere; word-break:break-word; padding-right:20px; }
   .pick small{ color:var(--hint); font-style:italic; font-size:14px; line-height:1.35; overflow-wrap:anywhere; }
+  /* the pin — her little organizing touch; sits in the card's top-right corner */
+  .pick .fav{ position:absolute; top:9px; right:11px; font-size:17px; line-height:1; color:var(--gold-soft); cursor:pointer; user-select:none; }
+  .pick .fav:hover{ color:var(--gold); }
+  .pick .fav.on{ color:var(--gold); }
 
   /* ---------- worksheet editor ---------- */
   .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
@@ -664,7 +672,7 @@ function namingDefault(){ return {
   openRoots: ['-karin','-lunai','-sorin'],
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, naming:namingDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], naming:namingDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
@@ -806,21 +814,45 @@ function viewHome(){
   }
   return wrap;
 }
+// gentle shelf structure — like sits with like. The Naming Tree is a special pick
+// (not a worksheet), folded in via the __naming pseudo-id.
+const SHELF_GROUPS = {
+  field: [
+    ['Folk & their kin',       ['portrait','sacred','folk']],
+    ['Places to wander',       ['grove','ourgrove']],
+    ['Keepers & collections',  ['namekeeper','specimens','warmth','__naming']],
+    ['Anything & play',        ['sparks','case','free-field']],
+  ],
+  world: [
+    ['Dream up new things',    ['people','creature','place','seed']],
+    ['Anything at all',        ['free-world']],
+  ],
+};
+function shelfItem(id){
+  if(id==='__naming') return { id:'__naming', title:'The Vael Naming Tree',
+    subtitle:'an illustrated plate — trunk, branches, elements, suffixes', accentColor:'#6e5232', open:()=>go('naming') };
+  return WORKSHEETS.find(w=>w.id===id);
+}
+function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); save(); go('home'); }
+function pickCard(w){
+  const fav=(DB.favorites||[]).includes(w.id);
+  const star=h('span',{class:'fav'+(fav?' on':''), role:'button', tabindex:'0', 'aria-label':fav?'unpin from favorites':'pin to favorites',
+    title:fav?'unpin':'pin to your favorites', onclick:e=>{ e.stopPropagation(); toggleFav(w.id); }}, fav?'★':'☆');
+  return h('button',{class:'pick', onclick:w.open||(()=>go('worksheet',{id:w.id}))},
+    h('div',{class:'ribbon', style:{background:w.accentColor||accentOf(w)}}),
+    h('b',null,w.title), h('small',null,w.subtitle||''), star);
+}
 function shelf(title, kit){
   const s = h('div',{class:'shelf'}, h('h3',null,title));
-  const g = h('div',{class:'grid-cards'});
-  WORKSHEETS.filter(w=>w.kit===kit).forEach(w=>{
-    g.append(h('button',{class:'pick', onclick:()=>go('worksheet',{id:w.id})},
-      h('div',{class:'ribbon', style:{background:accentOf(w)}}),
-      h('b',null,w.title),
-      h('small',null,w.subtitle||''),
-    ));
-  });
-  if (kit==='field') g.append(h('button',{class:'pick', onclick:()=>go('naming')},
-    h('div',{class:'ribbon', style:{background:'#6e5232'}}),
-    h('b',null,'The Vael Naming Tree'),
-    h('small',null,'an illustrated plate — trunk, branches, elements, suffixes')));
-  s.append(g); return s;
+  const groups = SHELF_GROUPS[kit]||[];
+  const known = new Set(groups.flatMap(([,ids])=>ids));
+  const group = (label, ids)=>{ const items=ids.map(shelfItem).filter(Boolean); if(!items.length) return;
+    s.append(h('div',{class:'shelf-cat'}, label));
+    const g=h('div',{class:'grid-cards'}); items.forEach(w=>g.append(pickCard(w))); s.append(g); };
+  const favIds=(DB.favorites||[]).filter(id=>known.has(id));   // her own curated row, first
+  if(favIds.length) group('★ Your favorites', favIds);
+  groups.forEach(([label,ids])=> group(label, ids));
+  return s;
 }
 function accentOf(w){ return ACCENTS[w.accent]||ACCENTS.gold; }
 
