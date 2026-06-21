@@ -782,10 +782,22 @@ const PRACTICE_CHECKLIST = [
 /* ---------- PPP 3rd-edition chapter spine (Apprentice book-aligned track) ----
    Mirrors the chapters of Stroustrup's "Programming: Principles and Practice
    Using C++" (3rd ed.) so the app tracks the physical book on Del's desk. The
-   summaries and drills here are ORIGINAL, topic-level prompts written for this
-   app — they are NOT reproduced from the book; the page-by-page reading still
-   happens in the book itself. Each chapter carries the modern-C++ tools it
-   introduces, so the coach prompts can refuse to teach ahead of where Del is. */
+   summaries, drills, and answers here are ORIGINAL, written for this app — they
+   are NOT reproduced from the book; the page-by-page reading still happens in
+   the book itself.
+
+   Each chapter carries:
+     summary   – a couple of plain sentences on what it's about
+     teaches   – the ideas it introduces
+     keyTerms  – the handful of terms worth knowing for this chapter
+     drills[]  – a small ladder (warm-up → main → stretch), each:
+                   prompt    – what to do
+                   hint      – a nudge (hidden until asked)
+                   expect    – the expected result / a sample answer
+                   watchFor  – what a good answer does (for self-check + Critique)
+                   skeleton  – optional starter scaffold with the key line blank
+   Reading chapters (graphics, front matter) use answer-style drills with no
+   skeleton. Tools used in each drill stay within PPP_UNLOCKS for that chapter. */
 
 // When each big tool is first taught — used to scope the coach: anything whose
 // chapter is past the current one is "not yet introduced; don't use or suggest it."
@@ -805,129 +817,705 @@ const PPP_UNLOCKS = [
   [21, 'STL algorithms (sort, find…), function objects'],
 ];
 
-// part labels keep the picker grouped exactly like the book's Parts.
 const PPP_CHAPTERS = [
   { n:0, part:'Front matter', title:'Notes to the Reader',
     summary:'Orientation, not code: how the book teaches (learn by building), what it expects of you, and that every example targets ISO standard C++ (C++20). Read it once so the later chapters make sense.',
-    teaches:['how to use the book','the “learn by doing” philosophy'], drills:[] },
+    teaches:['how to use the book','the “learn by doing” philosophy'],
+    keyTerms:['ISO standard C++','compiler','“learn by doing”'],
+    drills:[
+      { prompt:'Reading check: in your own words, why does the book teach by writing small programs instead of explaining everything first?',
+        hint:'Think about how you actually pick up a skill — reading about it, or doing it.',
+        expect:'Sample answer: programming is a skill, so you learn it by writing, running, and fixing small programs — not by memorizing rules. Each chapter adds one idea you use right away.',
+        watchFor:['mentions practice over memorizing','each chapter builds on the last'] },
+    ] },
 
   { n:1, part:'I · The Basics', title:'Hello, World!',
     summary:'What a program is, the classic first program, and the journey from source text to a running thing: compile, then link. Plus what a programming environment gives you.',
     teaches:['main()','#include <iostream> and std::cout','compile vs. link'],
-    drills:[{ prompt:'Write the smallest complete program that prints one line of your choosing, then returns 0 from main().',
-      hint:'You need one include for output, an int main(), a single output statement that ends the line, and a return.' }] },
+    keyTerms:['main()','std::cout','#include','compile','link'],
+    drills:[
+      { prompt:'Print exactly one line: Hello, Godling Universe!',
+        hint:'You need one include for output, an int main(), one output statement that ends the line, and a return.',
+        expect:'Hello, Godling Universe!',
+        watchFor:['#include <iostream>','the line is actually ended (\\n or std::endl)','return 0; from main'],
+        skeleton:`#include <iostream>
+
+int main() {
+    // print one line here
+    return 0;
+}` },
+      { prompt:'Print your name on one line and your favourite element on the next.',
+        hint:'Two output statements, each ending its line — or one statement with two line-ends.',
+        expect:'Del\nWood',
+        watchFor:['each line ends','reads cleanly'],
+        skeleton:`#include <iostream>
+
+int main() {
+    std::cout << /* name */ << "\\n";
+    // second line
+    return 0;
+}` },
+      { prompt:'Add a // comment above main saying what the program does. Predict: does the output change?',
+        hint:'Comments are for humans; the compiler ignores them.',
+        expect:'No — comments don’t print; the output is the same.',
+        watchFor:['comment uses //','output unchanged'] },
+    ] },
 
   { n:2, part:'I · The Basics', title:'Objects, Types, and Values',
     summary:'Reading input, variables and their types, operators, assignment vs. initialization, names, type safety, conversions, and letting the compiler deduce a type with auto.',
     teaches:['std::cin','int/double/string/char/bool','initialization','auto','type safety'],
-    drills:[{ prompt:'Read two numbers from the user into well-named variables, then print their sum and their average on separate lines.',
-      hint:'Initialize your variables, read with std::cin, and remember integer vs. floating-point division when you take the average.' }] },
+    keyTerms:['variable','int / double / std::string','initialization','auto','type safety'],
+    drills:[
+      { prompt:'Read the user’s name into a std::string and print "Hello, <name>!"',
+        hint:'#include <string>; declare std::string name; read with std::cin >> name;',
+        expect:'Hello, Del!',
+        watchFor:['variable initialized before use','uses std::string, not a char array'],
+        skeleton:`#include <iostream>
+#include <string>
+
+int main() {
+    std::string name;
+    // read a name, then greet
+    return 0;
+}` },
+      { prompt:'Read two doubles and print their sum and their average.',
+        hint:'Average = sum / 2.0 — keep it floating-point so it isn’t truncated.',
+        expect:'For 2.5 and 5:  Sum: 7.5   Average: 3.75',
+        watchFor:['uses double (not int) so the average is exact','variables initialized'],
+        skeleton:`#include <iostream>
+
+int main() {
+    double a {0}, b {0};
+    // read a and b; print sum and average
+    return 0;
+}` },
+      { prompt:'Use auto for a computed total and a named const for a tax rate (0.08); print price plus tax.',
+        hint:'const double rate {0.08}; auto total = price + price*rate;',
+        expect:'For price 10:  Total: 10.8',
+        watchFor:['const for the rate (no magic number)','auto deduces double'],
+        skeleton:`#include <iostream>
+
+int main() {
+    const double rate {0.08};
+    double price {0};
+    // read price; compute total with auto; print
+    return 0;
+}` },
+    ] },
 
   { n:3, part:'I · The Basics', title:'Computation',
     summary:'Expressions and statements, writing and calling simple functions, looping, and your first use of std::vector to hold a run of values.',
     teaches:['if / for / while','simple functions','std::vector (push_back, indexing, range-for)'],
-    drills:[{ prompt:'Read numbers until the user stops, store them in a std::vector<double>, then print how many there were and their largest value.',
-      hint:'A loop with std::cin in the condition, push_back to grow the vector, and a range-for to scan for the largest.' }] },
+    keyTerms:['if / for / while','function','std::vector','range-for'],
+    drills:[
+      { prompt:'Write a function square(int) that returns its argument squared; print square(7).',
+        hint:'int square(int x) { return x*x; }',
+        expect:'49',
+        watchFor:['return type matches the value','called from main'],
+        skeleton:`#include <iostream>
+
+// define square here
+
+int main() {
+    std::cout << square(7) << "\\n";
+    return 0;
+}` },
+      { prompt:'Read numbers until end-of-input into a std::vector<double>, then print how many and the largest.',
+        hint:'while (std::cin >> x) v.push_back(x); then a range-for to find the max.',
+        expect:'For 4 9 2:  Count: 3   Largest: 9',
+        watchFor:['initialize “largest” from the first element','range-for to scan'],
+        skeleton:`#include <iostream>
+#include <vector>
+
+int main() {
+    std::vector<double> v;
+    double x {0};
+    while (std::cin >> x) v.push_back(x);
+    // print count and largest
+    return 0;
+}` },
+      { prompt:'Also print the sum of all the values.',
+        hint:'Accumulate into a double total with a range-for. (No std::accumulate yet — that’s Ch 21.)',
+        expect:'For 4 9 2:  Sum: 15',
+        watchFor:['total initialized to 0','range-for, by value is fine for doubles'] },
+    ] },
 
   { n:4, part:'I · The Basics', title:'Errors!',
     summary:'The kinds of errors — compile-time, link-time, run-time — and how to deal with bad input by checking arguments and using exceptions instead of letting things go wrong silently.',
     teaches:['compile/link/run-time errors','throw / try / catch','argument checking'],
-    drills:[{ prompt:'Write a function area(width, height) that throws if either side is negative, and a main() that calls it inside a try/catch and prints a friendly message on failure.',
-      hint:'Validate first and throw std::runtime_error on bad input; wrap the call in try { … } catch (std::exception& e) { … }.' }] },
+    keyTerms:['compile / link / run-time error','exception','throw','try / catch'],
+    drills:[
+      { prompt:'Write area(double w, double h) that returns w*h but throws std::runtime_error if either side is negative.',
+        hint:'#include <stdexcept>; check first, throw on bad input, otherwise return.',
+        expect:'area(2,3) → 6;  area(-2,3) → throws',
+        watchFor:['validates BEFORE computing','throws std::runtime_error with a message'],
+        skeleton:`#include <iostream>
+#include <stdexcept>
+
+double area(double w, double h) {
+    // validate, then return w*h
+}
+
+int main() { /* call it */ }` },
+      { prompt:'In main, call area with user input inside a try/catch and print a friendly message on failure.',
+        hint:'catch (const std::exception& e) { std::cout << e.what(); }',
+        expect:'For -2 3: prints your error message, and the program keeps control',
+        watchFor:['catches by const reference','program doesn’t crash on bad input'],
+        skeleton:`#include <iostream>
+#include <stdexcept>
+
+int main() {
+    try {
+        // read w, h; call area; print result
+    } catch (const std::exception& e) {
+        // print e.what()
+    }
+}` },
+      { prompt:'Reading check: which kind of error is each — (a) a missing semicolon, (b) calling a function you never defined, (c) dividing by a user-entered 0?',
+        hint:'When is each caught: while compiling, while linking, or while running?',
+        expect:'(a) compile-time   (b) link-time   (c) run-time',
+        watchFor:['matches each to its phase'] },
+    ] },
 
   { n:5, part:'I · The Basics', title:'Writing a Program',
     summary:'Building a real program from scratch — the calculator — by thinking about the problem, sketching a grammar, and turning it into code one small, working version at a time.',
     teaches:['breaking a problem down','a Token idea (a kind + a value)','growing a program in small steps'],
-    drills:[{ prompt:'Define a small Token type that pairs a kind (a char) with a numeric value (a double), and make one Token and print both parts.',
-      hint:'A struct with two members and a simple way to construct it; you do not need operator overloading yet.' }] },
+    keyTerms:['Token','struct','grammar','small steps'],
+    drills:[
+      { prompt:'Define a struct Token with a char kind and a double value; make one and print both parts.',
+        hint:'struct Token { char kind; double value; };  then Token t { \'+\', 0 };',
+        expect:'kind: +   value: 0',
+        watchFor:['two members','braced initialization works'],
+        skeleton:`#include <iostream>
+
+struct Token {
+    // kind and value
+};
+
+int main() {
+    Token t { '+', 0 };
+    // print t.kind and t.value
+}` },
+      { prompt:'Give Token a constructor so Token t{\'8\', 8} reads naturally; print it.',
+        hint:'Token(char k, double v) : kind{k}, value{v} {}  — a member-initializer list.',
+        expect:'8 -> 8',
+        watchFor:['member-initializer list','no uninitialized members'],
+        skeleton:`#include <iostream>
+
+struct Token {
+    char kind; double value;
+    // add a constructor
+};
+
+int main() { Token t {'8', 8}; /* print */ }` },
+      { prompt:'Reading check: for the input "2+3", list the tokens you’d expect (kind and value).',
+        hint:'Numbers become one kind that carries a value; operators carry just a kind.',
+        expect:'{number, 2}  {+}  {number, 3}',
+        watchFor:['numbers carry a value; operators don’t'] },
+    ] },
 
   { n:6, part:'I · The Basics', title:'Completing a Program',
     summary:'Finishing the calculator: handling errors gracefully, negative numbers, the % operator, recovering after a bad line, and cleaning the code up so it reads well.',
     teaches:['error recovery in a loop','tidying code','named constants instead of magic numbers'],
-    drills:[{ prompt:'Write an input loop that reads a line, prints a result, and on bad input prints a message and keeps going instead of crashing.',
-      hint:'Catch the error inside the loop so one bad line does not end the program; keep prompting.' }] },
+    keyTerms:['error recovery','% (remainder)','named constant','clean code'],
+    drills:[
+      { prompt:'Write a loop that reads a double and prints it doubled; on bad (non-number) input, recover and keep going.',
+        hint:'if (!(std::cin >> x)) { std::cin.clear(); std::cin.ignore(10000, \'\\n\'); }',
+        expect:'5 → 10, then "x" → a message, then it keeps prompting',
+        watchFor:['clear() THEN ignore the bad input','one bad line doesn’t end the program'],
+        skeleton:`#include <iostream>
+#include <limits>
+
+int main() {
+    double x {0};
+    while (true) {
+        if (std::cin >> x) { /* print doubled */ }
+        else { /* recover: clear + ignore */ }
+    }
+}` },
+      { prompt:'Replace a magic number: compute a circle’s area with const double pi {3.14159}.',
+        hint:'area = pi * r * r;',
+        expect:'For r = 2:  12.56636',
+        watchFor:['pi named once as a const','no bare 3.14159 in the formula'],
+        skeleton:`#include <iostream>
+
+int main() {
+    const double pi {3.14159};
+    double r {0};
+    // read r; print area
+}` },
+      { prompt:'Read two ints and print the remainder of the first divided by the second, guarding a zero divisor.',
+        hint:'% is integer-only; check the divisor before dividing.',
+        expect:'17 % 5 → 2;  divisor 0 → a message',
+        watchFor:['% used on ints','divide-by-zero guarded'],
+        skeleton:`#include <iostream>
+
+int main() {
+    int a {0}, b {1};
+    // read a, b; guard b == 0; print a % b
+}` },
+    ] },
 
   { n:7, part:'I · The Basics', title:'Technicalities: Functions, etc.',
     summary:'How functions really work: declarations vs. definitions, scope, passing by value vs. by reference, order of evaluation, namespaces, and organizing code into modules and headers.',
     teaches:['pass by value vs. reference','scope','namespaces','modules & headers'],
-    drills:[{ prompt:'Write a function that takes a std::vector<double> by reference and doubles every element in place, then show before/after in main().',
-      hint:'Take the parameter as std::vector<double>& so your changes are seen by the caller; loop with a reference in the range-for.' }] },
+    keyTerms:['declaration vs definition','pass by reference (&)','scope','namespace'],
+    drills:[
+      { prompt:'Write void doubleInPlace(std::vector<double>& v) that doubles each element; show before/after.',
+        hint:'Take the parameter by reference (&), and use a reference in the loop: for (auto& x : v).',
+        expect:'[1 2 3] → [2 4 6]',
+        watchFor:['& on the parameter AND the loop variable','no copy of the vector is made'],
+        skeleton:`#include <iostream>
+#include <vector>
+
+void doubleInPlace(std::vector<double>& v) {
+    // double each element in place
+}
+
+int main() {
+    std::vector<double> v {1, 2, 3};
+    doubleInPlace(v);
+    // print v
+}` },
+      { prompt:'Write addOne (by value) and addOneRef (by reference); call both on the same int and show which changes it.',
+        hint:'By value gets a copy; by reference edits the original.',
+        expect:'after addOne(n): n unchanged;  after addOneRef(n): n + 1',
+        watchFor:['demonstrates the value/reference difference','clear output'],
+        skeleton:`#include <iostream>
+
+void addOne(int x)     { /* ... */ }
+void addOneRef(int& x) { /* ... */ }
+
+int main() {
+    int n {5};
+    // call each; print n after each
+}` },
+      { prompt:'Reading check: what’s the difference between declaring and defining a function, and why does a header hold the declaration?',
+        hint:'One says “this exists”; the other gives the body.',
+        expect:'A declaration names the function and its types; the definition supplies the body. Headers share declarations so other files can call it; the definition lives in exactly one place.',
+        watchFor:['one definition, many declarations'] },
+    ] },
 
   { n:8, part:'I · The Basics', title:'Technicalities: Classes, etc.',
     summary:'User-defined types: classes and members, separating interface from implementation, keeping an invariant true through a constructor, enums, and operator overloading.',
     teaches:['class with private data + public interface','constructors that enforce an invariant','enum class','operator overloading'],
-    drills:[{ prompt:'Write a Date class that stores year/month/day, validates them in the constructor (throw on an impossible date), and offers a read-only way to print itself.',
-      hint:'Keep the members private; the constructor is the one place that establishes the invariant, so check there and throw if it is broken.' }] },
+    keyTerms:['class','constructor','invariant','enum class','operator overloading'],
+    drills:[
+      { prompt:'Write a class Counter with a private int count {0}, a bump() that adds one, and value() that returns it.',
+        hint:'private: the data; public: the functions.',
+        expect:'after three bump()s, value() is 3',
+        watchFor:['data is private','count initialized to 0'],
+        skeleton:`class Counter {
+    int count {0};
+public:
+    // bump() and value()
+};` },
+      { prompt:'Write a Date{y,m,d} class whose constructor throws on an impossible month (not 1–12); add a print().',
+        hint:'Validate in the constructor — the one place that establishes the invariant.',
+        expect:'Date{2026,6,21} prints fine;  month 13 → throws',
+        watchFor:['validates in the constructor, not after','members are private'],
+        skeleton:`#include <stdexcept>
+
+class Date {
+    int y, m, d;
+public:
+    Date(int yy, int mm, int dd) /* : init list */ {
+        // validate the month, then store
+    }
+    // print()
+};` },
+      { prompt:'Add an enum class Weekday and make operator<< print a Weekday’s short name.',
+        hint:'std::ostream& operator<<(std::ostream& os, Weekday w) { ... return os; }',
+        expect:'Weekday::Mon → "Mon"',
+        watchFor:['enum class (scoped, not a bare enum)','operator<< takes and returns std::ostream&'],
+        skeleton:`#include <iostream>
+
+enum class Weekday { Mon, Tue, Wed };
+
+// operator<< for Weekday here
+
+int main() { std::cout << Weekday::Mon << "\\n"; }` },
+    ] },
 
   { n:9, part:'II · Input and Output', title:'Input and Output Streams',
     summary:'The stream model behind cin/cout, reading and writing files, handling I/O errors, reading a value safely, writing your own << and >> operators, formatting, and string streams.',
     teaches:['ifstream / ofstream','the standard input loop','user-defined << and >>','stringstream'],
-    drills:[{ prompt:'Read a file of numbers (one per line) into a std::vector<double> and print their sum; handle the file-not-found case gracefully.',
-      hint:'Open an std::ifstream, check it opened, loop reading with >> in the condition, and report instead of crashing if it failed.' }] },
+    keyTerms:['std::ifstream / std::ofstream','the input loop','std::istringstream','user-defined <<'],
+    drills:[
+      { prompt:'Open a file of numbers (one per line), sum them, and report if the file fails to open.',
+        hint:'std::ifstream in {name}; if (!in) { ... } while (in >> x) sum += x;',
+        expect:'the file’s total, or “could not open the file”',
+        watchFor:['checks the stream opened','loops with >> in the condition'],
+        skeleton:`#include <iostream>
+#include <fstream>
+
+int main() {
+    std::ifstream in {"nums.txt"};
+    if (!in) { /* report and stop */ }
+    double x {0}, sum {0};
+    // read and sum, then print
+}` },
+      { prompt:'Use a std::istringstream to pull three ints out of "10 20 30" and print their sum.',
+        hint:'#include <sstream>; std::istringstream ss {"10 20 30"}; ss >> a >> b >> c;',
+        expect:'60',
+        watchFor:['istringstream reads just like cin','all three extracted'],
+        skeleton:`#include <iostream>
+#include <sstream>
+
+int main() {
+    std::istringstream ss {"10 20 30"};
+    int a {0}, b {0}, c {0};
+    // extract and sum
+}` },
+      { prompt:'Give struct Point { int x, y; } an operator<< that prints "(x, y)".',
+        hint:'Return the std::ostream& so cout can chain.',
+        expect:'Point{3,4} → (3, 4)',
+        watchFor:['takes and returns std::ostream&','reads naturally with cout'],
+        skeleton:`#include <iostream>
+
+struct Point { int x, y; };
+// operator<< here
+
+int main() { std::cout << Point{3, 4} << "\\n"; }` },
+    ] },
 
   { n:10, part:'II · Input and Output', title:'A Display Model',
     summary:'Why a book teaches graphics, the simple display model it uses, attaching to a GUI library, coordinates, and the idea of a Shape you put on a window. (Uses the book’s PPP graphics library — best followed in the book.)',
-    teaches:['the display model','coordinates','Shape (PPP library)'], drills:[] },
+    teaches:['the display model','coordinates','Shape (PPP library)'],
+    keyTerms:['Window','Shape','coordinates','attach'],
+    drills:[
+      { prompt:'Reading check: what’s the difference between a Window and a Shape, and who attaches to whom?',
+        hint:'One is the canvas; the other is a thing drawn on it.',
+        expect:'A Window is the on-screen canvas; a Shape is something you draw. You attach Shapes to a Window, and the Window displays them.',
+        watchFor:['Window = canvas, Shape = drawn thing'] },
+      { prompt:'Reading check: in screen coordinates, where is (0,0) and which way does y grow?',
+        hint:'It’s different from a school graph.',
+        expect:'(0,0) is the top-left corner; y grows downward.',
+        watchFor:['top-left origin','y increases downward'] },
+    ] },
 
   { n:11, part:'II · Input and Output', title:'Graphics Classes',
     summary:'The concrete shape types: Point and Line, Lines, Color, Line_style, Polylines, closed shapes, Text, Mark, and Image. (PPP graphics library — follow along in the book.)',
-    teaches:['Point/Line/Color','Polyline','Text & Image (PPP library)'], drills:[] },
+    teaches:['Point/Line/Color','Polyline','Text & Image (PPP library)'],
+    keyTerms:['Point','Line','Color','Line_style','Polyline'],
+    drills:[
+      { prompt:'Reading check: what does a Polyline let you do that a single Line does not?',
+        hint:'Think about more than two points.',
+        expect:'A Polyline connects a sequence of points with several segments — a whole path, not just one segment.',
+        watchFor:['multiple connected segments'] },
+      { prompt:'Reading check: besides its points, name two things you can set on a shape’s outline.',
+        hint:'Look at Color and Line_style.',
+        expect:'Its Color and its Line_style (e.g., width or dashed).',
+        watchFor:['colour and line style'] },
+    ] },
 
   { n:12, part:'II · Input and Output', title:'Class Design',
     summary:'Designing class hierarchies: design principles, the Shape base class, base vs. derived classes and virtual functions, and what object-oriented programming buys you.',
     teaches:['base & derived classes','virtual functions','OOP basics'],
-    drills:[{ prompt:'Sketch a base class Shape with a virtual draw_lines() and two derived classes (e.g., Circle, Square) that override it; show a vector of Shape* being drawn in a loop.',
-      hint:'Mark the base function virtual, override it in each derived class, and loop over the base pointers calling the same function.' }] },
+    keyTerms:['base class','derived class','virtual','override','polymorphism'],
+    drills:[
+      { prompt:'Write a base class Shape with a virtual std::string name() (returns "Shape"), and a derived Circle that overrides it to "Circle".',
+        hint:'virtual in the base; override in the derived; give the base a virtual destructor.',
+        expect:'a Circle’s name() returns "Circle"',
+        watchFor:['virtual base function','override keyword','virtual destructor on the base'],
+        skeleton:`#include <iostream>
+#include <string>
+
+class Shape {
+public:
+    virtual std::string name() const { return "Shape"; }
+    virtual ~Shape() = default;
+};
+
+// class Circle : public Shape { ... };` },
+      { prompt:'Make a std::vector<Shape*> holding a Circle and a Square, and print each name() in a loop.',
+        hint:'The virtual call picks the right name() for each pointer.',
+        expect:'Circle\nSquare',
+        watchFor:['stores base pointers','same call, different result (polymorphism)'],
+        skeleton:`#include <vector>
+// using Shape/Circle/Square from above
+
+int main() {
+    Circle c; Square s;
+    std::vector<Shape*> shapes { &c, &s };
+    // loop and print name()
+}` },
+      { prompt:'Reading check: why does a base class with virtual functions need a virtual destructor?',
+        hint:'Think about deleting through a Shape*.',
+        expect:'So that deleting through a base pointer also runs the derived destructor; without it, the derived cleanup is skipped (undefined behaviour).',
+        watchFor:['deleting via base pointer','derived destructor must run'] },
+    ] },
 
   { n:13, part:'II · Input and Output', title:'Graphing Functions and Data',
     summary:'Plotting: graphing a simple function, the Function and Axis types, approximation, and graphing real data. (PPP graphics library — follow along in the book.)',
-    teaches:['Function & Axis (PPP library)','graphing data'], drills:[] },
+    teaches:['Function & Axis (PPP library)','graphing data'],
+    keyTerms:['Function','Axis','range','scale'],
+    drills:[
+      { prompt:'Reading check: to graph y = f(x), what three things must you choose to fit the curve in the window?',
+        hint:'range, count, scale.',
+        expect:'The x-range to sample, how many points to plot, and the scale (how units map to pixels).',
+        watchFor:['range, number of points, scale'] },
+      { prompt:'Reading check: why use an Axis object instead of drawing your own lines?',
+        hint:'ticks + labels + alignment.',
+        expect:'An Axis bundles the line, tick marks, and labels and lines them up with your scale — consistent and less error-prone.',
+        watchFor:['ticks/labels handled together'] },
+    ] },
 
   { n:14, part:'II · Input and Output', title:'Graphical User Interfaces',
     summary:'Interactive UIs: user-interface alternatives, a Next button, a window, Buttons and other widgets, drawing in response to input, simple animation, and debugging GUI code. (PPP library — follow along in the book.)',
-    teaches:['windows & widgets','callbacks (PPP library)'], drills:[] },
+    teaches:['windows & widgets','callbacks (PPP library)'],
+    keyTerms:['Widget','Button','callback','event loop'],
+    drills:[
+      { prompt:'Reading check: what is a callback, and why does a GUI need them?',
+        hint:'Who calls whom, and when?',
+        expect:'A callback is a function the GUI calls when an event happens (e.g., a button press). The GUI waits for events and calls back into your code, instead of your code driving the flow.',
+        watchFor:['a function run on an event','the GUI is in control (inversion of control)'] },
+      { prompt:'Reading check: name two widgets besides Button and what each is for.',
+        hint:'input vs. choice vs. output.',
+        expect:'e.g., In_box (type text in), Menu (choose an option), Out_box (show text).',
+        watchFor:['two sensible widgets with a purpose'] },
+    ] },
 
   { n:15, part:'III · Data and Algorithms', title:'Vector and Free Store',
     summary:'How a vector works underneath: memory and addresses, pointers, the free store (new/delete), why destructors matter, element access, and the this pointer. The chapter where pointers finally appear.',
     teaches:['pointers','new / delete','destructors (RAII)','the this pointer'],
-    drills:[{ prompt:'Write a tiny class that acquires a resource in its constructor and releases it in its destructor, and explain in a comment why the destructor is the safe place for cleanup.',
-      hint:'Acquire in the constructor, release in the destructor; this is RAII — the object’s lifetime controls the resource so nothing leaks.' }] },
+    keyTerms:['pointer','& (address-of)','* (dereference)','new / delete','destructor','RAII'],
+    drills:[
+      { prompt:'Declare an int, take its address into a pointer, and print the value through the pointer.',
+        hint:'int* p = &n;  then std::cout << *p;',
+        expect:'the value of n (e.g., 42)',
+        watchFor:['& takes the address','* reads through the pointer'],
+        skeleton:`#include <iostream>
+
+int main() {
+    int n {42};
+    int* p = &n;
+    // print *p
+}` },
+      { prompt:'Write a class Guard that prints "open" in its constructor and "close" in its destructor; create one in a scope and watch the order.',
+        hint:'The destructor runs automatically at the end of the scope.',
+        expect:'open\nclose',
+        watchFor:['constructor + destructor messages','cleanup tied to lifetime (RAII)'],
+        skeleton:`#include <iostream>
+
+class Guard {
+public:
+    Guard()  { /* "open"  */ }
+    ~Guard() { /* "close" */ }
+};
+
+int main() {
+    Guard g;
+    // ...
+}` },
+      { prompt:'Reading check: for int* p = new int{5}; — what must you not forget, and why is a destructor (RAII) the better habit?',
+        hint:'Who frees it, and when?',
+        expect:'You must delete p, or it leaks. RAII puts the delete in a destructor that runs automatically, so you can’t forget — and prefer std::vector / standard types over raw new/delete.',
+        watchFor:['leak without delete','RAII frees automatically'] },
+    ] },
 
   { n:16, part:'III · Data and Algorithms', title:'Arrays, Pointers, and References',
     summary:'Raw arrays, pointers vs. references, C-style strings, the trouble they cause, and the modern alternatives you should reach for instead. Worked example: palindromes.',
     teaches:['raw arrays & C-strings (and why to avoid them)','pointer vs. reference','prefer std::string / std::vector'],
-    drills:[{ prompt:'Write a function that reports whether a std::string is a palindrome, then say in a comment why std::string is safer here than a C-style char array.',
-      hint:'Compare characters from both ends moving inward; std::string knows its own length, so you avoid the off-by-one and buffer risks of raw arrays.' }] },
+    keyTerms:['array','C-style string','reference (alias)','prefer std::string'],
+    drills:[
+      { prompt:'Write bool isPalindrome(const std::string& s) and test it on "level" and "world".',
+        hint:'Compare s[i] with s[s.size()-1-i], moving inward.',
+        expect:'level → true,  world → false',
+        watchFor:['takes the string by const reference','uses std::string (knows its length) — no raw array'],
+        skeleton:`#include <iostream>
+#include <string>
+
+bool isPalindrome(const std::string& s) {
+    // compare ends moving inward
+}
+
+int main() { /* test "level" and "world" */ }` },
+      { prompt:'Reading check: why is std::string safer than a fixed char buf[10] you copy text into?',
+        hint:'What happens with 12 characters?',
+        expect:'A char[10] overflows if the text is longer than 9 chars + the null terminator; std::string grows as needed and tracks its own length, so you avoid buffer overruns and off-by-one bugs.',
+        watchFor:['overflow / off-by-one risk','string grows and knows its length'] },
+      { prompt:'Show a reference as an alias: make int& r refer to an int, then change the original through r.',
+        hint:'int& r = n;  r = 9;  now n == 9.',
+        expect:'n becomes 9',
+        watchFor:['a reference binds when created','editing r edits the original'],
+        skeleton:`#include <iostream>
+
+int main() {
+    int n {1};
+    int& r = n;
+    // change n via r, then print n
+}` },
+    ] },
 
   { n:17, part:'III · Data and Algorithms', title:'Essential Operations',
     summary:'The operations every value-like class should consider: list initialization, copy and move, the “essential operations” (default/copy/move/destructor), resizing, and finishing a Vector of your own.',
     teaches:['copy vs. move','the essential operations','{ } list initialization'],
-    drills:[{ prompt:'Give a small class a default constructor and an initializer-list–style constructor, and a print() that shows its contents; construct one with { } syntax.',
-      hint:'Think about what each constructor must leave true (the invariant); list-initialization uses the { } braces.' }] },
+    keyTerms:['copy','move','default constructor','{ } list initialization'],
+    drills:[
+      { prompt:'Write a class Box with a private int size, a default constructor (size 0), a Box{n} constructor, and value().',
+        hint:'Two constructors; build with { }.',
+        expect:'Box{} → 0,  Box{5} → 5',
+        watchFor:['default leaves a valid state','list-init with { }'],
+        skeleton:`#include <iostream>
+
+class Box {
+    int size {0};
+public:
+    Box() = default;
+    Box(int n) : size{n} {}
+    int value() const { return size; }
+};
+
+int main() { Box a; Box b {5}; /* print both */ }` },
+      { prompt:'Construct a std::vector<Box> with list-initialization { Box{1}, Box{2} } and print each value().',
+        hint:'Range-for over the vector.',
+        expect:'1 2',
+        watchFor:['braced init of the vector','const-correct access'],
+        skeleton:`#include <vector>
+// using Box from above
+
+int main() {
+    std::vector<Box> boxes { Box{1}, Box{2} };
+    // print each value()
+}` },
+      { prompt:'Reading check: in one line each, what’s the difference between copying and moving an object?',
+        hint:'What happens to the source?',
+        expect:'Copy duplicates the data (both usable); move transfers the guts of one into another, leaving the source empty but valid — cheaper for things like vectors.',
+        watchFor:['copy duplicates; move transfers and empties the source'] },
+    ] },
 
   { n:18, part:'III · Data and Algorithms', title:'Templates and Exceptions',
     summary:'Writing code that works for many types with templates, generalizing your Vector, range-checking with exceptions, and resource-management pointers.',
     teaches:['function & class templates','range-checked access','RAII pointers'],
-    drills:[{ prompt:'Write a function template largest(const std::vector<T>&) that returns the biggest element, and call it with both a vector of int and a vector of double.',
-      hint:'template <typename T> in front; the body is the same loop you already know — the type is now a parameter.' }] },
+    keyTerms:['template','typename T','.at() bounds-check','range error'],
+    drills:[
+      { prompt:'Write a function template largest(const std::vector<T>&) that returns the biggest element; call it for ints and doubles.',
+        hint:'template <typename T> in front; the body is your familiar max loop.',
+        expect:'works for a vector<int> and a vector<double> with the same code',
+        watchFor:['template <typename T>','one body, two types'],
+        skeleton:`#include <iostream>
+#include <vector>
+
+template <typename T>
+T largest(const std::vector<T>& v) {
+    // return the biggest element
+}
+
+int main() { /* call with int and double vectors */ }` },
+      { prompt:'Make largest throw if the vector is empty, and catch it in main.',
+        hint:'if (v.empty()) throw std::runtime_error("empty"); catch by const reference.',
+        expect:'an empty vector → the caught message',
+        watchFor:['guards the empty case','catches by const reference'],
+        skeleton:`#include <stdexcept>
+// largest<T> that throws on empty; main with a try/catch` },
+      { prompt:'Reading check: why does v.at(i) sometimes throw while v[i] does not check?',
+        hint:'checked vs. unchecked.',
+        expect:'.at() does bounds checking and throws std::out_of_range on a bad index; operator[] skips the check for speed, so a bad index is undefined behaviour.',
+        watchFor:['at() checks/throws; [] doesn’t'] },
+    ] },
 
   { n:19, part:'III · Data and Algorithms', title:'Containers and Iterators',
     summary:'How the standard containers are built and used: sequences and iterators, linked lists, generalizing your Vector once more, and when to choose vector vs. list vs. string.',
     teaches:['iterators (begin/end)','std::list','choosing a container'],
-    drills:[{ prompt:'Use iterators (begin()/end()) to walk a std::vector<int> and print each element, without using indexing.',
-      hint:'Get an iterator from begin(), loop while it != end(), dereference with * and ++ to advance — or use auto for its type.' }] },
+    keyTerms:['iterator','begin() / end()','std::list','container choice'],
+    drills:[
+      { prompt:'Print a std::vector<int> using iterators (begin()/end()), without indexing.',
+        hint:'for (auto it = v.begin(); it != v.end(); ++it) use *it.',
+        expect:'each element printed in order',
+        watchFor:['!= end() as the stop condition','dereference with *'],
+        skeleton:`#include <iostream>
+#include <vector>
+
+int main() {
+    std::vector<int> v {1, 2, 3};
+    // print with iterators, no [ ]
+}` },
+      { prompt:'Build a std::list<std::string>, push a few names, and print them with a range-for.',
+        hint:'#include <list>; a range-for works on a list too.',
+        expect:'the names, in insertion order',
+        watchFor:['list swaps in for vector with no other change','range-for'],
+        skeleton:`#include <iostream>
+#include <list>
+#include <string>
+
+int main() {
+    std::list<std::string> names;
+    // push_back a few; print with a range-for
+}` },
+      { prompt:'Reading check: when would you pick a std::list over a std::vector?',
+        hint:'insert-in-the-middle vs. index-by-position.',
+        expect:'When you often insert/remove in the middle and rarely index by position; vector wins for indexing and cache-friendly scans.',
+        watchFor:['middle insert/remove vs. random access'] },
+    ] },
 
   { n:20, part:'III · Data and Algorithms', title:'Maps and Sets',
     summary:'Associative containers: std::map, the faster std::unordered_map, std::set, how to time them, an overview of the containers, and a first look at ranges.',
     teaches:['std::map / std::unordered_map','std::set','ranges (intro)'],
-    drills:[{ prompt:'Read a line of words and print each distinct word with how many times it appeared, using a std::map<std::string,int>.',
-      hint:'map[word]++ creates the entry on first sight and counts it; then range-for over the map prints key and value.' }] },
+    keyTerms:['std::map','std::set','std::unordered_map','key → value'],
+    drills:[
+      { prompt:'Read words from input and print each distinct word with how many times it appeared, using std::map<std::string,int>.',
+        hint:'++m[word] creates the entry on first sight and counts it; then range-for over the map.',
+        expect:'each word with its count (alphabetical)',
+        watchFor:['m[word]++ creates and counts','structured bindings: for (auto& [w, c] : m)'],
+        skeleton:`#include <iostream>
+#include <map>
+#include <string>
+
+int main() {
+    std::map<std::string,int> m;
+    std::string w;
+    while (std::cin >> w) /* count */;
+    // print each word and count
+}` },
+      { prompt:'Use a std::set<int> to print the distinct values of a list with duplicates, in sorted order.',
+        hint:'Insert all; a set drops duplicates and keeps things sorted.',
+        expect:'[3 1 3 2] → 1 2 3',
+        watchFor:['set removes duplicates and sorts','range-for to print'],
+        skeleton:`#include <iostream>
+#include <set>
+
+int main() {
+    std::set<int> s;
+    // insert some values with duplicates; print
+}` },
+      { prompt:'Reading check: when would you prefer unordered_map over map?',
+        hint:'sorted vs. fast.',
+        expect:'When you don’t need keys in sorted order and want average O(1) lookups; map keeps keys sorted with O(log n) lookups. Use unordered_map for speed, map when order matters.',
+        watchFor:['ordered (log n) vs. average O(1)'] },
+    ] },
 
   { n:21, part:'III · Data and Algorithms', title:'Algorithms',
     summary:'The standard-library algorithms — sort, find, copy, numeric operations — and function objects/lambdas to customize them, instead of hand-writing loops.',
     teaches:['std::sort / std::find','lambdas & function objects','prefer algorithms over raw loops'],
-    drills:[{ prompt:'Put some numbers in a std::vector, std::sort them, then use std::find to report whether a chosen value is present.',
-      hint:'#include <algorithm>; sort takes begin()/end(); find returns end() when the value is not there.' }] },
+    keyTerms:['std::sort','std::find','lambda','<algorithm>'],
+    drills:[
+      { prompt:'Put numbers in a std::vector, std::sort them, and print the sorted result.',
+        hint:'#include <algorithm>; std::sort(v.begin(), v.end());',
+        expect:'[3 1 2] → 1 2 3',
+        watchFor:['sort takes begin()/end()','includes <algorithm>'],
+        skeleton:`#include <iostream>
+#include <vector>
+#include <algorithm>
+
+int main() {
+    std::vector<int> v {3, 1, 2};
+    // sort and print
+}` },
+      { prompt:'Use std::find to report whether a chosen value is in the vector.',
+        hint:'find returns end() when the value isn’t present.',
+        expect:'“found” or “not found”',
+        watchFor:['compares the result to v.end()','no hand-written search loop'],
+        skeleton:`// using v from above
+int target {2};
+auto it = std::find(v.begin(), v.end(), target);
+// report based on (it == v.end())` },
+      { prompt:'Use a lambda with std::sort to sort the vector descending.',
+        hint:'std::sort(v.begin(), v.end(), [](int a, int b){ return a > b; });',
+        expect:'[1 3 2] → 3 2 1',
+        watchFor:['lambda returns the comparison','> gives descending order'],
+        skeleton:`// sort v descending with a lambda comparator` },
+    ] },
 ];
 
 function pppDefaultIndex(){ return 1; }   // start at Ch 1 "Hello, World!", not the front-matter
@@ -957,7 +1545,7 @@ function namingDefault(){ return {
 // the Code Practice (Apprentice) space — book-chapter progress + per-chapter
 // drill code, flashcard progress, the per-session checklist, the confusion log,
 // and the paste-lock toggle. Free-text inputs live in .fields, keyed by name.
-function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, pasteLock:true }; }
+function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
 function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); merged.practice=Object.assign(practiceDefault(), d.practice||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
@@ -1958,9 +2546,15 @@ function viewPractice(tab, params){
 /* ---------- chapter spine (PPP 3rd ed.) + scoped coach ---------------------- */
 function prcChapter(){ const i=DB.practice.chapter|0; return PPP_CHAPTERS[(i>=0&&i<PPP_CHAPTERS.length)?i:1]; }
 function prcChapterDone(n){ return !!DB.practice.chapterDone[n]; }
-function prcCurDrill(){ const c=prcChapter(); return (c.drills&&c.drills[0])||null; }
-function prcDrillCode(){ const n=prcChapter().n; return (DB.practice.drills&&DB.practice.drills[n])||''; }
-function prcSetDrillCode(v){ const n=prcChapter().n; (DB.practice.drills=DB.practice.drills||{})[n]=v; save(); }
+// a chapter holds a small ladder of drills; the current one is tracked per chapter, and
+// each drill's typed code is stored under "chapter.drill" so the ladder rungs don't clobber.
+function prcChapterDrills(){ return prcChapter().drills || []; }
+function prcDrillIndex(){ const n=prcChapter().n, ds=prcChapterDrills(); const i=(DB.practice.drillIdx&&DB.practice.drillIdx[n])|0; return (i>=0&&i<ds.length)?i:0; }
+function prcSetDrillIndex(i){ const n=prcChapter().n; (DB.practice.drillIdx=DB.practice.drillIdx||{})[n]=i; save(); }
+function prcCurDrill(){ const ds=prcChapterDrills(); return ds.length? ds[prcDrillIndex()] : null; }
+function prcDrillKey(){ return prcChapter().n + '.' + prcDrillIndex(); }
+function prcDrillCode(){ const k=prcDrillKey(); return (DB.practice.drills&&DB.practice.drills[k])||''; }
+function prcSetDrillCode(v){ const k=prcDrillKey(); (DB.practice.drills=DB.practice.drills||{})[k]=v; save(); }
 function prcAllowed(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c<=n).map(([,t])=>t); }
 function prcNotYet(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c>n).map(([c,t])=>`${t} (Ch ${c})`); }
 function prcCodeBlock(){ const code=prcDrillCode().trim(); return code? '```cpp\n'+code+'\n```' : '(no code typed yet)'; }
@@ -2012,6 +2606,7 @@ function practiceLearn(host){
     h('h3',{class:'prc-h'}, `Chapter ${ch.n} — ${ch.title}`),
     h('p',null, ch.summary),
     (ch.teaches&&ch.teaches.length)? h('div',null, h('h4',{class:'prc-sub'},'This chapter introduces'), pList(ch.teaches)) : null,
+    (ch.keyTerms&&ch.keyTerms.length)? h('p',{class:'prc-note'}, 'Key terms: '+ch.keyTerms.join(' · ')) : null,
     h('h4',{class:'prc-sub'}, 'What you can use up to here'),
     allowed.length? pList(allowed) : h('p',{class:'hint'}, 'Just the basics so far — variables, simple output, and (from Ch 2) input.'),
     next? h('p',{class:'prc-note'}, `Not yet: ${next[1]} comes in Chapter ${next[0]} — try not to reach for it before then.`) : null,
@@ -2022,23 +2617,35 @@ function practiceLearn(host){
       h('button',{class:'navbtn', onclick:()=>{ DB.practice.chapter=Math.min(PPP_CHAPTERS.length-1,idx+1); save(); practiceLearn(host); }}, 'Next ›')),
   ));
 
-  // drill + sandbox + chapter-scoped coach
-  const drill=prcCurDrill();
+  // drill ladder + sandbox + chapter-scoped coach
+  const drills=prcChapterDrills(), di=prcDrillIndex(), drill=prcCurDrill();
   const drillCard=h('div',{class:'prc-card'});
   if(drill){
-    drillCard.append(h('h4',{class:'prc-sub'},'Drill'), h('p',null, drill.prompt),
-      drill.hint? h('details',{class:'prc-answer'}, h('summary',null,'Stuck? a nudge'), h('p',null, drill.hint)) : null);
+    if(drills.length>1) drillCard.append(h('div',{class:'toolrow', style:{justifyContent:'space-between', alignItems:'center'}},
+      h('button',{class:'navbtn', 'aria-label':'previous drill', onclick:()=>{ prcSetDrillIndex((di-1+drills.length)%drills.length); practiceLearn(host); }}, '‹'),
+      h('span',{class:'prc-label', style:{margin:0}}, `Drill ${di+1} of ${drills.length}`),
+      h('button',{class:'navbtn', 'aria-label':'next drill', onclick:()=>{ prcSetDrillIndex((di+1)%drills.length); practiceLearn(host); }}, '›')));
+    drillCard.append(h('h4',{class:'prc-sub'}, drills.length>1? '' : 'Drill'), h('p',null, drill.prompt),
+      drill.hint? h('details',{class:'prc-answer'}, h('summary',null,'Stuck? a nudge'), h('p',null, drill.hint)) : null,
+      (drill.watchFor&&drill.watchFor.length)? h('details',{class:'prc-answer'}, h('summary',null,'What a good answer does'), pList(drill.watchFor)) : null,
+      drill.expect? h('details',{class:'prc-answer'}, h('summary',null,'Show expected result'), h('p',{class:'prc-note', style:{whiteSpace:'pre-wrap'}}, drill.expect)) : null);
   } else {
     drillCard.append(h('h4',{class:'prc-sub'},'Practice'),
-      h('p',{class:'hint'}, ch.n===0? 'Orientation chapter — no code to type. Read it, then jump to Chapter 1.' : 'This chapter leans on the book’s graphics library, so it’s best followed in the book. You can still paste any code below for coaching.'));
+      h('p',{class:'hint'}, 'You can paste any code below for coaching.'));
   }
   const sandbox=h('textarea',{class:'prc-input prc-sandbox', rows:9, placeholder:'type your C++ here…', value:prcDrillCode(),
     oninput:e=>prcSetDrillCode(e.target.value),
     onpaste:e=>{ if(DB.practice.pasteLock){ e.preventDefault(); toast('Paste-lock is on — type it out to build muscle memory.'); } }});
   drillCard.append(pLabeled('Your sandbox', sandbox));
-  drillCard.append(h('label',{class:'prc-check'},
-    h('input',{type:'checkbox', checked:DB.practice.pasteLock?'checked':null, onchange:e=>{ DB.practice.pasteLock=e.target.checked; save(); }}),
-    h('span',null,'Paste-lock — type it yourself (the point is muscle memory)')));
+  const sandboxTools=h('div',{class:'toolrow'},
+    h('label',{class:'prc-check', style:{margin:0}},
+      h('input',{type:'checkbox', checked:DB.practice.pasteLock?'checked':null, onchange:e=>{ DB.practice.pasteLock=e.target.checked; save(); }}),
+      h('span',null,'Paste-lock — type it yourself')));
+  if(drill && drill.skeleton) sandboxTools.append(h('button',{class:'navbtn', onclick:()=>{
+    if(prcDrillCode().trim()){ toast('Clear your sandbox first to load the skeleton.'); return; }
+    prcSetDrillCode(drill.skeleton); practiceLearn(host);
+  }}, '⤓ Load skeleton'));
+  drillCard.append(sandboxTools);
   const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
   const coachBtn=(builder,label)=> h('button',{class:'navbtn', onclick:()=>{ coachOut.value=builder(); prcCopyArea(coachOut, 'Copied — paste into Claude / ChatGPT.'); }}, label);
   drillCard.append(
