@@ -372,6 +372,7 @@
   .prc-label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin-bottom:3px; }
   .prc-input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:8px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   textarea.prc-input{ resize:vertical; min-height:42px; }
+  textarea.prc-sandbox{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.55; tab-size:2; }
   .prc-block{ margin:10px 0; }
   .prc-out{ width:100%; min-height:120px; border:1.5px solid var(--gold-soft); border-radius:8px; background:#f7f1e2; padding:10px 12px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; color:var(--ink-soft); resize:vertical; margin-top:8px; }
 
@@ -393,6 +394,16 @@
   .prc-lore.is-ok{ border-left:3px solid var(--green); }
   .prc-lore.is-warning{ border-left:3px solid #b4632e; background:#f8ecdf; }
   .prc-lore.is-watch{ border-left:3px solid var(--gold); }
+
+  /* touch devices: the 17-pill lesson strip is the tightest tap target in here, and a
+     <16px input font makes iOS zoom in on focus. Grow both only for coarse pointers. */
+  @media (pointer:coarse){
+    .prc-lessontabs{ gap:8px; }
+    .prc-lessontabs .tab{ padding:9px 15px; font-size:15px; }
+    .prc-input{ padding:11px 12px; font-size:16px; }
+    .prc-check{ padding:9px 0; }
+    .prc-check input{ width:22px; height:22px; margin-top:2px; }
+  }
   /* ---------- print ---------- */
   .book-stage{ display:none; }
   .book-cover{ text-align:center; }
@@ -1203,6 +1214,158 @@ const PRACTICE_CANON_REF = [
     "Abilities (innate) - Skills (acquired, improvable) - Spells (great workings). Classed by what it IS, not how acquired; Seeds can grow any of them."
   ] }
 ];
+/* ---------- PPP 3rd-edition chapter spine (Apprentice book-aligned track) ----
+   Mirrors the chapters of Stroustrup's "Programming: Principles and Practice
+   Using C++" (3rd ed.) so the app tracks the physical book on Del's desk. The
+   summaries and drills here are ORIGINAL, topic-level prompts written for this
+   app — they are NOT reproduced from the book; the page-by-page reading still
+   happens in the book itself. Each chapter carries the modern-C++ tools it
+   introduces, so the coach prompts can refuse to teach ahead of where Del is. */
+
+// When each big tool is first taught — used to scope the coach: anything whose
+// chapter is past the current one is "not yet introduced; don't use or suggest it."
+const PPP_UNLOCKS = [
+  [2,  'std::cin / std::cout, auto'],
+  [3,  'std::vector basics, simple functions'],
+  [4,  'exceptions (try / catch / throw)'],
+  [7,  'your own functions, references, namespaces, modules & headers'],
+  [8,  'classes, constructors & invariants, enums, operator overloading'],
+  [9,  'file streams, string streams, user-defined << / >>'],
+  [12, 'inheritance & derived classes (virtual)'],
+  [15, 'free store: new / delete, pointers, the this pointer'],
+  [16, 'raw arrays, C-style strings, the address-of/deref operators'],
+  [18, 'templates'],
+  [19, 'iterators, linked lists, custom containers'],
+  [20, 'std::map, std::set, std::unordered_map'],
+  [21, 'STL algorithms (sort, find…), function objects'],
+];
+
+// part labels keep the picker grouped exactly like the book's Parts.
+const PPP_CHAPTERS = [
+  { n:0, part:'Front matter', title:'Notes to the Reader',
+    summary:'Orientation, not code: how the book teaches (learn by building), what it expects of you, and that every example targets ISO standard C++ (C++20). Read it once so the later chapters make sense.',
+    teaches:['how to use the book','the “learn by doing” philosophy'], drills:[] },
+
+  { n:1, part:'I · The Basics', title:'Hello, World!',
+    summary:'What a program is, the classic first program, and the journey from source text to a running thing: compile, then link. Plus what a programming environment gives you.',
+    teaches:['main()','#include <iostream> and std::cout','compile vs. link'],
+    drills:[{ prompt:'Write the smallest complete program that prints one line of your choosing, then returns 0 from main().',
+      hint:'You need one include for output, an int main(), a single output statement that ends the line, and a return.' }] },
+
+  { n:2, part:'I · The Basics', title:'Objects, Types, and Values',
+    summary:'Reading input, variables and their types, operators, assignment vs. initialization, names, type safety, conversions, and letting the compiler deduce a type with auto.',
+    teaches:['std::cin','int/double/string/char/bool','initialization','auto','type safety'],
+    drills:[{ prompt:'Read two numbers from the user into well-named variables, then print their sum and their average on separate lines.',
+      hint:'Initialize your variables, read with std::cin, and remember integer vs. floating-point division when you take the average.' }] },
+
+  { n:3, part:'I · The Basics', title:'Computation',
+    summary:'Expressions and statements, writing and calling simple functions, looping, and your first use of std::vector to hold a run of values.',
+    teaches:['if / for / while','simple functions','std::vector (push_back, indexing, range-for)'],
+    drills:[{ prompt:'Read numbers until the user stops, store them in a std::vector<double>, then print how many there were and their largest value.',
+      hint:'A loop with std::cin in the condition, push_back to grow the vector, and a range-for to scan for the largest.' }] },
+
+  { n:4, part:'I · The Basics', title:'Errors!',
+    summary:'The kinds of errors — compile-time, link-time, run-time — and how to deal with bad input by checking arguments and using exceptions instead of letting things go wrong silently.',
+    teaches:['compile/link/run-time errors','throw / try / catch','argument checking'],
+    drills:[{ prompt:'Write a function area(width, height) that throws if either side is negative, and a main() that calls it inside a try/catch and prints a friendly message on failure.',
+      hint:'Validate first and throw std::runtime_error on bad input; wrap the call in try { … } catch (std::exception& e) { … }.' }] },
+
+  { n:5, part:'I · The Basics', title:'Writing a Program',
+    summary:'Building a real program from scratch — the calculator — by thinking about the problem, sketching a grammar, and turning it into code one small, working version at a time.',
+    teaches:['breaking a problem down','a Token idea (a kind + a value)','growing a program in small steps'],
+    drills:[{ prompt:'Define a small Token type that pairs a kind (a char) with a numeric value (a double), and make one Token and print both parts.',
+      hint:'A struct with two members and a simple way to construct it; you do not need operator overloading yet.' }] },
+
+  { n:6, part:'I · The Basics', title:'Completing a Program',
+    summary:'Finishing the calculator: handling errors gracefully, negative numbers, the % operator, recovering after a bad line, and cleaning the code up so it reads well.',
+    teaches:['error recovery in a loop','tidying code','named constants instead of magic numbers'],
+    drills:[{ prompt:'Write an input loop that reads a line, prints a result, and on bad input prints a message and keeps going instead of crashing.',
+      hint:'Catch the error inside the loop so one bad line does not end the program; keep prompting.' }] },
+
+  { n:7, part:'I · The Basics', title:'Technicalities: Functions, etc.',
+    summary:'How functions really work: declarations vs. definitions, scope, passing by value vs. by reference, order of evaluation, namespaces, and organizing code into modules and headers.',
+    teaches:['pass by value vs. reference','scope','namespaces','modules & headers'],
+    drills:[{ prompt:'Write a function that takes a std::vector<double> by reference and doubles every element in place, then show before/after in main().',
+      hint:'Take the parameter as std::vector<double>& so your changes are seen by the caller; loop with a reference in the range-for.' }] },
+
+  { n:8, part:'I · The Basics', title:'Technicalities: Classes, etc.',
+    summary:'User-defined types: classes and members, separating interface from implementation, keeping an invariant true through a constructor, enums, and operator overloading.',
+    teaches:['class with private data + public interface','constructors that enforce an invariant','enum class','operator overloading'],
+    drills:[{ prompt:'Write a Date class that stores year/month/day, validates them in the constructor (throw on an impossible date), and offers a read-only way to print itself.',
+      hint:'Keep the members private; the constructor is the one place that establishes the invariant, so check there and throw if it is broken.' }] },
+
+  { n:9, part:'II · Input and Output', title:'Input and Output Streams',
+    summary:'The stream model behind cin/cout, reading and writing files, handling I/O errors, reading a value safely, writing your own << and >> operators, formatting, and string streams.',
+    teaches:['ifstream / ofstream','the standard input loop','user-defined << and >>','stringstream'],
+    drills:[{ prompt:'Read a file of numbers (one per line) into a std::vector<double> and print their sum; handle the file-not-found case gracefully.',
+      hint:'Open an std::ifstream, check it opened, loop reading with >> in the condition, and report instead of crashing if it failed.' }] },
+
+  { n:10, part:'II · Input and Output', title:'A Display Model',
+    summary:'Why a book teaches graphics, the simple display model it uses, attaching to a GUI library, coordinates, and the idea of a Shape you put on a window. (Uses the book’s PPP graphics library — best followed in the book.)',
+    teaches:['the display model','coordinates','Shape (PPP library)'], drills:[] },
+
+  { n:11, part:'II · Input and Output', title:'Graphics Classes',
+    summary:'The concrete shape types: Point and Line, Lines, Color, Line_style, Polylines, closed shapes, Text, Mark, and Image. (PPP graphics library — follow along in the book.)',
+    teaches:['Point/Line/Color','Polyline','Text & Image (PPP library)'], drills:[] },
+
+  { n:12, part:'II · Input and Output', title:'Class Design',
+    summary:'Designing class hierarchies: design principles, the Shape base class, base vs. derived classes and virtual functions, and what object-oriented programming buys you.',
+    teaches:['base & derived classes','virtual functions','OOP basics'],
+    drills:[{ prompt:'Sketch a base class Shape with a virtual draw_lines() and two derived classes (e.g., Circle, Square) that override it; show a vector of Shape* being drawn in a loop.',
+      hint:'Mark the base function virtual, override it in each derived class, and loop over the base pointers calling the same function.' }] },
+
+  { n:13, part:'II · Input and Output', title:'Graphing Functions and Data',
+    summary:'Plotting: graphing a simple function, the Function and Axis types, approximation, and graphing real data. (PPP graphics library — follow along in the book.)',
+    teaches:['Function & Axis (PPP library)','graphing data'], drills:[] },
+
+  { n:14, part:'II · Input and Output', title:'Graphical User Interfaces',
+    summary:'Interactive UIs: user-interface alternatives, a Next button, a window, Buttons and other widgets, drawing in response to input, simple animation, and debugging GUI code. (PPP library — follow along in the book.)',
+    teaches:['windows & widgets','callbacks (PPP library)'], drills:[] },
+
+  { n:15, part:'III · Data and Algorithms', title:'Vector and Free Store',
+    summary:'How a vector works underneath: memory and addresses, pointers, the free store (new/delete), why destructors matter, element access, and the this pointer. The chapter where pointers finally appear.',
+    teaches:['pointers','new / delete','destructors (RAII)','the this pointer'],
+    drills:[{ prompt:'Write a tiny class that acquires a resource in its constructor and releases it in its destructor, and explain in a comment why the destructor is the safe place for cleanup.',
+      hint:'Acquire in the constructor, release in the destructor; this is RAII — the object’s lifetime controls the resource so nothing leaks.' }] },
+
+  { n:16, part:'III · Data and Algorithms', title:'Arrays, Pointers, and References',
+    summary:'Raw arrays, pointers vs. references, C-style strings, the trouble they cause, and the modern alternatives you should reach for instead. Worked example: palindromes.',
+    teaches:['raw arrays & C-strings (and why to avoid them)','pointer vs. reference','prefer std::string / std::vector'],
+    drills:[{ prompt:'Write a function that reports whether a std::string is a palindrome, then say in a comment why std::string is safer here than a C-style char array.',
+      hint:'Compare characters from both ends moving inward; std::string knows its own length, so you avoid the off-by-one and buffer risks of raw arrays.' }] },
+
+  { n:17, part:'III · Data and Algorithms', title:'Essential Operations',
+    summary:'The operations every value-like class should consider: list initialization, copy and move, the “essential operations” (default/copy/move/destructor), resizing, and finishing a Vector of your own.',
+    teaches:['copy vs. move','the essential operations','{ } list initialization'],
+    drills:[{ prompt:'Give a small class a default constructor and an initializer-list–style constructor, and a print() that shows its contents; construct one with { } syntax.',
+      hint:'Think about what each constructor must leave true (the invariant); list-initialization uses the { } braces.' }] },
+
+  { n:18, part:'III · Data and Algorithms', title:'Templates and Exceptions',
+    summary:'Writing code that works for many types with templates, generalizing your Vector, range-checking with exceptions, and resource-management pointers.',
+    teaches:['function & class templates','range-checked access','RAII pointers'],
+    drills:[{ prompt:'Write a function template largest(const std::vector<T>&) that returns the biggest element, and call it with both a vector of int and a vector of double.',
+      hint:'template <typename T> in front; the body is the same loop you already know — the type is now a parameter.' }] },
+
+  { n:19, part:'III · Data and Algorithms', title:'Containers and Iterators',
+    summary:'How the standard containers are built and used: sequences and iterators, linked lists, generalizing your Vector once more, and when to choose vector vs. list vs. string.',
+    teaches:['iterators (begin/end)','std::list','choosing a container'],
+    drills:[{ prompt:'Use iterators (begin()/end()) to walk a std::vector<int> and print each element, without using indexing.',
+      hint:'Get an iterator from begin(), loop while it != end(), dereference with * and ++ to advance — or use auto for its type.' }] },
+
+  { n:20, part:'III · Data and Algorithms', title:'Maps and Sets',
+    summary:'Associative containers: std::map, the faster std::unordered_map, std::set, how to time them, an overview of the containers, and a first look at ranges.',
+    teaches:['std::map / std::unordered_map','std::set','ranges (intro)'],
+    drills:[{ prompt:'Read a line of words and print each distinct word with how many times it appeared, using a std::map<std::string,int>.',
+      hint:'map[word]++ creates the entry on first sight and counts it; then range-for over the map prints key and value.' }] },
+
+  { n:21, part:'III · Data and Algorithms', title:'Algorithms',
+    summary:'The standard-library algorithms — sort, find, copy, numeric operations — and function objects/lambdas to customize them, instead of hand-writing loops.',
+    teaches:['std::sort / std::find','lambdas & function objects','prefer algorithms over raw loops'],
+    drills:[{ prompt:'Put some numbers in a std::vector, std::sort them, then use std::find to report whether a chosen value is present.',
+      hint:'#include <algorithm>; sort takes begin()/end(); find returns end() when the value is not there.' }] },
+];
+
+function pppDefaultIndex(){ return 1; }   // start at Ch 1 "Hello, World!", not the front-matter
 /* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
 const IDB_NAME='vfj', IDB_STORE='kv', IDB_KEY='state';
@@ -1229,7 +1392,7 @@ function namingDefault(){ return {
 // the Code Practice (Apprentice) space — lesson/flashcard progress, checklist
 // toggles, per-item triage, the bug journal, and every editable field (text is
 // kept in .fields, keyed by name; PRACTICE_DEFAULTS supplies the starting copy).
-function practiceDefault(){ return { fields:{}, lesson:0, lessonDone:{}, flash:0, flashKnown:{}, testTarget:'', checklist:{}, approval:{}, prototype:{}, journal:[], template:'', dashTab:'plan' }; }
+function practiceDefault(){ return { fields:{}, lesson:0, lessonDone:{}, flash:0, flashKnown:{}, testTarget:'', checklist:{}, approval:{}, prototype:{}, journal:[], template:'', dashTab:'plan', chapter:1, chapterDone:{}, drills:{}, pasteLock:true }; }
 function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); merged.practice=Object.assign(practiceDefault(), d.practice||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
@@ -2181,9 +2344,15 @@ const PRACTICE_TABS = [
 /* ---------- state helpers (all reads/writes go through DB.practice) -------- */
 function pField(name){ const v=DB.practice.fields[name]; return v!=null ? v : (PRACTICE_DEFAULTS[name]!=null ? PRACTICE_DEFAULTS[name] : ''); }
 function pSetField(name, v){ DB.practice.fields[name]=v; save(); }
-function pCopy(text, msg){
-  try{ navigator.clipboard && navigator.clipboard.writeText(text); }catch(e){}
-  toast(msg||'Copied.');
+// Copy from a textarea: select it first — so it still works where the Clipboard API is
+// blocked (iPad Safari often needs the live selection, or a non-secure context) — then try
+// the API. The toast is honest: if nothing could be copied, the text is at least selected.
+function prcCopyArea(ta, msg){
+  try{ ta.focus(); ta.select(); ta.setSelectionRange(0, (ta.value||'').length); }catch(_){}
+  let ok=false;
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(ta.value); ok=true; } }catch(_){ ok=false; }
+  if(!ok){ try{ ok=!!(document.execCommand&&document.execCommand('copy')); }catch(_){ ok=false; } }
+  toast(ok? (msg||'Copied.') : 'Selected — press ⌘/Ctrl + C to copy.');
 }
 function pArea(name, rows, ph){ return h('textarea',{class:'prc-input', rows:rows||2, placeholder:ph||'', value:pField(name), oninput:e=>pSetField(name, e.target.value)}); }
 function pInput(name, ph){ return h('input',{class:'prc-input', placeholder:ph||'', value:pField(name), oninput:e=>pSetField(name, e.target.value)}); }
@@ -2200,7 +2369,7 @@ function pOutput(buildFn, label, msg){
   const ta=h('textarea',{class:'prc-out', readonly:true, value:buildFn()});
   return h('div',{class:'prc-block'},
     h('div',{class:'toolrow'},
-      h('button',{class:'navbtn primary', onclick:()=>{ ta.value=buildFn(); pCopy(ta.value, msg||('Copied '+label+'.')); }}, 'Copy '+label),
+      h('button',{class:'navbtn primary', onclick:()=>{ ta.value=buildFn(); prcCopyArea(ta, msg||('Copied '+label+'.')); }}, 'Copy '+label),
       h('button',{class:'navbtn', onclick:()=>{ ta.value=buildFn(); toast('Refreshed.'); }}, 'Refresh')),
     ta);
 }
@@ -2463,41 +2632,103 @@ function viewPractice(tab, params){
   return f;
 }
 
+/* ---------- chapter spine (PPP 3rd ed.) + scoped coach ---------------------- */
+function prcChapter(){ const i=DB.practice.chapter|0; return PPP_CHAPTERS[(i>=0&&i<PPP_CHAPTERS.length)?i:1]; }
+function prcChapterDone(n){ return !!DB.practice.chapterDone[n]; }
+function prcCurDrill(){ const c=prcChapter(); return (c.drills&&c.drills[0])||null; }
+function prcDrillCode(){ const n=prcChapter().n; return (DB.practice.drills&&DB.practice.drills[n])||''; }
+function prcSetDrillCode(v){ const n=prcChapter().n; (DB.practice.drills=DB.practice.drills||{})[n]=v; save(); }
+function prcAllowed(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c<=n).map(([,t])=>t); }
+function prcNotYet(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c>n).map(([c,t])=>`${t} (Ch ${c})`); }
+function prcCodeBlock(){ const code=prcDrillCode().trim(); return code? '```cpp\n'+code+'\n```' : '(no code typed yet)'; }
+// the scope guard injected into every coach prompt, so the AI never teaches ahead of the book.
+function pppScopeNote(){
+  const cur=prcChapter(); const have=prcAllowed(), notYet=prcNotYet();
+  return [
+    `Context: a beginner working through Stroustrup's "Programming: Principles and Practice Using C++" (3rd ed.), currently at Chapter ${cur.n} — ${cur.title}.`,
+    `Use only modern ISO C++ (C++20/23). Reject C-style arrays, raw owning pointers, and pre-C++11 patterns.`,
+    have.length? `Tools taught so far (fair game): ${have.join('; ')}.` : `Only the basics from Chapters 1–2 have been taught so far.`,
+    notYet.length? `NOT yet introduced — do not use, teach, or suggest these: ${notYet.join('; ')}.` : ''
+  ].filter(Boolean).join('\n');
+}
+function prcSocraticPrompt(){ const d=prcCurDrill();
+  return ['You are a patient Socratic C++ tutor. Never write the solution code — explain the idea, give an analogy, and ask me ONE guiding question so I find it myself. A short pseudo-code outline with the key line left blank is fine.','',
+    pppScopeNote(),'', d? 'The drill: '+d.prompt : 'No specific drill — I just want to understand the concept below.','',
+    'My attempt so far:', prcCodeBlock(),'','Give me one hint or guiding question. No full solution.'].join('\n'); }
+function prcCompilerPrompt(){
+  return ['Act as a C++20 compiler plus a kind translator for a beginner.','', pppScopeNote(),'',
+    'Here is my code:', prcCodeBlock(),'',
+    'If it would NOT compile, tell me the FIRST error in plain English and which line — but do not fix it for me, just point me at it. If it compiles, say so and show what it would print.'].join('\n'); }
+function prcCriticPrompt(){ const d=prcCurDrill();
+  return ['You are a careful C++ reviewer in the spirit of the C++ Core Guidelines, coaching a beginner. Review my COMPILING code — do not rewrite it for me.','',
+    pppScopeNote(),'', d? 'The drill: '+d.prompt : '', 'My code:', prcCodeBlock(),'',
+    'Flag any: raw new/delete, magic numbers, uninitialized variables, or a class whose invariant could be broken. Then ask me ONE "what happens if…" question (e.g., a negative or empty input) so I check my own logic.'].filter(Boolean).join('\n'); }
+function prcUE5Prompt(){
+  return ['I am learning standard C++ but heading to Unreal Engine 5 C++. For the concept in my code below, show the direct UE5 equivalent as a short mapping (e.g., std::vector→TArray, std::string→FString, std::cout→UE_LOG), with one gotcha each.','',
+    'Concept / code:', prcCodeBlock(),'','Keep it a mapping, not a rewrite of my program.'].join('\n'); }
+
 /* ---------- LEARN --------------------------------------------------------- */
 function practiceLearn(host){
   host.replaceChildren();
-  const idx=prcLessonIndex(), lesson=prcLesson();
-  const doneCount=CPP_LESSONS.filter((_,i)=>prcLessonDone(i)).length;
+  const ch=prcChapter(), idx=ch.n;
+  const doneCount=PPP_CHAPTERS.filter(c=>prcChapterDone(c.n)).length;
 
-  // lesson tab strip
-  const strip=h('div',{class:'prc-lessontabs'});
-  CPP_LESSONS.forEach((l,i)=>
-    strip.append(h('button',{class:'tab'+(i===idx?' on':''), onclick:()=>{ DB.practice.lesson=i; save(); practiceLearn(host); }},
-      prcLessonDone(i)? l.tab+' ✓' : l.tab)));
-  host.append(strip);
-  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, `${doneCount}/${CPP_LESSONS.length} lessons done`));
+  // chapter picker (grouped by Part), the spine of the book on Del's desk
+  host.append(pHead('Your place in the book'));
+  const sel=h('select',{class:'prc-input', onchange:e=>{ DB.practice.chapter=+e.target.value; save(); practiceLearn(host); }});
+  const groups={}, order=[];
+  PPP_CHAPTERS.forEach(c=>{ if(!groups[c.part]){ groups[c.part]=h('optgroup',{label:c.part}); order.push(c.part); }
+    groups[c.part].append(h('option',{value:c.n, selected:c.n===idx?'selected':null}, `${c.n}. ${c.title}`+(prcChapterDone(c.n)?' ✓':''))); });
+  order.forEach(p=> sel.append(groups[p]));
+  host.append(sel);
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, `${doneCount}/${PPP_CHAPTERS.length} chapters marked done`));
 
-  const card=h('div',{class:'prc-card'},
-    h('h3',{class:'prc-h'}, lesson.title),
-    h('p',null, lesson.plain),
-    lesson.book? h('p',{class:'prc-note'}, 'Book: '+lesson.book) : null,
-    h('h4',{class:'prc-sub'}, 'Files to open'), pList(lesson.files),
-    h('h4',{class:'prc-sub'}, 'Code clues'), pList(lesson.clues),
-    lesson.code? h('pre',{class:'prc-code'}, lesson.code) : null,
-    lesson.answer? h('details',{class:'prc-answer'}, h('summary',null,'Show expected result'), h('p',null, lesson.answer)) : null,
-    h('h4',{class:'prc-sub'}, 'Tiny exercise'), h('p',null, lesson.practice),
-    h('h4',{class:'prc-sub'}, 'Ask Rune'), h('p',{class:'hint'}, lesson.askRune),
-    h('h4',{class:'prc-sub'}, 'Ask Claude Code'), h('p',{class:'hint'}, lesson.askCodex),
+  // chapter card
+  const allowed=prcAllowed(), next=PPP_UNLOCKS.find(([c])=>c>idx);
+  host.append(h('div',{class:'prc-card'},
+    h('h3',{class:'prc-h'}, `Chapter ${ch.n} — ${ch.title}`),
+    h('p',null, ch.summary),
+    (ch.teaches&&ch.teaches.length)? h('div',null, h('h4',{class:'prc-sub'},'This chapter introduces'), pList(ch.teaches)) : null,
+    h('h4',{class:'prc-sub'}, 'What you can use up to here'),
+    allowed.length? pList(allowed) : h('p',{class:'hint'}, 'Just the basics so far — variables, simple output, and (from Ch 2) input.'),
+    next? h('p',{class:'prc-note'}, `Not yet: ${next[1]} comes in Chapter ${next[0]} — try not to reach for it before then.`) : null,
     h('div',{class:'toolrow'},
-      h('button',{class:'navbtn primary', onclick:()=>{ DB.practice.lessonDone[idx]=!prcLessonDone(idx); save(); practiceLearn(host); }},
-        prcLessonDone(idx)? 'Mark Not Done' : 'Mark Lesson Done')),
-  );
-  host.append(card);
+      h('button',{class:'navbtn', onclick:()=>{ DB.practice.chapter=Math.max(0,idx-1); save(); practiceLearn(host); }}, '‹ Previous'),
+      h('button',{class:'navbtn primary', onclick:()=>{ DB.practice.chapterDone[idx]=!prcChapterDone(idx); save(); practiceLearn(host); }},
+        prcChapterDone(idx)? 'Mark not done' : 'Mark chapter done'),
+      h('button',{class:'navbtn', onclick:()=>{ DB.practice.chapter=Math.min(PPP_CHAPTERS.length-1,idx+1); save(); practiceLearn(host); }}, 'Next ›')),
+  ));
 
-  // a Rune question, prefilled by the lesson
-  host.append(pHead('Ask Rune about this lesson'));
-  host.append(pLabeled('Your question', pArea('cppQuestion', 2, 'What part is confusing?')));
-  host.append(pOutput(prcCppQuestion, 'code question', 'Copied code question.'));
+  // drill + sandbox + chapter-scoped coach
+  const drill=prcCurDrill();
+  const drillCard=h('div',{class:'prc-card'});
+  if(drill){
+    drillCard.append(h('h4',{class:'prc-sub'},'Drill'), h('p',null, drill.prompt),
+      drill.hint? h('details',{class:'prc-answer'}, h('summary',null,'Stuck? a nudge'), h('p',null, drill.hint)) : null);
+  } else {
+    drillCard.append(h('h4',{class:'prc-sub'},'Practice'),
+      h('p',{class:'hint'}, ch.n===0? 'Orientation chapter — no code to type. Read it, then jump to Chapter 1.' : 'This chapter leans on the book’s graphics library, so it’s best followed in the book. You can still paste any code below for coaching.'));
+  }
+  const sandbox=h('textarea',{class:'prc-input prc-sandbox', rows:9, placeholder:'type your C++ here…', value:prcDrillCode(),
+    oninput:e=>prcSetDrillCode(e.target.value),
+    onpaste:e=>{ if(DB.practice.pasteLock){ e.preventDefault(); toast('Paste-lock is on — type it out to build muscle memory.'); } }});
+  drillCard.append(pLabeled('Your sandbox', sandbox));
+  drillCard.append(h('label',{class:'prc-check'},
+    h('input',{type:'checkbox', checked:DB.practice.pasteLock?'checked':null, onchange:e=>{ DB.practice.pasteLock=e.target.checked; save(); }}),
+    h('span',null,'Paste-lock — type it yourself (the point is muscle memory)')));
+  const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
+  const coachBtn=(builder,label)=> h('button',{class:'navbtn', onclick:()=>{ coachOut.value=builder(); prcCopyArea(coachOut, 'Copied — paste into Claude / ChatGPT.'); }}, label);
+  drillCard.append(
+    h('h4',{class:'prc-sub'},'Coach (scoped to this chapter)'),
+    h('p',{class:'hint'},'Each builds a ready prompt for your AI — none of them write the answer for you.'),
+    h('div',{class:'toolrow'},
+      coachBtn(prcSocraticPrompt,'Socratic hint'),
+      coachBtn(prcCompilerPrompt,'Compile-check'),
+      coachBtn(prcCriticPrompt,'Critique'),
+      coachBtn(prcUE5Prompt,'UE5 map'),
+      h('button',{class:'navbtn', onclick:()=>{ try{ sandbox.focus(); sandbox.select(); navigator.clipboard&&navigator.clipboard.writeText(prcDrillCode()); }catch(_){}; try{ window.open('https://godbolt.org/','_blank','noopener'); }catch(_){}; toast('Code copied — paste it into Compiler Explorer to run.'); }}, '▶ Compiler Explorer')),
+    coachOut);
+  host.append(drillCard);
 
   // flashcards
   host.append(prcFlashcards());
@@ -2607,7 +2838,7 @@ function practiceHandoff(host){
   host.append(pLabeled('Shared notes', pArea('messageTemplateNotes', 2)));
   host.append(h('div',{class:'prc-block'},
     h('div',{class:'toolrow'},
-      h('button',{class:'navbtn primary', onclick:()=>{ out.value=prcTemplateOutput(); pCopy(out.value, 'Copied message template.'); }}, 'Copy template'),
+      h('button',{class:'navbtn primary', onclick:()=>{ out.value=prcTemplateOutput(); prcCopyArea(out, 'Copied message template.'); }}, 'Copy template'),
       h('button',{class:'navbtn', onclick:()=>{ out.value=prcTemplateOutput(); toast('Refreshed.'); }}, 'Refresh')),
     out));
 }
@@ -2743,7 +2974,7 @@ function practiceQuest(host){
   const DASH=[['plan','Plan'],['do','Do'],['track','Track']];
   function renderDash(){
     sub.replaceChildren();
-    DASH.forEach(([k,label])=> sub.append(h('button',{class:'tab'+(DB.practice.dashTab===k?' on':''), onclick:()=>{ DB.practice.dashTab=k; save(); renderDash(); }}, label)));
+    DASH.forEach(([k,label])=> sub.append(h('button',{class:'tab'+(DB.practice.dashTab===k?' on':''), 'aria-pressed':(DB.practice.dashTab===k)?'true':'false', onclick:()=>{ DB.practice.dashTab=k; save(); renderDash(); }}, label)));
     panel.replaceChildren();
     const tab=DB.practice.dashTab||'plan';
     if(tab==='plan'){
