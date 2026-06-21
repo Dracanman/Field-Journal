@@ -270,6 +270,11 @@
   body.mode-full .simple-only{ display:none !important; }
   body.profile-maker .world-only{ display:none !important; }
   body.profile-world .maker-only{ display:none !important; }
+  /* the Apprentice's code-practice space is separate: hide the maker/world/game
+     journal chrome, and reveal .learn-only bits only there */
+  .learn-only{ display:none; }
+  body.profile-learn .learn-only{ display:initial; }
+  body.profile-learn .maker-only, body.profile-learn .world-only{ display:none !important; }
 
   /* ---------- Naming Tree plate (scaled 1500x1480) ---------- */
   .plate-wrap{ width:100%; overflow:hidden; margin:0 auto; }
@@ -344,6 +349,50 @@
 
   /* ---------- Game space (campaigns) — reuses studio/board/canon-doc styles ---------- */
   .profile-game .maker-only{ display:none !important; }
+  /* ---------- Code Practice (Apprentice profile) ---------- */
+  .prc{ max-width:760px; margin:0 auto; }
+  .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
+  .prc-sub{ font-size:14px; color:var(--ink); margin:6px 0 4px; }
+  .prc-note{ font-size:14px; color:var(--ink-soft); font-style:italic; margin:8px 0; }
+  .prc-card{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:14px 16px; margin:10px 0; }
+  .prc-card.is-open{ border-color:#b08a3a; background:#fbf3df; }
+  .prc-list{ margin:4px 0 8px; padding-left:20px; }
+  .prc-list li{ margin:3px 0; }
+  .prc-code{ background:#f0e7d0; border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .prc-answer{ background:#f6efde; border-left:3px solid var(--green); border-radius:6px; padding:8px 12px; margin:8px 0; }
+  .prc-answer summary{ cursor:pointer; color:var(--green); font-weight:600; }
+
+  /* lesson tab strip (reuses the .tab pill look) */
+  .prc-lessontabs{ display:flex; flex-wrap:wrap; gap:6px; justify-content:center; margin-bottom:10px; }
+  .prc-lessontabs .tab{ border:1.5px solid var(--gold-soft); background:#fff8; color:var(--ink-soft); border-radius:999px; padding:5px 12px; font-size:13px; }
+  .prc-lessontabs .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
+
+  /* fields + outputs */
+  .prc-field{ display:block; margin:8px 0; }
+  .prc-label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin-bottom:3px; }
+  .prc-input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:8px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  textarea.prc-input{ resize:vertical; min-height:42px; }
+  .prc-block{ margin:10px 0; }
+  .prc-out{ width:100%; min-height:120px; border:1.5px solid var(--gold-soft); border-radius:8px; background:#f7f1e2; padding:10px 12px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; color:var(--ink-soft); resize:vertical; margin-top:8px; }
+
+  .prc-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
+  .prc-gloss{ margin:4px 0; }
+  .prc-gloss dt{ font-weight:600; color:var(--ink); margin-top:8px; }
+  .prc-gloss dd{ margin:0 0 2px; }
+
+  .prc-flash .prc-flashface{ background:#f0e7d0; border-radius:8px; padding:14px 16px; text-align:center; }
+  .prc-flash .prc-flashface b{ font-size:20px; color:var(--ink); display:block; margin-bottom:6px; }
+
+  .prc-strip{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; background:#f0e7d0; border-radius:10px; padding:10px 14px; font-size:14px; margin-bottom:12px; }
+
+  .prc-check{ display:flex; gap:10px; align-items:flex-start; padding:5px 0; }
+  .prc-check input{ margin-top:4px; }
+
+  .prc-entries{ margin:8px 0; }
+
+  .prc-lore.is-ok{ border-left:3px solid var(--green); }
+  .prc-lore.is-warning{ border-left:3px solid #b4632e; background:#f8ecdf; }
+  .prc-lore.is-watch{ border-left:3px solid var(--gold); }
   /* ---------- print ---------- */
   .book-stage{ display:none; }
   .book-cover{ text-align:center; }
@@ -678,6 +727,482 @@ const SEED_SLOTS = ['A Seed','A Leaf','A Stone','A Flower','A Bark','A Root','A 
 const KNOWN_ROOTS = [ {root:'-druun', meaning:'earth · stone · buried-roots', locked:true}, {root:'-thari', meaning:'wood · grove · sanctuary', locked:true} ];
 const OPEN_ROOTS = ['-maren','-aeryn','-karin','-lunai','-sorin'];
 
+/* ========================================================================== *
+   CODE PRACTICE — lesson data (ported from GodlingUniverse-CodePractice's
+   GodlingLearningHelper: app-data-core.js `cppLessons` + app-data-cpp-lessons.js).
+   Plain global array, like data/elements.js. The Apprentice (learner) profile
+   renders these in the Learn tab. The raw markdown in the CodePractice repo
+   (cpp-lessons/, cpp-exercises/) remains the authoring source of truth.
+
+   Flavor synced to approved canon 2026-06-15_1159: the four gauges (Personal
+   Mana, Divine Mana, Divine Hunger, Strain), the divine gem, Seeds, and a
+   sheltered Vael people. Optional fields: code, answer, book (PPP3 pointer).
+ * ========================================================================== */
+const CPP_LESSONS = [
+  /* ---- reading / orientation lessons (from app-data-core.js) ---- */
+  {
+    tab: "Read",
+    title: "Reading a C++ snippet",
+    plain: "Start with one word in the example (a type, a name, a function), then find where it is declared and where it is used.",
+    files: ["cpp-lessons/lesson_01_what_is_cpp.md", "cpp-lessons/lesson_02_variables_and_state_cpp.md"],
+    clues: ["int", "std::cout", "main()", "DivineMana"],
+    practice: "Pick one name in a C++ example, find where it is declared, then where it is used.",
+    askRune: "Explain how one C++ line declares a value and another line uses it.",
+    askCodex: "Ask Claude Code for one tiny value or text edit in that snippet, then explain it."
+  },
+  {
+    tab: "State",
+    title: "State as C++ variables",
+    plain: "State is the current bundle of values a program remembers. In C++ each one is a typed variable: the four gauges, a counter, a flag.",
+    files: ["cpp-lessons/lesson_02_variables_and_state_cpp.md"],
+    clues: ["int PersonalMana", "int DivineHunger", "int Strain", "bool HasGroveHome"],
+    practice: "Write the four gauges (Personal Mana, Divine Mana, Divine Hunger, Strain) as C++ variables for this moment.",
+    askRune: "Explain how a group of C++ variables together make up the current state.",
+    askCodex: "Ask Claude Code to add one new state variable and print it."
+  },
+  {
+    tab: "Loop",
+    title: "The loop idea in C++",
+    plain: "A loop repeats steps until a condition stops it. A game loop reads input, updates state, checks rules, and shows the next moment, over and over.",
+    files: ["cpp-lessons/lesson_07_game_loop_cpp.md"],
+    clues: ["while (IsRunning)", "ReadInput()", "UpdateElias()", "DrawFrame()"],
+    practice: "Read the while loop and name each step in plain English.",
+    askRune: "Explain a C++ while loop without assuming I know game programming.",
+    askCodex: "Ask Claude Code to add one beginner comment to a loop step only if it helps."
+  },
+  {
+    tab: "Identity",
+    title: "Identity: Elias, a Vael godling (earth+wood)",
+    plain: "Elias is an Earth-origin soul remade as a Vael, with an earth+wood spark. A godling shelters and grows a people; an Arkborne is an ecosystem partner, not a 'civilization carrier'. The C++ examples model him with gauges, a sheltered people, and costs.",
+    files: ["cpp-lessons/lesson_02_variables_and_state_cpp.md", "cpp-lessons/lesson_06_classes_cpp.md"],
+    clues: ["the four gauges", "a people the godling shelters", "a rising cost (Strain)", "a fullness fed by others (Divine Hunger)"],
+    practice: "Pick one C++ variable in a lesson and say which canon idea it models: a gauge, a people, or a cost.",
+    askRune: "Explain the four gauges (Personal Mana, Divine Mana, Divine Hunger, Strain) in beginner terms.",
+    askCodex: "Ask Claude Code to keep any new C++ example aligned with current canon (ecosystem-bearing Arkborne, the four gauges)."
+  },
+  {
+    tab: "Git",
+    title: "Git: tiny checkpoints",
+    plain: "Use Git to see what changed and make small local commits in this practice repo.",
+    files: ["practice_log.md", "lessons/lesson_05_git_basics.md"],
+    clues: ["git status", "git diff", "git add", "git commit", "git log"],
+    practice: "Edit practice_log.md, run git status, and read the changed file name.",
+    askRune: "Explain Git as a save-game checkpoint for coding practice.",
+    askCodex: "Ask Codex to commit only after clean review."
+  },
+
+  /* ---- C++ fundamentals 1-7 (from app-data-cpp-lessons.js) ---- */
+  {
+    tab: "C++ 1",
+    title: "C++ Lesson 01 - What Is C++?",
+    plain: "C++ is the strict, fast language Unreal uses for deep game systems. Strictness is annoying at first but builds predictable, fast code.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_01_what_is_cpp.md"],
+    book: "PPP3: 'Hello, World!' - your first program, main(), and output. Do the chapter's Drills.",
+    clues: ["#include <iostream>", "int main()", "DivineMana", "std::cout"],
+    practice: "Change DivineMana from 100 to 75 and explain what the printed line would show.",
+    askRune: "Can you explain this C++ example one line at a time like I am learning Unreal later?",
+    askCodex: "Ask Claude Code to create a tiny hello-Elias .cpp file in the practice repo and explain how to compile it.",
+    code: `#include <iostream>\n\nint main()\n{\n    int DivineMana = 100;\n    std::cout << "Elias Divine Mana: " << DivineMana << "\\n";\n    return 0;\n}`,
+    answer: "With DivineMana = 75 the program prints: Elias Divine Mana: 75"
+  },
+  {
+    tab: "C++ 2",
+    title: "C++ Lesson 02 - Variables And State",
+    plain: "A variable is a named place that stores one value. Game state is everything the game remembers right now. Each line gives the program one remembered fact about Elias.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_02_variables_and_state_cpp.md"],
+    book: "PPP3: Objects, Types, and Values - variables, types (int/double/bool/string), and initialization. Do the Drills.",
+    clues: ["int PersonalMana", "float GemOpacity", "bool HasGroveHome", "std::string Role"],
+    practice: "Write new values for the four gauges, PeopleSheltered, and GemOpacity for this moment, then say which value matters most for the current danger.",
+    askRune: "Can you help me turn Elias's current scene state into simple C++ variables?",
+    askCodex: "Ask Claude Code to add one new state variable to the example file and print it.",
+    code: `#include <string>\n\nint PersonalMana = 95;\nint DivineMana = 85;\nint DivineHunger = 92;\nint Strain = 15;\nint PeopleSheltered = 0;\nfloat GemOpacity = 0.25f;\nbool HasGroveHome = true;\nstd::string Role = "Vael godling (earth+wood)";`,
+    answer: "There is no single right answer - any values work. The skill being practiced: each variable holds exactly one fact, and changing one changes the state."
+  },
+  {
+    tab: "C++ 3",
+    title: "C++ Lesson 03 - If Statements",
+    plain: "An if statement asks a question. True runs the inside code; false skips it. Canon example: if Strain is 100 or higher, backlash happens. >= means greater than or equal to.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_03_if_statements_cpp.md"],
+    book: "PPP3: selection - if/else (in the Computation material). Watch the boundary conditions.",
+    clues: ["if (Strain >= 100)", "else", "Backlash"],
+    practice: "Set Strain to 40, then 99, then 100. For each value, write whether backlash happens.",
+    askRune: "Can you explain why Strain 99 and Strain 100 cause different results in this if statement?",
+    askCodex: "Ask Claude Code to add an else-if warning band between 80 and 99 to the example.",
+    code: `#include <iostream>\n\nint Strain = 104;\n\nif (Strain >= 100)\n{\n    std::cout << "Backlash happens. Elias must stabilize.\\n";\n}\nelse\n{\n    std::cout << "Strain is dangerous, but not breaking yet.\\n";\n}`,
+    answer: "40: no backlash. 99: no backlash (99 is not >= 100). 100: backlash happens - >= includes exactly 100."
+  },
+  {
+    tab: "C++ 4",
+    title: "C++ Lesson 04 - Functions",
+    plain: "A function is a named action the code can call instead of repeating steps. CastShelter() checks mana, spends mana, adds Strain, and reports whether the cast worked. int& lets a function change the caller's variable.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_04_functions_cpp.md"],
+    book: "PPP3: Functions - and references (int&) for pass-by-reference (changing the caller's variable).",
+    clues: ["void AddStrain(int& Strain, int Amount)", "bool CastShelter", "return false"],
+    practice: "Start with PersonalMana 60 and Strain 10. After one Shelter cast, what are PersonalMana and Strain?",
+    askRune: "Can you explain what int& means in this function using Personal Mana and Strain?",
+    askCodex: "Ask Claude Code to write one new tiny ability function that spends mana and adds Strain.",
+    code: `#include <iostream>\n\nvoid AddStrain(int& Strain, int Amount)\n{\n    Strain = Strain + Amount;\n}\n\nbool CastShelter(int& PersonalMana, int& Strain)\n{\n    if (PersonalMana < 20)\n    {\n        return false;\n    }\n\n    PersonalMana = PersonalMana - 20;\n    AddStrain(Strain, 12);\n    return true;\n}`,
+    answer: "PersonalMana: 60 - 20 = 40. Strain: 10 + 12 = 22. The cast returns true because PersonalMana was at least 20."
+  },
+  {
+    tab: "C++ 5",
+    title: "C++ Lesson 05 - Vectors And Lists",
+    plain: "A vector is a C++ container holding several values in order, and it grows as items are added. Useful for a sheltered people, Seeds, helpers, or hazards. push_back adds to the end.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_05_vectors_and_lists_cpp.md"],
+    book: "PPP3: vector - the standard library's workhorse container; push_back() and size().",
+    clues: ["std::vector<std::string>", "push_back"],
+    practice: "Add two Seeds to a seeds vector, then write how many the list holds.",
+    askRune: "Can you explain a C++ vector like it is a list of Vael Elias is trying to shelter?",
+    askCodex: "Ask Claude Code to add a third vector to the example and print its size.",
+    code: `#include <string>\n#include <vector>\n\nstd::vector<std::string> ShelteredVael = { "Ana", "Bo", "Cael" };\nstd::vector<std::string> ChoirHorrors = { "Corrupted Beast", "Corrupted Beast" };\nstd::vector<std::string> Seeds;\n\nSeeds.push_back("Earth-Wood Seed");`,
+    answer: "After two push_back calls the seeds vector holds 2 Seeds."
+  },
+  {
+    tab: "C++ 6",
+    title: "C++ Lesson 06 - Classes",
+    plain: "A class describes a kind of thing; an object is one actual thing made from it. The Elias class groups the values and actions that belong to Elias in one place.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_06_classes_cpp.md"],
+    book: "PPP3: Classes - user-defined types with member data and member functions (methods).",
+    clues: ["class Elias", "public:", "void AddStrain(int Amount)"],
+    practice: "Design a tiny Vael class with Name, Constitution, Calm, IsSheltered. A plain-English class plan is enough.",
+    askRune: "Can you help me design an Elias class and explain which parts are variables and which parts are functions?",
+    askCodex: "Ask Claude Code to turn my plain-English Vael class plan into real C++ and explain each line.",
+    code: `#include <string>\n\nclass Elias\n{\npublic:\n    std::string Role = "Vael godling (earth+wood)";\n    int DivineMana = 85;\n    int PersonalMana = 95;\n    int Strain = 0;\n\n    void AddStrain(int Amount)\n    {\n        Strain = Strain + Amount;\n    }\n};`,
+    answer: "A solid plan: Name (string), Constitution (int), Calm (int), IsSheltered (bool) are the variables. Actions like CalmDown() or ReachShelter() would be the functions."
+  },
+  {
+    tab: "C++ 7",
+    title: "C++ Lesson 07 - Game Loop",
+    plain: "A game loop is the repeating cycle keeping a game alive: read input, update state, check rules, draw the next moment. Unreal gives Tick, events, and timers instead of a hand-written loop, but the idea is the same.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-lessons/lesson_07_game_loop_cpp.md"],
+    book: "PPP3: iteration - while and for loops (in the Computation material).",
+    clues: ["while (IsRunning)", "ReadInput()", "DrawFrame()"],
+    practice: "Write the loop steps for a shelter moment, then add one more step that feels useful.",
+    askRune: "Can you explain how a C++ while loop and Unreal Tick are related but not the same thing?",
+    askCodex: "Ask Claude Code to sketch the shelter-moment loop as commented pseudocode in a .cpp file.",
+    code: `bool IsRunning = true;\n\nwhile (IsRunning)\n{\n    ReadInput();\n    UpdateElias();\n    UpdateVael();\n    UpdateHorrors();\n    CheckWinOrLoss();\n    DrawFrame();\n}`,
+    answer: "Example extra steps that fit: UpdateGauges(), UpdateCooldowns(), or PlaySounds(). Any step that must happen every moment belongs in the loop."
+  },
+
+  /* ---- exercises 1-5 (from app-data-cpp-lessons.js) ---- */
+  {
+    tab: "Ex 1",
+    title: "C++ Exercise 01 - Elias State",
+    plain: "Practice making the state variables yourself. The program needs to remember Elias's current values while he shelters a Vael people through danger.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-exercises/exercise_01_elias_state.md"],
+    book: "PPP3: Objects, Types, and Values - redo the chapter Drills with your own values.",
+    clues: ["int PersonalMana = 95", "float GemOpacity = 0.10f"],
+    practice: "Change the starter values to show: mana spent, Strain gained, one more person sheltered, gem a little more solid.",
+    askRune: "Can you check my Elias C++ variables and tell me what each one means in plain English?",
+    askCodex: "Ask Claude Code to compile my state snippet and show what it prints.",
+    code: `int PersonalMana = 95;\nint DivineMana = 85;\nint DivineHunger = 92;\nint Strain = 0;\nint PeopleSheltered = 0;\nfloat GemOpacity = 0.10f;`,
+    answer: "One valid answer: PersonalMana 80, Strain 8, PeopleSheltered 1, GemOpacity 0.15f, DivineMana and DivineHunger unchanged. Exact numbers are yours - the point is each change tells one part of the story."
+  },
+  {
+    tab: "Ex 2",
+    title: "C++ Exercise 02 - Strain Backlash",
+    plain: "Practice the backlash if statement on real numbers until the boundary behavior feels obvious.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-exercises/exercise_02_strain_backlash.md"],
+    book: "PPP3: selection - boundary conditions in an if (>= includes the edge).",
+    clues: ["if (Strain >= 100)", "Backlash = true"],
+    practice: "Try Strain 25, 75, 99, 100, 120 - write whether Backlash becomes true or false for each.",
+    askRune: "Can you explain this Strain backlash if statement with a small truth table?",
+    askCodex: "Ask Claude Code to wrap the check in a loop that tests all five values at once.",
+    code: `int Strain = 100;\nbool Backlash = false;\n\nif (Strain >= 100)\n{\n    Backlash = true;\n}`,
+    answer: "25: false. 75: false. 99: false. 100: true. 120: true. The boundary is exactly 100 because >= includes it."
+  },
+  {
+    tab: "Ex 3",
+    title: "C++ Exercise 03 - People Sheltered Counter",
+    plain: "Practice increasing values step by step: each sheltered person raises PeopleSheltered by one and the gem solidifies by 0.05f.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-exercises/exercise_03_refugee_saved_counter.md"],
+    book: "PPP3: iteration & expressions - increment and accumulation (+= or + 1).",
+    clues: ["PeopleSheltered + 1", "GemOpacity + 0.05f"],
+    practice: "Three people sheltered: what is PeopleSheltered? GemOpacity starts at 0.25f: what is it after three increases of 0.05f?",
+    askRune: "Can you help me trace this counter step by step?",
+    askCodex: "Ask Claude Code to write the three-step trace as running code with printed steps.",
+    code: `int PeopleSheltered = 0;\nfloat GemOpacity = 0.25f;\n\nPeopleSheltered = PeopleSheltered + 1;\nGemOpacity = GemOpacity + 0.05f;`,
+    answer: "PeopleSheltered: 3. GemOpacity: 0.25 + 0.05 + 0.05 + 0.05 = 0.40f."
+  },
+  {
+    tab: "Ex 4",
+    title: "C++ Exercise 04 - Simple Spell Function",
+    plain: "Practice a cost-paying ability: a Tend cast spends 10 Personal Mana and adds 5 Strain, and refuses to cast when mana is too low.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-exercises/exercise_04_simple_spell_function.md"],
+    book: "PPP3: Functions - return values and an early-return guard (if too low, return false).",
+    clues: ["bool CastTend", "if (PersonalMana < 10)"],
+    practice: "Start with PersonalMana 25 and Strain 20. After casting Tend once, write the new PersonalMana and Strain.",
+    askRune: "Can you explain why this function returns true or false?",
+    askCodex: "Ask Claude Code to add a second cast attempt and show what happens when mana runs out.",
+    code: `bool CastTend(int& PersonalMana, int& Strain)\n{\n    if (PersonalMana < 10)\n    {\n        return false;\n    }\n\n    PersonalMana = PersonalMana - 10;\n    Strain = Strain + 5;\n    return true;\n}`,
+    answer: "PersonalMana: 25 - 10 = 15. Strain: 20 + 5 = 25. The cast returns true. A second cast would also work (15 >= 10), leaving PersonalMana 5 - and a third would return false."
+  },
+  {
+    tab: "Ex 5",
+    title: "C++ Exercise 05 - Simple Class Design",
+    plain: "Practice deciding what belongs together: a class groups the values and actions of one kind of thing.",
+    files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md", "cpp-exercises/exercise_05_simple_class_design.md"],
+    book: "PPP3: Classes - decide the members, then try the chapter's 'Try this' exercises.",
+    clues: ["class Vael", "bool IsSheltered = false"],
+    practice: "Design a tiny Elias class with PersonalMana, DivineMana, DivineHunger, Strain, PeopleSheltered, GemOpacity, CastShelter(), AddStrain(). Imperfect code is fine.",
+    askRune: "Can you help me choose what belongs inside an Elias class for beginner Unreal C++ practice?",
+    askCodex: "Ask Claude Code to review my class design and suggest exactly one improvement.",
+    code: `class Vael\n{\npublic:\n    int Constitution = 30;\n    int Calm = 50;\n    bool IsSheltered = false;\n};`,
+    answer: "The gauges and counters become member variables; CastShelter() and AddStrain() become member functions. Grouping test: if it describes or belongs to Elias, it goes inside the class."
+  }
+];
+/* ========================================================================== *
+   CODE PRACTICE — glossary deck (ported from GodlingLearningHelper
+   app-data-core.js `glossary`). Beginner C++ vocabulary in plain English,
+   used by the flashcard deck and the searchable glossary in the Learn tab.
+ * ========================================================================== */
+const GLOSSARY = [
+  { term: "variable", plain: "A named place that holds one value, with a type.", example: "int DivineMana = 85; holds one of Elias's gauge values.", file: "cpp-lessons/lesson_02_variables_and_state_cpp.md", where: "Look for int, float, bool, and std::string declarations." },
+  { term: "function", plain: "A named action the code can call instead of repeating steps.", example: "CastShelter() spends mana, adds Strain, and reports if it worked.", file: "cpp-lessons/lesson_04_functions_cpp.md", where: "Search for a name followed by ( ) and a { } body." },
+  { term: "reference (int&)", plain: "Lets a function change the caller's own variable instead of a copy.", example: "void AddStrain(int& Strain, int Amount) raises the caller's Strain.", file: "cpp-lessons/lesson_04_functions_cpp.md", where: "Look for & right after a type in a parameter list." },
+  { term: "vector", plain: "A standard container holding several values in order; it grows as you add.", example: "std::vector<std::string> Vael; a growing list of sheltered people.", file: "cpp-lessons/lesson_05_vectors_and_lists_cpp.md", where: "Search for std::vector and push_back." },
+  { term: "class", plain: "A blueprint that groups related values and actions for one kind of thing.", example: "class Elias { ... }; groups Elias's gauges and his abilities.", file: "cpp-lessons/lesson_06_classes_cpp.md", where: "Search for class and public:." },
+  { term: "object", plain: "One actual thing made from a class.", example: "Elias hero; makes one Elias object from the class blueprint.", file: "cpp-lessons/lesson_06_classes_cpp.md", where: "Look for a class name used as a variable type." },
+  { term: "if statement", plain: "Runs code only when a condition is true.", example: "if (Strain >= 100) backlash happens; otherwise it is skipped.", file: "cpp-lessons/lesson_03_if_statements_cpp.md", where: "Search for if ( and else." },
+  { term: "loop", plain: "Repeats steps until a condition stops it.", example: "while (IsRunning) updates Elias and the Vael each moment.", file: "cpp-lessons/lesson_07_game_loop_cpp.md", where: "Search for while or for." },
+  { term: "#include / header", plain: "Pulls in code from a library so you can use it.", example: "#include <vector> lets you use std::vector; <iostream> gives std::cout.", file: "cpp-lessons/lesson_05_vectors_and_lists_cpp.md", where: "Look at the top of the file for #include lines." },
+  { term: "std::cout", plain: "Prints text and values to the screen.", example: "std::cout << DivineMana; prints Elias's current divine mana.", file: "cpp-lessons/lesson_01_what_is_cpp.md", where: "Search for std::cout and the << operator." }
+];
+/* ========================================================================== *
+   CODE PRACTICE — static content (ported from GodlingLearningHelper
+   app-data-core.js + app-data-prototype.js). All read-only data; the Practice
+   view (src/views/practice.js) renders and reads form state from DB.practice.
+
+   Canon reference is settled canon only, synced to the approved stamp
+   2026-06-15_1159 — no [OPEN] answers, no live gauge numbers, no roster.
+ * ========================================================================== */
+const PRACTICE_CANON_STAMP = "2026-06-15_1159";
+
+// Default text for every editable field, keyed by field name. pField() falls
+// back to these when DB.practice.fields has no value yet.
+const PRACTICE_DEFAULTS = {
+  projectStatus: "CodePractice is a separate local repo for learning C++ for Unreal: lessons, exercises, and tiny practice snippets.",
+  whatWorked: "Tiny C++ snippets (variables, if, functions, vectors, classes, loops) build the Unreal C++ fundamentals without needing UE5 yet.",
+  whatFailed: "Do not let this grow into the full game. Keep every practice step tiny and readable.",
+  exactError: "",
+  taskName: "C++ Lesson 01 - What Is C++?",
+  taskState: "Ready",
+  confidenceLevel: "Ready to test",
+  tinyGoal: "Open the Learn tab, pick the C++ 1 lesson, read the tiny example, then change DivineMana to 75 and say what would print.",
+  questCodeRead: "Open the C++ 1 lesson in this helper. The full lesson with code also lives in CPP_LEARNING_PACK_COMPILED_2026-06-11.md and cpp-lessons/lesson_01_what_is_cpp.md.",
+  practiceStep: "Read C++ Lesson 01 in the helper, do its tiny exercise, then mark the lesson done.",
+  practiceExpected: "The C++ snippet compiles and prints the expected line (for example, Elias Divine Mana: 75).",
+  practiceObserved: "",
+  practiceQuestion: "What does std::cout do in the lesson 01 example?",
+  filesInvolved: "CPP_LEARNING_PACK_COMPILED_2026-06-11.md\ncpp-lessons/\ncpp-exercises/\nglossary.md",
+  beginnerConcept: "A variable holds one value. A function is a named action. A vector holds a group of values in order.",
+  codexSummary: "",
+  runeExplainNext: "Explain how one small C++ idea (variable, function, vector, class) works, and connect it to a current-canon concept: a gauge, a Seed, or the Vael people.",
+  safestNextStep: "One lesson, one tiny exercise, one practice-log line. That is a full win.",
+  cppQuestion: "Can you explain the lesson 01 example one line at a time?",
+  cppLessonConfidence: "Ready to test",
+  runeSummary: "Rune explained one small C++ concept and recommended one tiny next step.",
+  codexTinyRequest: "Make one tiny C++ practice snippet or helper edit, then update the matching lesson note.",
+  codexBoundaries: "Keep it local and beginner-friendly. Do not add APIs, secrets, UE5 files, complex frameworks, or full game systems.",
+  messageTemplateNotes: "Keep it direct, clear, actionable, and beginner-safe.",
+  testBuilderNote: "Record what Del saw after compiling and running the C++ snippet.",
+  prototypeOverallNote: "Track tiny C++ practice pieces: a gauge variable, an if-check, a cost-paying function, a vector of people, an Elias class, a loop.",
+  bugTitle: "C++ confusion",
+  bugTried: "Read or wrote a small C++ snippet and tried to predict what it prints.",
+  bugHappened: "I was not sure why the printed output differed from what I expected.",
+  bugConfusing: "The difference between declaring a variable, calling a function, and what & (a reference) does.",
+  bugRuneAsk: "Please explain this C++ snippet line by line and what it prints.",
+  loreCheckInput: "Elias is a Vael godling with an earth+wood spark. An Arkborne is ecosystem-bearing, not a divine battery, and a people is standalone. The setting's source is the Primordial Cloudsea."
+};
+
+const PRACTICE_CHECKLIST = [
+  "Open a C++ lesson or exercise in the helper.",
+  "Pick one C++ keyword or name to trace.",
+  "Read one small function or block only.",
+  "Change one tiny value or line.",
+  "Predict the output, then compile and run to check.",
+  "Write what happened in practice_log.md.",
+  "Run git status before committing.",
+  "Ask Rune one focused question if stuck.",
+  "Stop before the task grows too large."
+];
+
+const PRACTICE_OPEN_WHERE = [
+  { title: "Open In Browser", items: ["The kit app (this Code Practice space)"] },
+  { title: "Open In Code Editor", items: [
+    "cpp-lessons/*.md and cpp-exercises/*.md",
+    "CPP_LEARNING_PACK_COMPILED_2026-06-11.md",
+    "glossary.md and practice_log.md"
+  ] },
+  { title: "Practice Focus", items: [
+    "The four gauges (Personal Mana, Divine Mana, Divine Hunger, Strain)",
+    "The divine spark / gem and the divinity ladder",
+    "Seeds (data-driven, context-dependent)",
+    "The Vael people and sheltering them",
+    "Arkborne as an ecosystem-bearing partner",
+    "The Primordial Cloudsea as the source"
+  ] },
+  { title: "Ask Rune", items: [
+    "Explain one beginner code idea",
+    "Connect the code idea to Elias's identity",
+    "Recommend one tiny next practice step"
+  ] },
+  { title: "Ask Codex", items: [
+    "Make one small C++ snippet or helper change",
+    "Compile and run it locally to verify",
+    "Commit the practice repo only"
+  ] }
+];
+
+const PRACTICE_TEST_TARGETS = [
+  { id: "cpp-snippet", name: "C++ lesson snippet", steps: [
+    "Open a C++ lesson tab (C++ 1-7) in the helper.",
+    "Read the Tiny Code Example and predict what it prints.",
+    "Copy the snippet into a .cpp file (or an online compiler).",
+    "Compile and run it.",
+    "Confirm the printed output matches the lesson's expected result."
+  ] },
+  { id: "cpp-exercise", name: "C++ exercise", steps: [
+    "Open an exercise tab (Ex 1-5) in the helper.",
+    "Do the exercise on paper or in a .cpp file.",
+    "Check your answer against the 'Show expected result' reveal.",
+    "Mark the exercise done."
+  ] },
+  { id: "helper-page", name: "Learning Helper page", steps: [
+    "Open the Code Practice space in the kit.",
+    "Read Today's Tiny Quest.",
+    "Open the Learn tab and choose one C++ lesson.",
+    "Generate a Rune question.",
+    "Confirm the helper points to C++ practice, not UE5 work yet."
+  ] },
+  { id: "cpp-lessons", name: "C++ lessons folder", steps: [
+    "Open cpp-lessons/lesson_01_what_is_cpp.md.",
+    "Confirm lessons 01 through 07 exist.",
+    "Confirm every lesson has a goal, explanation, tiny code example, tiny exercise, and Rune question.",
+    "Confirm the identity lesson explains Elias as a Vael godling (earth+wood)."
+  ] },
+  { id: "glossary", name: "Glossary", steps: [
+    "Open the Glossary in the Learn tab.",
+    "Confirm the terms are C++ terms in plain English.",
+    "Confirm terms include variable, function, reference (int&), vector, class, and std::cout."
+  ] }
+];
+
+const PRACTICE_ACTORS = [
+  { name: "cpp-lessons/", type: "C++ lessons", files: ["cpp-lessons/lesson_01_what_is_cpp.md", "cpp-lessons/lesson_06_classes_cpp.md"], test: "Read one lesson and predict its output.", boundary: "Learning notes; compile snippets in a scratch .cpp file." },
+  { name: "cpp-exercises/", type: "C++ exercises", files: ["cpp-exercises/exercise_01_elias_state.md"], test: "Do one exercise and check the expected result.", boundary: "Practice data only, not canon balance." },
+  { name: "CPP_LEARNING_PACK_COMPILED_2026-06-11.md", type: "Compiled lesson pack", files: ["CPP_LEARNING_PACK_COMPILED_2026-06-11.md"], test: "Find one lesson's full text here.", boundary: "Reference copy of the lessons." },
+  { name: "glossary.md", type: "C++ vocabulary", files: ["glossary.md"], test: "Look up one C++ term.", boundary: "Beginner reference only." }
+];
+
+// Built from APPROVED_CANON_2026-06-15_1159. Tracks what is NOT yet locked.
+// Tags: [OPEN] = undecided, do not fill in; [DESTINATION] = Del's intent, not yet
+// true; [WORKING] = soft default, not locked; [AUDIT] = not yet audited;
+// [LOCAL] = repo practice boundary.
+const PRACTICE_APPROVALS = [
+  { tag: "[OPEN]", title: "Bringing god's name", text: "The Ancient nature-and-earth god who pulled Elias has no name yet. 'Bringer' / 'the Pulling God' are unsatisfying placeholders.", why: "Open Questions #8.", recommendation: "Do not invent a name. Decide with Del." },
+  { tag: "[OPEN]", title: "Bringing-god relationship name", text: "The word for Elias's relationship to that god is unnamed. 'Sponsor' is rejected.", why: "Open Questions #7.", recommendation: "Leave unnamed until Del names it." },
+  { tag: "[OPEN]", title: "Where the story starts", text: "Which world or universe the book's story begins in is undecided.", why: "Open Questions #1.", recommendation: "Do not assume a starting world." },
+  { tag: "[OPEN]", title: "Multiple Vael godlings", text: "How multiple Vael godlings work - one per race per Game, one per enclave/branch, or something else - is open.", why: "Open Questions #2.", recommendation: "Keep the model open; ask Del." },
+  { tag: "[OPEN]", title: "Golem-elemental people name", text: "The golem-like elemental signature people use the 'Kaelith' placeholder, flagged for renaming (too close to Vaelrith).", why: "Open Questions #9.", recommendation: "Treat 'Kaelith' as a placeholder, not a final name." },
+  { tag: "[OPEN]", title: "Vael word for the Choir", text: "What the Vael call the Unmaking Choir in their own tongue is undecided.", why: "Open Questions #10.", recommendation: "Do not coin a term." },
+  { tag: "[OPEN]", title: "Divinity tiers beyond the gem ladder", text: "The ladder's first four stages are canon; the tiers after 'bond with themed energy', and how need-scaling deepens, are open.", why: "Open Questions #13.", recommendation: "Do not extend the ladder past stage four." },
+  { tag: "[OPEN]", title: "Do uplifted beasts feed the spark?", text: "Whether divinely-uplifted beasts (the beastmaster path) feed the spark like a people does is unconfirmed - likely yes, at reduced efficiency.", why: "Open Questions #12.", recommendation: "Leave as 'likely, unconfirmed'." },
+  { tag: "[DESTINATION]", title: "The First-Arkborne Quest", text: "The System guiding a godling to their first Arkborne (wild newborns or Arkborne-grade Seeds) is design intent, not current in-world fact.", why: "Section 7 - game/story design intent.", recommendation: "Write as intent, not history." },
+  { tag: "[DESTINATION]", title: "Claiming / fusing an Arkborne", text: "Every godling claiming an Arkborne (domination / befriending / coexistence) and planting their domain onto it is where the story is headed.", why: "Section 7 - Godlings and Arkborne.", recommendation: "Keep as destination, not a done deal." },
+  { tag: "[DESTINATION]", title: "Bestowed-divinity ceremony", text: "Bestowed divinity and the divine-leader use-case are canon in principle; the ceremonial FORM (how a channel is granted, revoked, its limits) is not.", why: "Open Questions #14-15.", recommendation: "Don't lock the ritual or the steward mechanics." },
+  { tag: "[DESTINATION]", title: "Branch-conferral ritual", text: "A ritual that CONFERS a -druun / -thari branch onto a Vael is intended, not established.", why: "Corrections #35.", recommendation: "Treat as intent." },
+  { tag: "[WORKING]", title: "'Vaeldruunthari start' label", text: "The label for Elias's enhanced two-element (earth+wood) start uses the old naming-root system.", why: "Section 8 - working label only.", recommendation: "Usable as a soft default; do not harden." },
+  { tag: "[WORKING]", title: "Creation Flow order", text: "The meta and narrative creation-flow ordering is an explicit workshop draft, open to rearrangement.", why: "Section 8 - Creation Flow.", recommendation: "Don't treat the order as fixed." },
+  { tag: "[AUDIT]", title: "Elias & Earthwood campaign state", text: "Elias Rowan Mercer and the entire Earthwood campaign state await a campaign-pass rewrite, not silent edits.", why: "Section 17 - Not Yet Audited.", recommendation: "Unapproved until audited; no silent edits." },
+  { tag: "[AUDIT]", title: "Oruvath specifics", text: "Anything about Oruvath beyond the general Arkborne rules is not yet audited.", why: "Section 17.", recommendation: "Use the general Arkborne rules only." },
+  { tag: "[AUDIT]", title: "Strain numbers", text: "The Strain PRINCIPLE is canon; exact numbers, cooldowns, and costs are deferred to the game phase.", why: "Section 17 / Corrections #20.", recommendation: "Keep numbers out of canon - game-phase only." },
+  { tag: "[LOCAL]", title: "Local practice only", text: "The helper is plain local files, separate from the lore repo and the parked UE5 repo.", why: "This repo is beginner C++ practice, not an AI, backend, or game-engine project.", recommendation: "No APIs, secrets, or UE5 files here; keep it offline and simple." }
+];
+
+const PRACTICE_MAP_ITEMS = [
+  ["Gauge variables", "Declare the four gauges as typed C++ variables."],
+  ["If / backlash check", "if (Strain >= 100) sets a backlash flag."],
+  ["Cost-paying function", "A function that spends mana, adds Strain, and returns true or false."],
+  ["Vector of people", "A std::vector that grows with push_back."],
+  ["Elias class", "A class that groups Elias's gauges and abilities."],
+  ["Game loop sketch", "A while loop that updates and draws each moment."]
+];
+
+const PRACTICE_CHAR_SHEET = {
+  intro: "The fixed structure of a Godling Universe character sheet. Structure only - no filled-in values.",
+  stats: [
+    { group: "Physical", items: ["Strength", "Constitution", "Agility"] },
+    { group: "Mental", items: ["Intellect", "Willpower"] },
+    { group: "Magical", items: ["Resonance - how well you channel/sense magic", "Wellspring - how much magic you can hold"] }
+  ],
+  gauges: [
+    ["Personal Mana", "Ordinary magical resource; core-filtered from ambient mana; self-refills (faster in rich ground)."],
+    ["Divine Mana", "Divine-tier resource; self-regenerates; spent on divine work and the leaving-the-domain drain."],
+    ["Divine Hunger", "Fullness: 100 = fully fed, 0 = starvation. Fed by people / Arkborne only - does NOT self-refill."],
+    ["Strain", "Overuse cost on the core; rests off; great spells and spark-channeled divine magic strain hardest."]
+  ],
+  gem: "The Core Display centerpiece: color shows the divinity's leaning theme, opacity shows how grown/bonded the gem is (the divinity ladder).",
+  capabilities: [
+    ["Abilities", "Innate - talent, affinity, faster learning. Passive or skill-accelerating."],
+    ["Skills", "Acquired, active, improvable techniques below the great-spell tier."],
+    ["Spells", "Great workings - discrete, heavy, have-them-or-don't; gained or learned, not felt out."]
+  ],
+  note: "Stats are stable traits (who you are); gauges are current state (move in play). Stat names are universal; any flavoring is display-only. Capabilities are classed by WHAT they are, not how acquired."
+};
+
+const PRACTICE_ELIAS = {
+  intro: "Author reference (settled canon) - not Elias's in-world awareness. [OPEN] items are left undecided.",
+  facts: [
+    ["Origin", "An Earth-origin soul, pulled into the God Games."],
+    ["Past life", "Elias Rowan Mercer - a NASA researcher who died on the Moon. Mines, forest, and geology are past-life memory-threads."],
+    ["People", "Vael - a perfected Vael body grown on arrival."],
+    ["Elements", "Earth + Wood - an unnatural two-element start, gifted by his bringing god."],
+    ["Environment", "Mountain-forest-cave (reads mountain first, with earth and wood underneath)."],
+    ["Bringing god", "One of the Ancients - a nature-and-earth god who spares little but sees something special. Name: undecided [OPEN]."],
+    ["Godling", "A mortal with a divine spark = potential, not destiny. It can grow toward godhood, fail, or corrupt."]
+  ]
+};
+
+const PRACTICE_CANON_REF = [
+  { title: "Cosmology", points: [
+    "Primordial Cloudsea - the uncreated source of gods and magic, and one of the universes the Games run in. ('Cloud Universe' is retired drift.)",
+    "The Ancients made the arena worlds; the Cloudsea grows to touch and fuel them."
+  ] },
+  { title: "The Gods (three tiers)", points: [
+    "Ancients (never mortal) -> lesser gods (once godlings; 'lesser' = rank, not weakness) -> an emerging godling tier (Elias may be its first).",
+    "Gods anchor a domain to a place + theme; they cannot leave without drain - fortresses that cannot march."
+  ] },
+  { title: "The enemy & the Games", points: [
+    "The Unmaking Choir - Lovecraftian horrors corrupting the multiverse; the gods are losing.",
+    "The God Games raise godlings and create MOBILE divinity: a godling fused with a living Arkborne whose domain moves with them."
+  ] },
+  { title: "Godlings & divinity", points: [
+    "Spark = potential, not guaranteed godhood. Ladder: spark grows -> solidifies into a gem -> gem grows -> thematic divinity.",
+    "Spark-shatter rips the soul apart - the one final death.",
+    "Divine Hunger is fed by people / Arkborne only; a people is the efficient feed."
+  ] },
+  { title: "Mortals & divine power", points: [
+    "Mortals hold only a bestowed FRACTION; real divinity requires the costly godling journey.",
+    "Gods can create constant angels/demons (they don't grow). A people is STANDALONE - not a divine battery fed by a god's fire."
+  ] },
+  { title: "Mana & strain", points: [
+    "Ambient (world) -> Personal (core-filtered) -> Divine (spark-filtered) mana. Filtering is passive; it can't be willed faster.",
+    "Arkborne are manavores - they actively EAT ambient mana (everyone else is a passive spring).",
+    "Strain is the escalating cost of overuse; great spells and spark-channeled divine magic strain hardest."
+  ] },
+  { title: "Arkborne", points: [
+    "Massive living beings: part animal, part magic, part dimensional space. ECOSYSTEM-bearing by default - a civilization aboard is the exception.",
+    "Not divine on their own; divinity enters only through godling fusion. Dead Arkborne become islands."
+  ] },
+  { title: "Arrival & the System", points: [
+    "A whole PEOPLE arrives bodily and whole; a GODLING arrives remade (soul caught, perfected body, the in-between dream).",
+    "The System interprets and translates real growth - it does not invent power. It shapes only the starter area."
+  ] },
+  { title: "Capabilities", points: [
+    "Abilities (innate) - Skills (acquired, improvable) - Spells (great workings). Classed by what it IS, not how acquired; Seeds can grow any of them."
+  ] }
+];
 /* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
 const IDB_NAME='vfj', IDB_STORE='kv', IDB_KEY='state';
@@ -701,8 +1226,12 @@ function namingDefault(){ return {
   openRoots: ['-karin','-lunai','-sorin'],
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault() }; }
-function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); return merged; }
+// the Code Practice (Apprentice) space — lesson/flashcard progress, checklist
+// toggles, per-item triage, the bug journal, and every editable field (text is
+// kept in .fields, keyed by name; PRACTICE_DEFAULTS supplies the starting copy).
+function practiceDefault(){ return { fields:{}, lesson:0, lessonDone:{}, flash:0, flashKnown:{}, testTarget:'', checklist:{}, approval:{}, prototype:{}, journal:[], template:'', dashTab:'plan' }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); merged.practice=Object.assign(practiceDefault(), d.practice||{}); return merged; }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
   try{
@@ -778,12 +1307,15 @@ function errorCard(e){
 }
 
 function topbar(){
-  const full = DB.mode==='full', world = DB.profile==='worldbuilder', game = DB.profile==='game';
+  const full = DB.mode==='full', world = DB.profile==='worldbuilder', game = DB.profile==='game', learn = DB.profile==='learner';
   const n=DB.creations.length, count=n?` (${n})`:'';
   // each profile sees only its own actions — the Maker never meets the canon machinery,
   // the Worldbuilder leads with the Studio, the Game leads with Campaigns. Only the primary
   // nav scrolls; the utility cluster (mode / ⋯) is fixed on the right so nothing gets clipped.
-  const nav = game
+  const nav = learn
+    ? h('div',{class:'navmid'},
+        h('button',{class:'navbtn primary', onclick:()=>go('practice')}, '✶ Code Practice'))
+    : game
     ? h('div',{class:'navmid'},
         h('button',{class:'navbtn primary', onclick:()=>go('campaigns')}, '♟ Campaigns'),
         h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count))
@@ -799,13 +1331,13 @@ function topbar(){
   // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
   // no clip). The Cozy/Full toggle stays out (it's how you toggle). The Maker in Cozy has
   // no advanced utilities, so no ⋯ shows there.
-  const showMore = world || game || full;
+  const showMore = world || game || learn || full;
   const util = h('div',{class:'navutil'},
-    (world||game)? null : modeSwitch(full),
+    (world||game||learn)? null : modeSwitch(full),
     showMore? h('button',{class:'navbtn', 'aria-label':'more', title:'more', onclick:()=>moreMenu()}, '⋯') : null,
   );
   return h('div',{class:'topbar no-print'},
-    h('div',{class:'brand', onclick:()=>go(world?'studio':game?'campaigns':'home')}, svgUse('ic-seedling','mark'), h('b',null,'The Vael Field Journal')),
+    h('div',{class:'brand', onclick:()=>go(world?'studio':game?'campaigns':learn?'practice':'home')}, svgUse('ic-seedling','mark'), h('b',null, learn?'Code Practice':'The Vael Field Journal')),
     nav, util,
   );
 }
@@ -827,9 +1359,9 @@ function modeSwitch(full){
     h('button',{class:'seg'+(full?' on':''), 'aria-pressed':full?'true':'false', onclick:()=>{ if(!full) setMode('full'); }}, '✦ Full kit'),
   );
 }
-function profileLanding(p){ return p==='worldbuilder'?'studio' : p==='game'?'campaigns' : 'home'; }
+function profileLanding(p){ return p==='worldbuilder'?'studio' : p==='game'?'campaigns' : p==='learner'?'practice' : 'home'; }
 function setProfile(p){ DB.profile=p; if(p!=='maker') DB.mode='full'; save(); applyMode(); go(profileLanding(p));
-  toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : p==='game'? 'The Game — your campaigns.' : 'Maker — the journal.'); }
+  toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : p==='game'? 'The Game — your campaigns.' : p==='learner'? 'Apprentice — code practice.' : 'Maker — the journal.'); }
 
 /* ---------- home ----------------------------------------------------------- */
 function viewHome(){
@@ -1552,10 +2084,10 @@ function undoToast(msg, onUndo){
 }
 
 /* ---------- Cozy / Full kit mode ------------------------------------------- */
-function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game');
-  const cls = DB.profile==='worldbuilder'?'profile-world' : DB.profile==='game'?'profile-game' : 'profile-maker';
+function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game','profile-learn');
+  const cls = DB.profile==='worldbuilder'?'profile-world' : DB.profile==='game'?'profile-game' : DB.profile==='learner'?'profile-learn' : 'profile-maker';
   b.classList.add(cls);
-  const advanced = DB.profile!=='maker';   // worldbuilder + game always see the full toolset
+  const advanced = DB.profile!=='maker';   // worldbuilder + game + apprentice always see the full toolset
   b.classList.add((advanced || DB.mode==='full')?'mode-full':'mode-simple');
 }
 // Gating is pure CSS on the body class, so a mode switch only needs to flip the class
@@ -1573,7 +2105,8 @@ function chooseProfile(){
       DB.profile=p; DB.profileChosen=true; if(p!=='maker') DB.mode='full';
       save(); applyMode(); close();
       if(p==='maker'){ render(); showIntro(true); }
-      else { go(p==='worldbuilder'?'studio':'campaigns'); toast(p==='worldbuilder'? 'Welcome, Worldbuilder.' : 'Welcome to the Game.'); }
+      else { go(p==='worldbuilder'?'studio':p==='game'?'campaigns':'practice');
+        toast(p==='worldbuilder'? 'Welcome, Worldbuilder.' : p==='game'? 'Welcome to the Game.' : 'Welcome to Code Practice.'); }
     }
     return h('div',{class:'intro'},
       svgUse('ic-seedling','em'),
@@ -1586,6 +2119,8 @@ function chooseProfile(){
           h('b',null,'⚒ The Worldbuilder'), h('small',null,'the canon studio — browse, draft, and triage the world')),
         h('button',{class:'navbtn ppick', onclick:()=>pick('game')},
           h('b',null,'♟ The Game'), h('small',null,'run a campaign — resume, ledger, threads, AI handoffs')),
+        h('button',{class:'navbtn ppick', onclick:()=>pick('learner')},
+          h('b',null,'✶ The Apprentice'), h('small',null,'code practice — learn C++ for Unreal, one tiny lesson at a time')),
       ),
     );
   }, { cls:'intro-bg', dismissible:false });
@@ -1599,6 +2134,7 @@ function switchProfileSheet(){
     opt('maker','✿ The Maker','her journal'),
     opt('worldbuilder','⚒ The Worldbuilder','the canon studio'),
     opt('game','♟ The Game','run a campaign'),
+    opt('learner','✶ The Apprentice','code practice'),
   );
   close=showModalNode('Switch space', 'Open another space. Your work stays where it is.', body);
 }
@@ -1623,6 +2159,616 @@ function showIntro(force){
   ), { cls:'intro-bg', onClose:()=>{ DB.seenIntro=true; save(); } });
 }
 
+/* ========================================================================== *
+   CODE PRACTICE (Apprentice profile) — the GodlingLearningHelper, ported into
+   the kit. Six tabs mirror the helper's tool groups: Learn, Test, Handoff,
+   Track, Canon, and Today's Tiny Quest. Lesson/glossary/canon data live in
+   src/data/practice-*.js; all editable state lives in DB.practice and is saved
+   through the kit's save(). Modelled on the Canon Studio (worldbuilder/studio.js).
+ * ========================================================================== */
+
+const PRACTICE_REPO = "GodlingUniverse-CodePractice (local practice repo)";
+
+const PRACTICE_TABS = [
+  ['learn',   'Learn',            'C++ lessons, the glossary flashcard deck, and a searchable glossary. Read one, do its tiny exercise, mark it done.'],
+  ['test',    'Test',             'A manual test checklist for a chosen target, a map of the practice files, and where to open things.'],
+  ['handoff', 'Handoff',          'Build clean messages to hand to Rune or Claude Code, plus quick message templates.'],
+  ['track',   'Track',            'Notes, an approvals triage, a practice map, the bug journal, a canon lore-boundary check, and exports.'],
+  ['canon',   'Canon',            'Read-only canon reference (settled canon only) — the character sheet, the Elias snapshot, and the world rules.'],
+  ['quest',   "Today's Quest",    'One tiny quest: plan it, do it, track what you saw — then copy it as a handoff.'],
+];
+
+/* ---------- state helpers (all reads/writes go through DB.practice) -------- */
+function pField(name){ const v=DB.practice.fields[name]; return v!=null ? v : (PRACTICE_DEFAULTS[name]!=null ? PRACTICE_DEFAULTS[name] : ''); }
+function pSetField(name, v){ DB.practice.fields[name]=v; save(); }
+function pCopy(text, msg){
+  try{ navigator.clipboard && navigator.clipboard.writeText(text); }catch(e){}
+  toast(msg||'Copied.');
+}
+function pArea(name, rows, ph){ return h('textarea',{class:'prc-input', rows:rows||2, placeholder:ph||'', value:pField(name), oninput:e=>pSetField(name, e.target.value)}); }
+function pInput(name, ph){ return h('input',{class:'prc-input', placeholder:ph||'', value:pField(name), oninput:e=>pSetField(name, e.target.value)}); }
+function pLabeled(label, control){ return h('label',{class:'prc-field'}, h('span',{class:'prc-label'}, label), control); }
+function pSelect(value, options, onchange){
+  const sel=h('select',{class:'prc-input', onchange:e=>onchange(e.target.value)});
+  options.forEach(([val,label])=> sel.append(h('option',{value:val, selected: val===value?'selected':null}, label)));
+  return sel;
+}
+function pHead(text){ return h('h3',{class:'prc-h'}, text); }
+function pCard(){ return h('div',{class:'prc-card'}, ...arguments); }
+function pList(items){ return h('ul',{class:'prc-list'}, ...items.map(i=>h('li',null,i))); }
+function pOutput(buildFn, label, msg){
+  const ta=h('textarea',{class:'prc-out', readonly:true, value:buildFn()});
+  return h('div',{class:'prc-block'},
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>{ ta.value=buildFn(); pCopy(ta.value, msg||('Copied '+label+'.')); }}, 'Copy '+label),
+      h('button',{class:'navbtn', onclick:()=>{ ta.value=buildFn(); toast('Refreshed.'); }}, 'Refresh')),
+    ta);
+}
+
+/* ---------- lesson + flashcard helpers ------------------------------------ */
+function prcLessonIndex(){ const i=DB.practice.lesson|0; return (i>=0 && i<CPP_LESSONS.length)?i:0; }
+function prcLesson(){ return CPP_LESSONS[prcLessonIndex()]; }
+function prcLessonDone(i){ return !!DB.practice.lessonDone[i]; }
+function prcFlashIndex(){ const i=DB.practice.flash|0; return (i>=0 && i<GLOSSARY.length)?i:0; }
+function prcFlashKnown(i){ return !!DB.practice.flashKnown[i]; }
+function prcTestTarget(){ return PRACTICE_TEST_TARGETS.find(t=>t.id===DB.practice.testTarget) || PRACTICE_TEST_TARGETS[0]; }
+function prcTemplate(){ return PRACTICE_TEMPLATES.find(t=>t.id===DB.practice.template) || PRACTICE_TEMPLATES[0]; }
+function prcApproval(i){ return DB.practice.approval[i] || {}; }
+function prcProto(i){ return DB.practice.prototype[i] || {}; }
+
+/* ---------- text builders (handoff / quest / messages) -------------------- */
+function prcQuestText(){
+  return [
+    "Godling Universe G001 tiny quest", "",
+    `Task: ${pField("taskName")} - ${pField("taskState")}`,
+    `Confidence: ${pField("confidenceLevel")}`, "",
+    "Goal:", pField("tinyGoal") || "Not filled in yet.", "",
+    "Open/read in code editor:", pField("questCodeRead") || "Not filled in yet.", "",
+    "Try / compile:", pField("practiceStep") || "Not filled in yet.", "",
+    "Expected result:", pField("practiceExpected") || "Not filled in yet.", "",
+    "What Del saw:", pField("practiceObserved") || "Not filled in yet.", "",
+    "Question for Rune:", pField("practiceQuestion") || "Not filled in yet."
+  ].join("\n");
+}
+function prcCppQuestion(){
+  const lesson=prcLesson();
+  const question=pField("cppQuestion") || "Please explain this concept in beginner-friendly language.";
+  return [
+    "Rune, please explain this one small code piece from Del's Godling Universe code practice repo.", "",
+    "Selected C++ lesson:", lesson.title, "",
+    "Lesson confidence:", pField("cppLessonConfidence") || "Not filled in yet.", "",
+    "Plain-language goal:", lesson.plain, "",
+    "Code/text files Del is looking at in a code editor:", lesson.files.join("\n"), "",
+    "Code clues Del should find:", lesson.clues.join("\n"), "",
+    "What Del should try / compile:", lesson.practice, "",
+    "What Del should ask Rune:", lesson.askRune, "",
+    "What Del should ask Claude Code after Claude explains it:", lesson.askCodex, "",
+    "Del's question:", question, "",
+    "Please keep the explanation small. Clearly separate what Del should read in the code editor from what Del should compile and run."
+  ].join("\n");
+}
+function prcHandoff(){
+  return [
+    "Message to Rune from Del's Code Practice space",
+    "Audience: Rune", "Revision: G001",
+    "Purpose: help Del understand the current C++ learning step.", "",
+    "1. What Del was trying to do:", pField("tinyGoal") || "Not filled in yet.", "",
+    "2. From Codex: what changed or what was reported:", pField("codexSummary") || "Paste Codex summary here before sending to Rune.", "",
+    "3. What worked:", pField("whatWorked") || "Not filled in yet.", "",
+    "4. What failed or is uncertain:", pField("whatFailed") || "Nothing recorded yet.", "",
+    "5. Exact error messages, if any:", pField("exactError") || "No exact error message recorded.", "",
+    "6. Files involved:", pField("filesInvolved") || "No files recorded yet.", "",
+    "7. What beginner concept Del may be struggling with:", pField("beginnerConcept") || "Not filled in yet.", "",
+    "8. Topic Del wants Rune to explain next:", pField("runeExplainNext") || "Not filled in yet.", "",
+    "9. Safest next tiny step:", pField("safestNextStep") || "Not filled in yet.", "",
+    "Current repo:", PRACTICE_REPO, "",
+    "Current task:", `${pField("taskName") || "Unnamed task"} - ${pField("taskState") || "Unknown state"}`, "",
+    "Del's confidence / approval state:", pField("confidenceLevel") || "Not filled in yet.", "",
+    "Tiny quest:", prcQuestText(), "",
+    "C++ lesson focus:", prcLesson().title, "",
+    "Del's code question:", pField("cppQuestion") || "Not filled in yet.", "",
+    "Bug/confusion journal summary:", prcJournalText()
+  ].join("\n");
+}
+function prcRuneMessage(){
+  return [
+    "Rune, please review this Godling Universe G001 learning handoff for Del.",
+    "The message below is from Del's local helper. Codex notes are included inside the labeled handoff only.", "",
+    "Please explain it in direct, beginner-safe language. Do not assume Del knows JavaScript, HTML, CSS, canvas, game loops, GitHub, or Google Docs workflows.", "",
+    "Del needs:",
+    "1. A plain-English explanation of what happened.",
+    "2. The beginner concept underneath it.",
+    "3. The safest next tiny step.",
+    "4. One small practice task Del can compile and run.", "",
+    "Generated handoff:", "```text", prcHandoff(), "```"
+  ].join("\n");
+}
+function prcCodexRequest(){
+  return [
+    "Message to Codex from Del's Code Practice space",
+    "Audience: Codex", "Revision: G001",
+    "Purpose: make the next tiny C++ practice snippet or helper edit after Rune's explanation.", "",
+    "1. Current repo:", PRACTICE_REPO, "",
+    "2. Current tiny task:", `${pField("taskName") || "Unnamed task"} - ${pField("taskState") || "Unknown state"}`, "",
+    "Del's confidence / approval state:", pField("confidenceLevel") || "Not filled in yet.", "",
+    "3. What Del tested or observed:", pField("practiceObserved") || "Not filled in yet.", "",
+    "4. Rune's plain-English recommendation:", pField("runeSummary") || "Paste Rune's recommendation here before sending to Codex.", "",
+    "5. One tiny thing Codex should build or change:", pField("codexTinyRequest") || "Not filled in yet.", "",
+    "6. Files or areas likely involved:", pField("filesInvolved") || "No files recorded yet.", "",
+    "7. Boundaries Codex should keep:", pField("codexBoundaries") || "Keep it small, local, C++-focused, and beginner-safe.", "",
+    "8. Manual verification Codex should include:", pField("practiceStep") || "Add one Del-friendly manual test.", "",
+    "9. Beginner concept Del wants preserved:", pField("beginnerConcept") || "Keep explanations beginner-friendly."
+  ].join("\n");
+}
+function prcTestText(){
+  const target=prcTestTarget();
+  return [
+    `C++ manual test - ${target.name}`, "",
+    ...target.steps.map((step,i)=>`${i+1}. ${step}`), "",
+    "Del note:", pField("testBuilderNote") || "Not filled in yet.", "",
+    "Expected result:", pField("practiceExpected") || "Not filled in yet.", "",
+    "What Del saw:", pField("practiceObserved") || "Not filled in yet."
+  ].join("\n");
+}
+function prcApprovalItemText(i){
+  const item=PRACTICE_APPROVALS[i], a=prcApproval(i);
+  return [
+    `${item.tag} ${item.title}`,
+    `Status: ${a.status || "Pending"}`,
+    `Current text: ${item.text}`,
+    `Why: ${item.why}`,
+    `Recommendation: ${item.recommendation}`,
+    `Del note: ${a.note || "No note yet."}`
+  ].join("\n");
+}
+function prcApprovalSummary(){ return PRACTICE_APPROVALS.map((_,i)=>prcApprovalItemText(i)).join("\n\n"); }
+function prcMapSummary(){
+  const lines=PRACTICE_MAP_ITEMS.map(([name,desc],i)=>{ const p=prcProto(i); const note=p.note||''; return `- ${name}: ${p.stage||"Drafting"}. ${desc}${note?` Note: ${note}`:""}`; });
+  return ["Godling Universe G001 practice map","",...lines,"","Overall note:", pField("prototypeOverallNote") || "No overall note."].join("\n");
+}
+function prcJournalText(){
+  const entries=DB.practice.journal||[];
+  if(!entries.length){
+    return ["No saved journal entries yet.","",
+      `Draft title: ${pField("bugTitle")}`, `Tried: ${pField("bugTried")}`,
+      `Happened: ${pField("bugHappened")}`, `Confusing: ${pField("bugConfusing")}`,
+      `Ask Rune: ${pField("bugRuneAsk")}`].join("\n");
+  }
+  return entries.map((e,i)=>[
+    `${i+1}. ${e.title} (${e.createdAt})`,
+    `Tried: ${e.tried || "Not filled in."}`,
+    `Happened: ${e.happened || "Not filled in."}`,
+    `Confusing: ${e.confusing || "Not filled in."}`,
+    `Ask Rune: ${e.askRune || "Not filled in."}`
+  ].join("\n")).join("\n\n");
+}
+// Rough keyword lint against the approved canon (stamp 2026-06-15_1159). Flags
+// wording that contradicts settled canon; a heuristic, not a proof.
+function prcLoreChecks(){
+  const text=pField("loreCheckInput").toLowerCase();
+  return [
+    { title:"Cloudsea term", status: (text.includes("cloud universe")||text.includes("cloudsea universe"))?"warning":"ok",
+      body:"The setting term is the Primordial Cloudsea (the uncreated source and one of the Games' universes). 'Cloud Universe' / 'Cloudsea Universe' are retired drift." },
+    { title:"Arkborne definition", status: (text.includes("civilization-bearing")||text.includes("civilization carrier")||text.includes("worldbeast"))?"warning":"ok",
+      body:"Arkborne are ecosystem-bearing by default; a civilization aboard is the exception. They gain divinity only through godling fusion." },
+    { title:"Gauge model", status: (text.includes("corruption gauge")||text.includes("corruption meter")||text.includes("health bar"))?"warning":"ok",
+      body:"Runtime gauges are Personal Mana, Divine Mana, Divine Hunger (fed by people/Arkborne only), and Strain. 'Corruption' is the Choir, not a player gauge." },
+    { title:"Mortals & divine power", status: (text.includes("feeds the whole race")||text.includes("divine batteries"))?"warning":"ok",
+      body:"Mortals hold only a bestowed fraction; real divinity needs the godling journey. A people is standalone - not sustained by a god's running fire." },
+    { title:"Spark / divinity ladder", status: (text.includes("guaranteed godhood")||text.includes("spark guarantees"))?"warning":"ok",
+      body:"The spark is potential, not destiny: it can grow (spark -> gem -> thematic divinity), fail, or corrupt. Spark-shatter is final soul-death." },
+    { title:"System source", status: (text.includes("random power")||text.includes("creates power from nothing")||text.includes("invents power"))?"warning":"ok",
+      body:"The System interprets and translates real growth - it does not invent or randomly assign power. It shapes only the starter area." },
+    { title:"Capability taxonomy", status: (text.includes("learned ability")||text.includes("innate skill"))?"warning":"ok",
+      body:"Abilities (innate), Skills (acquired, improvable), Spells (great workings) - classified by what it IS, not how acquired. A Seed can grow any of them." },
+    { title:"Open items", status: (text.includes("the bringing god is named")||text.includes("bringing god's name is"))?"warning":"watch",
+      body:"Do not fill in [OPEN] canon (e.g. the bringing god's name, or the term for that relationship). Leave it undecided and ask Del." },
+    { title:"AI / local boundary", status: (text.includes("api key")||text.includes("ai changes save")||text.includes("ai spawns"))?"warning":"ok",
+      body:"In CodePractice, helpers can suggest practice steps, but they do not edit the main lore repo, the parked UE5 repo, saves, secrets, or real game files." }
+  ];
+}
+function prcLoreText(){
+  return ["Godling Universe G001 lore boundary check","","Input:", pField("loreCheckInput") || "No text pasted.","",
+    ...prcLoreChecks().map(c=>`- ${c.title}: ${c.status.toUpperCase()} - ${c.body}`)].join("\n");
+}
+function prcGithubExport(){
+  return [
+    "## Godling Universe G001 Helper Update","",
+    `Task: ${pField("taskName")} - ${pField("taskState")}`, `Confidence: ${pField("confidenceLevel")}`,"",
+    "### Tiny Quest", pField("tinyGoal") || "Not filled in yet.","",
+    "### C++ Test", pField("practiceStep") || "Not filled in yet.","",
+    "### What Del Saw", pField("practiceObserved") || "Not filled in yet.","",
+    "### Approval Snapshot", prcApprovalSummary(),"",
+    "### Practice Map", prcMapSummary(),"",
+    "### Boundary","Local helper only. No API calls, no secrets, no UE5 files, and no main-repo edits from the helper."
+  ].join("\n");
+}
+function prcDocsExport(){
+  return [
+    "# Godling Universe G001 Learning Handoff","",
+    "## Boundary","Reference backup only. CodePractice remains local C++ practice.",
+    "Do not add UE5 project files, Source, Content, generated folders, binaries, saves, secrets, or API keys here.","",
+    "## Current Tiny Quest", prcQuestText(),"",
+    "## Rune Explanation Topic", pField("runeExplainNext") || "Not filled in yet.","",
+    "## Codex Build Request", pField("codexTinyRequest") || "Not filled in yet.","",
+    "## C++ Lesson", prcCppQuestion(),"",
+    "## Bug / Confusion Journal", prcJournalText(),"",
+    "## G001 Approvals", prcApprovalSummary()
+  ].join("\n");
+}
+
+// Quick message templates (logic lives here; pure data lives in practice-content.js).
+const PRACTICE_TEMPLATES = [
+  { id:"explain-code", label:"Explain this code", audience:"Rune", build:()=>[
+    "Rune, please explain this small CodePractice concept for Del.","",
+    `Current concept: ${prcLesson().title}`,
+    `Del's question: ${pField("cppQuestion") || "Not filled in yet."}`,
+    `Files: ${prcLesson().files.join(", ")}`,
+    `Practice step: ${prcLesson().practice}`,"",
+    "Please keep it beginner-friendly and connect it to current canon (Vael godling, the four gauges, ecosystem-bearing Arkborne).",
+    pField("messageTemplateNotes")] },
+  { id:"tiny-edit", label:"Make one tiny edit", audience:"Codex", build:()=>[
+    "Codex, please make one tiny GodlingUniverse-CodePractice edit.","",
+    `Goal: ${pField("codexTinyRequest") || pField("tinyGoal")}`,
+    `Rune recommendation: ${pField("runeSummary") || "Not filled in yet."}`,
+    `Boundaries: ${pField("codexBoundaries")}`,
+    `Manual test: ${pField("practiceStep")}`,"",
+    "Keep it local, beginner-friendly, and separate from the main lore repo and parked UE5 repo.",
+    pField("messageTemplateNotes")] },
+  { id:"review-identity", label:"Review identity wording", audience:"Rune", build:()=>[
+    "Rune, please review this CodePractice wording against current canon.","",
+    pField("loreCheckInput") || "Paste wording here first.","",
+    "Check that Elias is a Vael godling (earth+wood), an Arkborne is ecosystem-bearing (not a 'civilization carrier'), and the setting term is the Primordial Cloudsea.",
+    pField("messageTemplateNotes")] },
+  { id:"test-result", label:"Explain test result", audience:"Rune", build:()=>[
+    "Rune, please explain this C++ practice result in beginner language.","",
+    `Tested: ${pField("practiceStep")}`,
+    `Expected: ${pField("practiceExpected")}`,
+    `Saw: ${pField("practiceObserved") || "Not filled in yet."}`,
+    `Question: ${pField("practiceQuestion")}`,
+    pField("messageTemplateNotes")] },
+  { id:"bug-help", label:"Help with confusion", audience:"Rune", build:()=>[
+    "Rune, please help Del untangle this CodePractice confusion.","",
+    `Title: ${pField("bugTitle")}`,
+    `Tried: ${pField("bugTried")}`,
+    `Happened: ${pField("bugHappened")}`,
+    `Confusing part: ${pField("bugConfusing")}`,
+    `Please explain: ${pField("bugRuneAsk")}`,
+    pField("messageTemplateNotes")] }
+];
+function prcTemplateOutput(){ return prcTemplate().build().filter(Boolean).join("\n"); }
+
+/* ========================================================================== *
+   VIEW SHELL + TABS
+ * ========================================================================== */
+function viewPractice(tab, params){
+  tab = tab || 'learn';
+  const f = framed('Code Practice', 'learn C++ for Unreal — one tiny lesson, one tiny step', 'beginner-safe, local, and separate from the lore + parked UE5 repos');
+  const body = f.querySelector('.framed-body');
+  const cur = PRACTICE_TABS.find(t=>t[0]===tab) || PRACTICE_TABS[0];
+
+  const tabs=h('div',{class:'studio-tabs'});
+  PRACTICE_TABS.forEach(([k,label])=>
+    tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('practice',{tab:k})}, label)));
+  body.append(tabs);
+  body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'56ch'}}, cur[2]));
+
+  const host=h('div',{class:'prc'}); body.append(host);
+  if(tab==='learn') practiceLearn(host);
+  else if(tab==='test') practiceTest(host);
+  else if(tab==='handoff') practiceHandoff(host);
+  else if(tab==='track') practiceTrack(host);
+  else if(tab==='canon') practiceCanon(host);
+  else if(tab==='quest') practiceQuest(host);
+  return f;
+}
+
+/* ---------- LEARN --------------------------------------------------------- */
+function practiceLearn(host){
+  host.replaceChildren();
+  const idx=prcLessonIndex(), lesson=prcLesson();
+  const doneCount=CPP_LESSONS.filter((_,i)=>prcLessonDone(i)).length;
+
+  // lesson tab strip
+  const strip=h('div',{class:'prc-lessontabs'});
+  CPP_LESSONS.forEach((l,i)=>
+    strip.append(h('button',{class:'tab'+(i===idx?' on':''), onclick:()=>{ DB.practice.lesson=i; save(); practiceLearn(host); }},
+      prcLessonDone(i)? l.tab+' ✓' : l.tab)));
+  host.append(strip);
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, `${doneCount}/${CPP_LESSONS.length} lessons done`));
+
+  const card=h('div',{class:'prc-card'},
+    h('h3',{class:'prc-h'}, lesson.title),
+    h('p',null, lesson.plain),
+    lesson.book? h('p',{class:'prc-note'}, 'Book: '+lesson.book) : null,
+    h('h4',{class:'prc-sub'}, 'Files to open'), pList(lesson.files),
+    h('h4',{class:'prc-sub'}, 'Code clues'), pList(lesson.clues),
+    lesson.code? h('pre',{class:'prc-code'}, lesson.code) : null,
+    lesson.answer? h('details',{class:'prc-answer'}, h('summary',null,'Show expected result'), h('p',null, lesson.answer)) : null,
+    h('h4',{class:'prc-sub'}, 'Tiny exercise'), h('p',null, lesson.practice),
+    h('h4',{class:'prc-sub'}, 'Ask Rune'), h('p',{class:'hint'}, lesson.askRune),
+    h('h4',{class:'prc-sub'}, 'Ask Claude Code'), h('p',{class:'hint'}, lesson.askCodex),
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>{ DB.practice.lessonDone[idx]=!prcLessonDone(idx); save(); practiceLearn(host); }},
+        prcLessonDone(idx)? 'Mark Not Done' : 'Mark Lesson Done')),
+  );
+  host.append(card);
+
+  // a Rune question, prefilled by the lesson
+  host.append(pHead('Ask Rune about this lesson'));
+  host.append(pLabeled('Your question', pArea('cppQuestion', 2, 'What part is confusing?')));
+  host.append(pOutput(prcCppQuestion, 'code question', 'Copied code question.'));
+
+  // flashcards
+  host.append(prcFlashcards());
+
+  // glossary search
+  host.append(pHead('Glossary'));
+  const results=h('dl',{class:'prc-gloss'});
+  const search=h('input',{class:'prc-input', placeholder:'search C++ terms…', oninput:e=>renderGloss(e.target.value)});
+  host.append(h('div',{class:'prc-block'}, search, results));
+  function renderGloss(filter){
+    const q=(filter||'').trim().toLowerCase();
+    results.replaceChildren();
+    GLOSSARY.filter(e=>`${e.term} ${e.plain} ${e.example} ${e.file} ${e.where}`.toLowerCase().includes(q)).forEach(e=>{
+      results.append(
+        h('dt',null, e.term),
+        h('dd',null, e.plain),
+        h('dd',{class:'hint'}, 'Godling example: '+e.example),
+        h('dd',{class:'hint'}, 'File clue: '+e.file),
+        h('dd',{class:'hint'}, 'Where Del sees it: '+e.where));
+    });
+  }
+  renderGloss('');
+}
+function prcFlashcards(){
+  const wrap=h('div',{class:'prc-card prc-flash'});
+  function render(){
+    wrap.replaceChildren();
+    const i=prcFlashIndex(), card=GLOSSARY[i];
+    const known=GLOSSARY.filter((_,k)=>prcFlashKnown(k)).length;
+    wrap.append(
+      h('h3',{class:'prc-h'}, 'Flashcards'),
+      h('p',{class:'hint'}, `${i+1}/${GLOSSARY.length} cards - ${known} known`),
+      h('div',{class:'prc-flashface'},
+        h('b',null, card.term),
+        h('p',null, card.plain),
+        h('p',{class:'hint'}, 'Example: '+card.example),
+        h('p',{class:'hint'}, 'File: '+card.file)),
+      h('div',{class:'toolrow'},
+        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(i-1+GLOSSARY.length)%GLOSSARY.length; save(); render(); }}, '‹ Prev'),
+        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flashKnown[i]=!prcFlashKnown(i); save(); render(); }}, prcFlashKnown(i)? 'Mark Learning' : 'Mark Known'),
+        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(i+1)%GLOSSARY.length; save(); render(); }}, 'Next ›')),
+    );
+  }
+  render();
+  return wrap;
+}
+
+/* ---------- TEST ---------------------------------------------------------- */
+function practiceTest(host){
+  host.replaceChildren();
+  host.append(pHead('Manual test checklist'));
+  const stepsHost=h('div',null);
+  host.append(pLabeled('Test target', pSelect(prcTestTarget().id, PRACTICE_TEST_TARGETS.map(t=>[t.id,t.name]), v=>{ DB.practice.testTarget=v; save(); renderSteps(); })));
+  host.append(stepsHost);
+  host.append(pLabeled('Del note', pArea('testBuilderNote', 2)));
+  host.append(pLabeled('Expected result', pArea('practiceExpected', 2)));
+  host.append(pLabeled('What Del saw', pArea('practiceObserved', 2)));
+  host.append(pOutput(prcTestText, 'test checklist', 'Copied C++ test checklist.'));
+  function renderSteps(){ stepsHost.replaceChildren(pList(prcTestTarget().steps)); }
+  renderSteps();
+
+  // file/practice map
+  host.append(pHead('Practice files'));
+  const grid=h('div',{class:'prc-grid'});
+  PRACTICE_ACTORS.forEach(a=>{
+    grid.append(pCard(
+      h('h4',{class:'prc-sub'}, a.name),
+      h('p',{class:'hint'}, a.type),
+      h('p',null, a.files.join(', ')),
+      h('p',null, h('b',null,'Test: '), a.test),
+      h('p',null, h('b',null,'Boundary: '), a.boundary)));
+  });
+  host.append(grid);
+
+  // open-where reference
+  host.append(pHead('Where to open things'));
+  const ow=h('div',{class:'prc-grid'});
+  PRACTICE_OPEN_WHERE.forEach(g=> ow.append(pCard(h('h4',{class:'prc-sub'}, g.title), pList(g.items))));
+  host.append(ow);
+}
+
+/* ---------- HANDOFF ------------------------------------------------------- */
+function practiceHandoff(host){
+  host.replaceChildren();
+  host.append(pHead('Build a handoff for Rune'));
+  host.append(pLabeled('What Del was trying to do', pArea('tinyGoal', 2)));
+  host.append(pLabeled('From Codex (paste summary)', pArea('codexSummary', 3, 'Paste Claude Code summary here')));
+  host.append(pLabeled('What worked', pArea('whatWorked', 2)));
+  host.append(pLabeled('What failed or is uncertain', pArea('whatFailed', 2)));
+  host.append(pLabeled('Exact error messages', pArea('exactError', 2)));
+  host.append(pLabeled('Files involved', pArea('filesInvolved', 2)));
+  host.append(pLabeled('Beginner concept Del struggles with', pArea('beginnerConcept', 2)));
+  host.append(pLabeled('Topic for Rune to explain next', pArea('runeExplainNext', 2)));
+  host.append(pLabeled('Safest next tiny step', pArea('safestNextStep', 2)));
+  host.append(pOutput(prcHandoff, 'handoff', 'Copied handoff. Paste it into Rune or ChatGPT.'));
+  host.append(pOutput(prcRuneMessage, 'for Rune', 'Copied clean Rune message.'));
+
+  host.append(pHead('Build a request for Claude Code'));
+  host.append(pLabeled("Rune's recommendation", pArea('runeSummary', 2)));
+  host.append(pLabeled('One tiny thing to build/change', pArea('codexTinyRequest', 2)));
+  host.append(pLabeled('Boundaries to keep', pArea('codexBoundaries', 2)));
+  host.append(pOutput(prcCodexRequest, 'Codex request', 'Copied clean Codex message.'));
+
+  host.append(pHead('Quick message templates'));
+  const out=h('textarea',{class:'prc-out', readonly:true, value:prcTemplateOutput()});
+  host.append(pLabeled('Template', pSelect(prcTemplate().id, PRACTICE_TEMPLATES.map(t=>[t.id, `${t.label} → ${t.audience}`]), v=>{ DB.practice.template=v; save(); out.value=prcTemplateOutput(); })));
+  host.append(pLabeled('Shared notes', pArea('messageTemplateNotes', 2)));
+  host.append(h('div',{class:'prc-block'},
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>{ out.value=prcTemplateOutput(); pCopy(out.value, 'Copied message template.'); }}, 'Copy template'),
+      h('button',{class:'navbtn', onclick:()=>{ out.value=prcTemplateOutput(); toast('Refreshed.'); }}, 'Refresh')),
+    out));
+}
+
+/* ---------- TRACK --------------------------------------------------------- */
+function practiceTrack(host){
+  host.replaceChildren();
+
+  host.append(pHead('Project notes'));
+  host.append(pLabeled('Project status', pArea('projectStatus', 2)));
+  host.append(pLabeled('Task name', pInput('taskName')));
+  host.append(pLabeled('Task state', pInput('taskState')));
+  host.append(pLabeled('Confidence', pInput('confidenceLevel')));
+
+  // approvals triage
+  host.append(pHead('Canon approvals — triage'));
+  PRACTICE_APPROVALS.forEach((item,i)=>{
+    const a=prcApproval(i);
+    const isOpen=item.tag==='[OPEN]';
+    host.append(h('article',{class:'prc-card'+(isOpen?' is-open':'')},
+      h('h4',{class:'prc-sub'}, `${item.tag} ${item.title}`),
+      h('p',{class:'hint'}, item.text),
+      h('p',null, item.why),
+      h('p',null, 'Recommendation: '+item.recommendation),
+      pLabeled('Del approval', pSelect(a.status||'Pending', ['Pending','Approved','Needs rewrite','Rejected'].map(s=>[s,s]), v=>{ DB.practice.approval[i]=Object.assign({}, a, {status:v}); save(); })),
+      pLabeled('Del note', h('textarea',{class:'prc-input', rows:2, value:a.note||'', oninput:e=>{ DB.practice.approval[i]=Object.assign({}, prcApproval(i), {note:e.target.value}); save(); }}))));
+  });
+  host.append(pOutput(prcApprovalSummary, 'approval summary', 'Copied approval summary.'));
+
+  // practice map
+  host.append(pHead('Practice map'));
+  PRACTICE_MAP_ITEMS.forEach(([name,desc],i)=>{
+    const p=prcProto(i);
+    host.append(h('article',{class:'prc-card'},
+      h('h4',{class:'prc-sub'}, name),
+      h('p',{class:'hint'}, desc),
+      pLabeled('Stage', pSelect(p.stage||'Drafting', ['Idea','Drafting','Ready for Del test','Needs Rune review','Done','Parked'].map(s=>[s,s]), v=>{ DB.practice.prototype[i]=Object.assign({}, prcProto(i), {stage:v}); save(); })),
+      pLabeled('Note', h('textarea',{class:'prc-input', rows:2, value:p.note||'', oninput:e=>{ DB.practice.prototype[i]=Object.assign({}, prcProto(i), {note:e.target.value}); save(); }}))));
+  });
+  host.append(pLabeled('Overall note', pArea('prototypeOverallNote', 2)));
+  host.append(pOutput(prcMapSummary, 'practice map', 'Copied practice map.'));
+
+  // bug journal
+  host.append(pHead('Bug / confusion journal'));
+  host.append(pLabeled('Title', pInput('bugTitle')));
+  host.append(pLabeled('Tried', pArea('bugTried', 2)));
+  host.append(pLabeled('Happened', pArea('bugHappened', 2)));
+  host.append(pLabeled('Confusing part', pArea('bugConfusing', 2)));
+  host.append(pLabeled('Ask Rune', pArea('bugRuneAsk', 2)));
+  const entriesHost=h('div',{class:'prc-entries'});
+  host.append(h('div',{class:'toolrow'},
+    h('button',{class:'navbtn primary', onclick:()=>{
+      const entry={ title:pField('bugTitle')||'Untitled confusion', tried:pField('bugTried'), happened:pField('bugHappened'), confusing:pField('bugConfusing'), askRune:pField('bugRuneAsk'), createdAt:new Date().toLocaleString() };
+      DB.practice.journal=[entry, ...(DB.practice.journal||[])].slice(0,12); save(); renderEntries(); toast('Saved a journal entry.');
+    }}, 'Add journal entry')));
+  host.append(entriesHost);
+  host.append(pOutput(prcJournalText, 'journal', 'Copied journal.'));
+  function renderEntries(){
+    entriesHost.replaceChildren();
+    const entries=DB.practice.journal||[];
+    if(!entries.length){ entriesHost.append(h('p',{class:'hint'}, 'No saved entries yet.')); return; }
+    entries.forEach(e=> entriesHost.append(h('article',{class:'prc-card'},
+      h('h4',{class:'prc-sub'}, e.title), h('p',{class:'hint'}, e.createdAt),
+      h('p',null, 'Tried: '+(e.tried||'Not filled in.')),
+      h('p',null, 'Happened: '+(e.happened||'Not filled in.')),
+      h('p',null, 'Ask Rune: '+(e.askRune||'Not filled in.')))));
+  }
+  renderEntries();
+
+  // lore boundary checker
+  host.append(pHead('Canon lore-boundary check'));
+  host.append(pLabeled('Paste wording to check', pArea('loreCheckInput', 3)));
+  const loreHost=h('div',{class:'prc-grid'});
+  host.append(h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:()=>renderLore()}, 'Run check')));
+  host.append(loreHost);
+  host.append(pOutput(prcLoreText, 'lore check', 'Copied lore boundary check.'));
+  function renderLore(){
+    loreHost.replaceChildren();
+    prcLoreChecks().forEach(c=> loreHost.append(h('article',{class:'prc-card prc-lore is-'+c.status},
+      h('h4',{class:'prc-sub'}, `${c.title}: ${c.status}`), h('p',null, c.body))));
+  }
+  renderLore();
+
+  // learning checklist
+  host.append(pHead('Learning checklist'));
+  PRACTICE_CHECKLIST.forEach((item,i)=>{
+    host.append(h('label',{class:'prc-check'},
+      h('input',{type:'checkbox', checked: DB.practice.checklist[i]?'checked':null, onchange:e=>{ DB.practice.checklist[i]=e.target.checked; save(); }}),
+      h('span',null, item)));
+  });
+
+  // exports
+  host.append(pHead('Exports'));
+  host.append(pOutput(prcGithubExport, 'GitHub export', 'Copied GitHub export.'));
+  host.append(pOutput(prcDocsExport, 'docs export', 'Copied reference-only docs export.'));
+}
+
+/* ---------- CANON (read-only) --------------------------------------------- */
+function practiceCanon(host){
+  host.replaceChildren();
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Settled canon only — synced to stamp '+PRACTICE_CANON_STAMP+'. Read-only.'));
+
+  host.append(pHead('Character sheet (structure)'));
+  host.append(h('p',{class:'hint'}, PRACTICE_CHAR_SHEET.intro));
+  const stats=pCard(h('h4',{class:'prc-sub'}, 'Stats (baseline 10)'));
+  PRACTICE_CHAR_SHEET.stats.forEach(r=> stats.append(h('p',null, `${r.group}: ${r.items.join(', ')}`)));
+  host.append(stats);
+  host.append(pCard(h('h4',{class:'prc-sub'}, 'Gauges (move in play)'), pList(PRACTICE_CHAR_SHEET.gauges.map(([n,d])=>`${n} - ${d}`))));
+  host.append(pCard(h('h4',{class:'prc-sub'}, 'The Gem (core display)'), h('p',null, PRACTICE_CHAR_SHEET.gem)));
+  host.append(pCard(h('h4',{class:'prc-sub'}, 'Capabilities'), pList(PRACTICE_CHAR_SHEET.capabilities.map(([n,d])=>`${n} - ${d}`))));
+  host.append(h('p',{class:'prc-note'}, PRACTICE_CHAR_SHEET.note));
+
+  host.append(pHead('Elias snapshot'));
+  host.append(h('p',{class:'hint'}, PRACTICE_ELIAS.intro));
+  const dl=h('dl',{class:'prc-gloss'});
+  PRACTICE_ELIAS.facts.forEach(([k,v])=> dl.append(h('dt',null,k), h('dd',null,v)));
+  host.append(dl);
+
+  host.append(pHead('Canon quick reference'));
+  PRACTICE_CANON_REF.forEach(s=> host.append(pCard(h('h4',{class:'prc-sub'}, s.title), pList(s.points))));
+}
+
+/* ---------- TODAY'S QUEST ------------------------------------------------- */
+function practiceQuest(host){
+  host.replaceChildren();
+  host.append(h('div',{class:'prc-strip'},
+    h('span',null, h('b',null,'Task: '), pField('taskName')||'Unnamed task'),
+    h('span',null, h('b',null,'State: '), pField('taskState')||'Unknown'),
+    h('span',null, h('b',null,'Confidence: '), pField('confidenceLevel')||'Not filled in')));
+
+  const sub=h('div',{class:'studio-tabs'});
+  const panel=h('div',null);
+  const DASH=[['plan','Plan'],['do','Do'],['track','Track']];
+  function renderDash(){
+    sub.replaceChildren();
+    DASH.forEach(([k,label])=> sub.append(h('button',{class:'tab'+(DB.practice.dashTab===k?' on':''), onclick:()=>{ DB.practice.dashTab=k; save(); renderDash(); }}, label)));
+    panel.replaceChildren();
+    const tab=DB.practice.dashTab||'plan';
+    if(tab==='plan'){
+      panel.append(
+        pLabeled('Task name', pInput('taskName')),
+        pLabeled('Task state', pInput('taskState')),
+        pLabeled('Confidence', pInput('confidenceLevel')),
+        pLabeled('Tiny goal', pArea('tinyGoal', 2)));
+    } else if(tab==='do'){
+      panel.append(
+        pLabeled('Open/read in code editor', pArea('questCodeRead', 2)),
+        pLabeled('Try / compile', pArea('practiceStep', 2)));
+    } else {
+      panel.append(
+        pLabeled('Expected result', pArea('practiceExpected', 2)),
+        pLabeled('What Del saw', pArea('practiceObserved', 2)),
+        pLabeled('Question for Rune', pArea('practiceQuestion', 2)));
+    }
+  }
+  renderDash();
+  host.append(sub, panel);
+  host.append(pOutput(prcQuestText, 'tiny quest', 'Copied tiny quest.'));
+}
+
+registerView('practice', (v) => viewPractice(v.tab, v.params));
 /* ---------- Procreate: send a card out as an image ------------------------- */
 let _probe;
 function probeCtx(){ if(!_probe) _probe=document.createElement('canvas').getContext('2d'); return _probe; }
