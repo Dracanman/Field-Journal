@@ -349,6 +349,38 @@
 
   /* ---------- Game space (campaigns) — reuses studio/board/canon-doc styles ---------- */
   .profile-game .maker-only{ display:none !important; }
+
+  .survival-panel{
+    margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:12px;
+    background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .survival-title{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .survival-title h3{ font-size:25px; }
+  .survival-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-top:14px; }
+  .survival-gauge{ padding:12px; border:1px solid #e7dcc4; border-radius:10px; background:#fffaf0; }
+  .survival-gauge-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .survival-gauge-head span{ display:flex; align-items:center; gap:4px; color:var(--hint); }
+  .survival-number{
+    width:64px; border:1px solid var(--gold-soft); border-radius:7px; background:#fffdf7;
+    color:var(--ink); font:inherit; padding:4px 6px; text-align:right;
+  }
+  .survival-track{ height:9px; overflow:hidden; border-radius:999px; background:var(--paper-slot); border:1px solid #e7dcc4; }
+  .survival-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--green)); transition:width .15s ease; }
+  .survival-nudges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .survival-nudges .toolbtn{ flex:1 1 38px; padding:4px 7px; }
+  .survival-condition-editor{ margin-top:16px; }
+  .survival-condition-editor > label{ display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:7px; }
+  .survival-conditions{ display:flex; flex-wrap:wrap; gap:8px; min-height:34px; align-items:center; }
+  .condition-chip{ display:inline-flex; align-items:center; gap:7px; padding:6px 9px 6px 11px; border:1px solid var(--gold-soft); border-radius:999px; background:#fff8; }
+  .condition-chip button{ border:0; background:transparent; color:#a85c45; font-size:18px; line-height:1; padding:0; }
+  .survival-add{ display:flex; gap:8px; margin-top:10px; }
+  .survival-add input{ flex:1 1 240px; min-width:0; border:1px solid var(--gold-soft); border-radius:8px; background:#fffdf7; color:var(--ink); font:inherit; padding:8px 10px; }
+  .survival-status{ margin-top:8px; }
+  @media (max-width:620px){
+    .survival-panel{ padding:14px; }
+    .survival-grid{ grid-template-columns:1fr; }
+    .survival-add{ flex-direction:column; }
+  }
   /* ---------- Code Practice (Apprentice profile) ---------- */
   .prc{ max-width:760px; margin:0 auto; }
   .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
@@ -1591,7 +1623,9 @@ function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; retur
 
 /* ---------- app state & router -------------------------------------------- */
 let VIEW = { name:'home' };
-function go(name, params){ VIEW = Object.assign({name}, params); window.scrollTo(0,0); render(); }
+// `name` is the reserved view id (render() does VIEWS[VIEW.name]); it must win over any
+// caller param so a param literally called `name` can't silently reroute to home.
+function go(name, params){ VIEW = Object.assign({}, params, {name}); window.scrollTo(0,0); render(); }
 
 // view registry — register(name, fn(VIEW)->node). Adding a screen is one call; no
 // edits to render(). Builders run lazily, so the view fns may be defined in later modules.
@@ -1604,7 +1638,7 @@ registerView('worksheet', (v) => viewWorksheet(v.id, v.editId));
 registerView('studio', (v) => viewStudio(v.tab, v.params));
 registerView('naming', () => viewNamingTree());
 registerView('campaigns', () => viewCampaigns());
-registerView('campaign', (v) => viewCampaign(v.name, v.tab));
+registerView('campaign', (v) => viewCampaign(v.camp, v.tab));   // campaign name travels as `camp`, never `name` (reserved view id)
 
 function render(){
   $app.replaceChildren(topbar());
@@ -3749,6 +3783,93 @@ function promoteCardModal(id){
  * ========================================================================== */
 
 // ---- state tracker (the save file): pull a glanceable resume ----
+const SURVIVAL_GAUGES = [
+  { key:'health', label:'Health' },
+  { key:'nourishment', label:'Nourishment' },
+  { key:'hydration', label:'Hydration' },
+  { key:'rest', label:'Rest' },
+  { key:'temperature', label:'Temperature Stability' },
+];
+
+function escapeRegExp(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g,'\\$&'); }
+function trackerSection(text, headingRe){
+  const lines=String(text||'').split('\n'); let start=-1;
+  for(let i=0;i<lines.length;i++){ if(headingRe.test(lines[i].trim())){ start=i; break; } }
+  if(start<0) return null;
+  let end=lines.length;
+  for(let i=start+1;i<lines.length;i++){
+    const s=lines[i].trim();
+    if(/^##\s+/.test(s) || /^---\s*$/.test(s)){ end=i; break; }
+  }
+  return { lines, start, end, body:lines.slice(start+1,end).join('\n') };
+}
+function parseGaugeNumber(raw, fallbackCurrent=100, fallbackMax=100){
+  const nums=String(raw||'').match(/-?\d+(?:\.\d+)?/g)||[];
+  let max=nums.length>1? Number(nums[1]) : Number(fallbackMax);
+  if(!Number.isFinite(max) || max<=0) max=100;
+  let current=nums.length? Number(nums[0]) : Number(fallbackCurrent);
+  if(!Number.isFinite(current)) current=max;
+  current=Math.max(0,Math.min(max,Math.round(current)));
+  return { current, max:Math.round(max), raw:String(raw||'').trim() };
+}
+function normalizeSurvivalState(state){
+  const src=state||{}, out={ present:src.present!==false, conditions:[] };
+  SURVIVAL_GAUGES.forEach(g=>{
+    const v=(src.gauges&&src.gauges[g.key]!==undefined)?src.gauges[g.key]:src[g.key];
+    if(typeof v==='number') out[g.key]=parseGaugeNumber(String(v),v,100);
+    else if(v&&typeof v==='object') out[g.key]=parseGaugeNumber(`${v.current??100} / ${v.max??100}`,100,100);
+    else out[g.key]=parseGaugeNumber(v,100,100);
+  });
+  const seen=new Set();
+  (src.conditions||[]).forEach(x=>{
+    const clean=String(x||'').replace(/^[-*]\s*/,'').replace(/[\r\n|]+/g,' ').trim().slice(0,80);
+    const key=clean.toLowerCase();
+    if(clean && key!=='none' && !seen.has(key)){ seen.add(key); out.conditions.push(clean); }
+  });
+  return out;
+}
+function parseSurvival(text){
+  const sec=trackerSection(text,/^##\s+(?:MORTAL\s+)?SURVIVAL(?:\s+STATE)?\b/i);
+  const out=normalizeSurvivalState({present:!!sec,conditions:[]});
+  if(!sec) return out;
+  SURVIVAL_GAUGES.forEach(g=>{
+    const m=new RegExp('^[\\-\\s]*'+escapeRegExp(g.label)+':\\s*(.+)$','mi').exec(sec.body);
+    if(m) out[g.key]=parseGaugeNumber(m[1],100,100);
+  });
+  let inConditions=false;
+  for(const ln of sec.body.split('\n')){
+    if(/^Conditions:\s*$/i.test(ln.trim())){ inConditions=true; continue; }
+    if(!inConditions) continue;
+    const m=/^[-*]\s+(.+)$/.exec(ln.trim());
+    if(m && !/^none\.?$/i.test(m[1].trim())) out.conditions.push(m[1].trim());
+  }
+  return normalizeSurvivalState(out);
+}
+function formatSurvivalSection(state){
+  const s=normalizeSurvivalState(state);
+  const lines=[
+    '## MORTAL SURVIVAL STATE', '',
+    '(Reserves 0–100; higher is better. Specific wounds and hazards are named conditions.)',
+  ];
+  SURVIVAL_GAUGES.forEach(g=> lines.push(`- ${g.label}: ${s[g.key].current} / ${s[g.key].max}`));
+  lines.push('', 'Conditions:');
+  if(s.conditions.length) s.conditions.forEach(x=>lines.push('- '+x));
+  else lines.push('- None');
+  return lines.join('\n');
+}
+function updateSurvivalState(text,state){
+  const t=assertTracker(String(text||''));
+  const section=formatSurvivalSection(state);
+  const existing=trackerSection(t,/^##\s+(?:MORTAL\s+)?SURVIVAL(?:\s+STATE)?\b/i);
+  if(existing){
+    return [...existing.lines.slice(0,existing.start), ...section.split('\n'), ...existing.lines.slice(existing.end)].join('\n');
+  }
+  const runtime=trackerSection(t,/^##\s+.*RUNTIME STATE\b/i);
+  if(runtime){
+    return [...runtime.lines.slice(0,runtime.end), '', ...section.split('\n'), '', ...runtime.lines.slice(runtime.end)].join('\n');
+  }
+  return t.replace(/\s*$/,'')+'\n\n---\n\n'+section+'\n';
+}
 function parseTracker(text){
   const t=String(text||'');
   const one=re=>{ const m=re.exec(t); return m? m[1].trim() : ''; };
@@ -3767,6 +3888,7 @@ function parseTracker(text){
       core: one(/(?:Gem \(core display\)|Core[ /]+Spark display|Core display)[^:\n]*:\s*(.+)/i),
       body: one(/^Body:\s*(.+)$/m),
     },
+    survival: parseSurvival(t),
   };
 }
 // a campaign is "archived/closed" if its tracker status says so, else current
@@ -3780,7 +3902,7 @@ function parseThreads(text){
     const h=/^##\s+([A-Za-z]+)/.exec(ln.trim());
     if(h){ const key=h[1].toUpperCase(); if(THREAD_BUCKETS.includes(key)){ cur=key; out[cur]=out[cur]||[]; } else cur=null; continue; }
     if(!cur) continue;
-    const s=ln.trim(); if(!s || /^\(none/i.test(s)) continue;           // skip blanks + "(none…)" placeholders
+    const s=ln.trim(); if(!s || /^\(none/i.test(s)) continue;
     out[cur].push(s.replace(/^[-*]\s+/,''));
   }
   return out;
@@ -3792,7 +3914,7 @@ function ledgerEntriesBlock(text){
   const open=text.indexOf('```', hi); if(open<0) return null;
   const afterOpen=text.indexOf('\n', open)+1;
   const closeRel=text.slice(afterOpen).indexOf('```'); if(closeRel<0) return null;
-  return { afterOpen, closeAbs: afterOpen+closeRel, inner: text.slice(afterOpen, afterOpen+closeRel) };
+  return { afterOpen, closeAbs: afterOpen+closeRel, inner:text.slice(afterOpen, afterOpen+closeRel) };
 }
 function parseLedger(text){
   const blk=ledgerEntriesBlock(text); const body=blk? blk.inner : '';
@@ -3832,6 +3954,7 @@ function addThread(text, status, line){
 function scaffoldName(templateText, name){ return String(templateText).replace(/\[Campaign Name\]/g, name); }
 
 // ---- write guards (never write back a file that isn't the one we think) ----
+function assertTracker(text){ if(!/Campaign State Tracker/i.test(text) || !/Personal Mana/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign state tracker'); return text; }
 function assertLedger(text){ if(!/Campaign Ledger/i.test(text) || !/##\s+ENTRIES/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign ledger'); return text; }
 function assertThreads(text){ if(!/Campaign Threads/i.test(text)) throw new Error('refusing to write — that file isn’t the threads file'); return text; }
 
@@ -3914,7 +4037,7 @@ function campaignGroup(label, rows, empty){
   const g=h('div',{style:{marginTop:'8px'}}, h('div',{class:'kicker', style:{margin:'12px 0 8px'}}, label));
   if(!rows.length){ g.append(h('p',{class:'hint'}, empty||'(none)')); return g; }
   const list=h('div',{class:'canon-list'});
-  rows.forEach(r=> list.append(h('button',{class:'pick', onclick:()=>go('campaign',{name:r.name})},
+  rows.forEach(r=> list.append(h('button',{class:'pick', onclick:()=>go('campaign',{camp:r.name})},
     h('div',{class:'ribbon', style:{background:ACCENTS.gold}}), h('b',null, r.name), h('small',null, r.status? r.status.slice(0,90) : 'campaign'))));
   g.append(list); return g;
 }
@@ -3927,7 +4050,7 @@ function viewCampaign(name, tab){
   body.append(h('div',{class:'toolrow', style:{marginBottom:'4px'}}, h('button',{class:'navbtn', onclick:()=>go('campaigns')}, '← All campaigns')));
   const cur=CAMP_TABS.find(x=>x[0]===tab)||CAMP_TABS[0];
   const tabs=h('div',{class:'studio-tabs'});
-  CAMP_TABS.forEach(([k,label])=> tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('campaign',{name,tab:k})}, label)));
+  CAMP_TABS.forEach(([k,label])=> tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('campaign',{camp:name,tab:k})}, label)));
   body.append(tabs);
   body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
   const host=h('div',null); body.append(host);
@@ -4052,13 +4175,98 @@ function startCampaignModal(){
       await ghUpdate(cfg, `${base}/CAMPAIGN STATE TRACKER ${name}.md`, ()=>scaffoldName(tracker,name), 'Start campaign '+name+' (tracker)',   {create:true});
       await ghUpdate(cfg, `${base}/CAMPAIGN THREADS ${name}.md`,       ()=>scaffoldName(threads,name), 'Start campaign '+name+' (threads)',   {create:true});
       await ghUpdate(cfg, `${cbase}/CHARACTER SHEET ${name}.md`,       ()=>scaffoldName(sheet,name),   'Start campaign '+name+' (character)', {create:true});
-      toast('Created '+name+'.'); close(); go('campaign',{name});
+      toast('Created '+name+'.'); close(); go('campaign',{camp:name});
     }catch(e){ status.textContent='Failed: '+e.message; create.disabled=false; }
   };
   close=showModalNode('Start a new campaign', 'Scaffolds the ledger, state tracker, threads, and a character sheet from the templates.',
     h('div',null, h('label',null,'Name'), nameIn,
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
+/* ========================================================================== *
+   SURVIVAL STATE — a small, manual editor layered onto the Game Resume view.
+   No automatic penalties yet: this only reads/writes the campaign tracker.
+ * ========================================================================== */
+const campResumeWithoutSurvival=campResume;
+
+function survivalEditor(cfg, trackerPath, parsed, host, campaignName){
+  const state=normalizeSurvivalState(parsed.survival);
+  const values={};
+  let conditions=state.conditions.slice();
+  const status=h('div',{class:'hint survival-status'});
+  const grid=h('div',{class:'survival-grid'});
+
+  SURVIVAL_GAUGES.forEach(g=>{
+    const gauge=state[g.key];
+    const number=h('input',{class:'survival-number', type:'number', min:'0', max:String(gauge.max), value:String(gauge.current), inputmode:'numeric', 'aria-label':g.label});
+    const fill=h('div',{class:'survival-fill'});
+    const track=h('div',{class:'survival-track', role:'meter', 'aria-label':g.label, 'aria-valuemin':'0', 'aria-valuemax':String(gauge.max)} , fill);
+    const paint=()=>{
+      let n=Math.round(Number(number.value)); if(!Number.isFinite(n)) n=0;
+      n=Math.max(0,Math.min(gauge.max,n)); number.value=String(n);
+      fill.style.width=((n/gauge.max)*100)+'%'; track.setAttribute('aria-valuenow',String(n));
+    };
+    const nudge=delta=>{ number.value=String(Number(number.value||0)+delta); paint(); };
+    number.oninput=paint; number.onchange=paint; paint();
+    values[g.key]={number,max:gauge.max};
+    grid.append(h('div',{class:'survival-gauge'},
+      h('div',{class:'survival-gauge-head'}, h('b',null,g.label), h('span',null,number,' / '+gauge.max)),
+      track,
+      h('div',{class:'survival-nudges'},
+        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(-5)},'−5'),
+        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(-1)},'−1'),
+        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(1)},'+1'),
+        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(5)},'+5'))));
+  });
+
+  const conditionList=h('div',{class:'survival-conditions'});
+  const conditionInput=h('input',{placeholder:'Add a condition — Bleeding, Freezing, Poisoned…', maxlength:'80'});
+  const drawConditions=()=>{
+    conditionList.replaceChildren();
+    if(!conditions.length){ conditionList.append(h('span',{class:'hint'},'No named conditions.')); return; }
+    conditions.forEach((name,i)=> conditionList.append(h('span',{class:'condition-chip'}, name,
+      h('button',{type:'button','aria-label':'Remove '+name, onclick:()=>{ conditions.splice(i,1); drawConditions(); }},'×'))));
+  };
+  const addCondition=()=>{
+    const clean=conditionInput.value.replace(/[\r\n|]+/g,' ').trim().slice(0,80);
+    if(!clean) return;
+    if(!conditions.some(x=>x.toLowerCase()===clean.toLowerCase())) conditions.push(clean);
+    conditionInput.value=''; drawConditions();
+  };
+  conditionInput.onkeydown=e=>{ if(e.key==='Enter'){ e.preventDefault(); addCondition(); } };
+  drawConditions();
+
+  const save=h('button',{class:'navbtn primary', type:'button'},'Save survival state');
+  save.onclick=async()=>{
+    save.disabled=true; status.textContent='Saving to the campaign tracker…';
+    const next={conditions};
+    SURVIVAL_GAUGES.forEach(g=>{ next[g.key]={current:Number(values[g.key].number.value),max:values[g.key].max}; });
+    try{
+      await ghUpdate(cfg, trackerPath, text=>updateSurvivalState(text,next), 'Update survival state via Game', {guard:assertTracker});
+      toast('Survival state saved.'); host.replaceChildren(); await campResume(host,campaignName);
+    }catch(e){ status.textContent='Failed: '+e.message; save.disabled=false; }
+  };
+
+  return h('div',{class:'survival-panel'},
+    h('div',{class:'survival-title'}, h('h3',null,'Mortal survival'), h('span',{class:'hint'},'manual state · higher reserves are better')),
+    h('p',{class:'hint'}, state.present
+      ? 'These values describe the body. They are separate from Personal Mana, Divine Mana, Divine Hunger, and Strain.'
+      : 'This tracker predates survival gauges. Saving will initialize the five reserves at 100 without adding automatic penalties.'),
+    grid,
+    h('div',{class:'survival-condition-editor'}, h('label',null,'Named wounds and hazards'), conditionList,
+      h('div',{class:'survival-add'}, conditionInput, h('button',{class:'navbtn', type:'button', onclick:addCondition},'Add condition'))),
+    h('div',{class:'toolrow'},save), status);
+}
+
+campResume=async function(host,name){
+  await campResumeWithoutSurvival(host,name);
+  if(!ghReady()) return;
+  try{
+    const cfg=ghCfg(), files=await campaignFiles(cfg,name);
+    if(!files.tracker) return;
+    const r=await ghGetText(cfg,files.tracker); if(!r) return;
+    host.append(survivalEditor(cfg,files.tracker,parseTracker(r.text),host,name));
+  }catch(e){ host.append(h('p',{class:'hint'},'Survival editor unavailable: '+e.message)); }
+};
 /* ---------- boot ----------------------------------------------------------- */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // flush the in-memory state to IndexedDB when the app is backgrounded/closed
