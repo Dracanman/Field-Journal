@@ -384,6 +384,54 @@
     .gauge-grid{ grid-template-columns:1fr; }
     .survival-add{ flex-direction:column; }
   }
+/* ---------- Region Update 1: read-only saved-region status ---------- */
+.region-view{display:grid;gap:14px}
+.region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
+.region-readonly b{color:var(--ink)}
+.region-readonly span{color:var(--hint);font-style:italic}
+.region-empty,.region-warning{padding:20px;border:1px dashed var(--gold-soft);border-radius:10px;background:var(--paper-card);text-align:center}
+.region-warning{text-align:left;border-style:solid;background:#fff8ef}
+.region-card{padding:18px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+.region-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.region-card-head h3{font-size:25px}
+.region-card-head p{margin:2px 0 0}
+.region-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em}
+.region-badge.ok{background:#e7efe2;color:#436047;border:1px solid #bfd0b8}
+.region-badge.bad{background:#f8e8e2;color:#8b4b3d;border:1px solid #e1b8aa}
+.region-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-top:14px}
+.region-stat{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0}
+.region-stat-label{color:var(--hint)}
+.region-stat b{text-align:right;color:var(--ink);font-weight:600}
+.region-layer-list{margin:14px 0 8px}
+.region-valid{margin:10px 0 0;color:var(--green);font-weight:600}
+.region-invalid{margin-top:12px;padding:12px;border:1px solid #e1b8aa;border-radius:8px;background:#fff4ef;color:#7f493d}
+.region-invalid ul{margin:7px 0 0;padding-left:20px}
+@media(max-width:620px){.region-card{padding:14px}.region-stat{align-items:flex-start;flex-direction:column}.region-stat b{text-align:left}}
+
+/* ---------- Region Update 2: read-only layered map renderer ---------- */
+.region-map{padding:16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+.region-map-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.region-map-head h3{font-size:22px;margin:0}
+/* cosmic placement tints the frame; it is deliberately distinct from local elevation */
+.region-map.cosmic-top{border-top:4px solid #8fc7e6}
+.region-map.cosmic-middle{border-top:4px solid #cdb25e}
+.region-map.cosmic-bottom{border-top:4px solid #6f6076}
+.region-layer-switch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.region-map-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.region-map-stage{border:1px solid #e7dcc4;border-radius:10px;background:#fbf7ec;overflow:hidden;touch-action:none}
+.region-map-svg{display:block;width:100%;height:min(60vh,460px);background:#f4eedd;cursor:grab}
+.region-map-svg:active{cursor:grabbing}
+.region-cell{stroke:#00000010;stroke-width:.02}
+.region-fog{fill:#cabfa4;opacity:.55}
+.region-conn-line{stroke:#5a4a36;stroke-width:.08;stroke-linecap:round;stroke-dasharray:.22 .18;opacity:.85}
+.region-feature-dot{fill:#7a3b2e;stroke:#fff;stroke-width:.05}
+.region-feature-label{fill:#43331f;font-family:system-ui,sans-serif;font-size:.42px;paint-order:stroke;stroke:#fff8ef;stroke-width:.12}
+.region-map-empty-text{fill:var(--hint);font-family:system-ui,sans-serif;font-size:.8px}
+.region-map-meta{margin-top:10px}
+.region-conn-list{margin:6px 0 0;padding-left:20px;color:var(--ink)}
+.region-map-text{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0;white-space:pre-wrap;font-size:13px;max-height:340px;overflow:auto}
+.region-readonly-note{margin:10px 0 0;font-style:italic}
+@media(max-width:620px){.region-map{padding:12px}.region-map-svg{height:54vh}}
   /* ---------- Code Practice (Apprentice profile) ---------- */
   .prc{ max-width:760px; margin:0 auto; }
   .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
@@ -4078,6 +4126,435 @@ function sessionZeroHandoff(name){
   ].join('\n');
 }
 /* ========================================================================== *
+   REGION DATA FOUNDATION — schema, normalization, validation, stable JSON,
+   human-readable summaries, discovery classification, and future write guards.
+
+   This module intentionally does NOT render maps or mutate campaign files.
+   Cosmic Cloudsea placement and local traversable geography are independent.
+ * ========================================================================== */
+const REGION_SCHEMA_VERSION = 1;
+const REGION_COSMIC_LAYERS = ['top','middle','bottom'];
+const REGION_LOCAL_LAYER_TYPES = [
+  'high-airspace',
+  'floating-islands',
+  'peaks-canopy',
+  'surface',
+  'cliffs-ravines',
+  'caves',
+  'deep-caverns',
+  'dimensional-interiors',
+];
+const REGION_ID_RE = /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
+const REGION_HIDDEN_VISIBILITIES = ['gm','gm-only','hidden','private'];
+const REGION_TOP_LEVEL_ORDER = [
+  'schemaVersion','id','title','campaign','cosmicLayer','localLayers','features',
+  'connections','terrain','revealed','pins','markers','elementalInfluence','notes','metadata',
+];
+
+function regionIsRecord(value){ return !!value && typeof value==='object' && !Array.isArray(value); }
+function regionClone(value){ return value===undefined ? undefined : JSON.parse(JSON.stringify(value)); }
+function regionTrim(value){ return typeof value==='string' ? value.trim() : value; }
+function regionFiniteNumber(value){
+  if(typeof value==='number') return Number.isFinite(value) ? value : value;
+  if(typeof value==='string' && value.trim()!==''){
+    const n=Number(value); if(Number.isFinite(n)) return n;
+  }
+  return value;
+}
+function regionOptionalArray(value){ return value==null ? [] : value; }
+function regionOptionalRecord(value){ return value==null ? {} : value; }
+function regionNormalizeId(value){ return typeof value==='string' ? value.trim() : value; }
+function regionNormalizePosition(position){
+  if(!regionIsRecord(position)) return position;
+  const out={...position};
+  ['x','y','z'].forEach(k=>{ if(k in out) out[k]=regionFiniteNumber(out[k]); });
+  return out;
+}
+function regionNormalizeBounds(bounds){
+  if(!regionIsRecord(bounds)) return bounds;
+  const out={...bounds};
+  ['x','y','z','width','height','depth','minX','minY','minZ','maxX','maxY','maxZ'].forEach(k=>{
+    if(k in out) out[k]=regionFiniteNumber(out[k]);
+  });
+  return out;
+}
+function regionNormalizeList(value, mapper){
+  if(value==null) return [];
+  if(!Array.isArray(value)) return value;
+  return value.map(item=>mapper(regionClone(item)));
+}
+
+function normalizeRegion(region){
+  const src=regionClone(region);
+  if(!regionIsRecord(src)) return src;
+  const out={...src};
+  if('schemaVersion' in out) out.schemaVersion=regionFiniteNumber(out.schemaVersion);
+  if('id' in out) out.id=regionNormalizeId(out.id);
+  if('title' in out) out.title=regionTrim(out.title);
+  if('campaign' in out) out.campaign=regionTrim(out.campaign);
+  if(typeof out.cosmicLayer==='string') out.cosmicLayer=out.cosmicLayer.trim().toLowerCase();
+
+  out.localLayers=regionNormalizeList(out.localLayers, layer=>{
+    if(!regionIsRecord(layer)) return layer;
+    const next={...layer};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if(typeof next.type==='string') next.type=next.type.trim().toLowerCase();
+    if('label' in next) next.label=regionTrim(next.label);
+    if('verticalOrder' in next) next.verticalOrder=regionFiniteNumber(next.verticalOrder);
+    if(next.visible===undefined) next.visible=true;
+    if('bounds' in next) next.bounds=regionNormalizeBounds(next.bounds);
+    if('featureIds' in next) next.featureIds=regionOptionalArray(next.featureIds);
+    return next;
+  });
+
+  out.features=regionNormalizeList(out.features, feature=>{
+    if(!regionIsRecord(feature)) return feature;
+    const next={...feature};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('type' in next) next.type=regionTrim(next.type);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('geometry' in next) next.geometry=regionClone(next.geometry);
+    if('tags' in next) next.tags=regionOptionalArray(next.tags);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.connections=regionNormalizeList(out.connections, connection=>{
+    if(!regionIsRecord(connection)) return connection;
+    const next={...connection};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('from' in next) next.from=regionNormalizeId(next.from);
+    if('to' in next) next.to=regionNormalizeId(next.to);
+    if('type' in next) next.type=regionTrim(next.type);
+    if('status' in next) next.status=regionTrim(next.status);
+    if(next.bidirectional===undefined) next.bidirectional=false;
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.pins=regionNormalizeList(out.pins, pin=>{
+    if(!regionIsRecord(pin)) return pin;
+    const next={...pin};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('category' in next) next.category=regionTrim(next.category);
+    if('iconLabel' in next) next.iconLabel=regionTrim(next.iconLabel);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.markers=regionNormalizeList(out.markers, marker=>{
+    if(!regionIsRecord(marker)) return marker;
+    const next={...marker};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('characterId' in next) next.characterId=regionNormalizeId(next.characterId);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('status' in next) next.status=regionTrim(next.status);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.notes=regionNormalizeList(out.notes, note=>{
+    if(!regionIsRecord(note)) return note;
+    const next={...note};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('text' in next) next.text=regionTrim(next.text);
+    if('category' in next) next.category=regionTrim(next.category);
+    if('visibility' in next) next.visibility=regionTrim(next.visibility);
+    return next;
+  });
+
+  out.terrain=regionOptionalRecord(out.terrain);
+  out.revealed=regionOptionalRecord(out.revealed);
+  out.elementalInfluence=regionOptionalRecord(out.elementalInfluence);
+  out.metadata=regionOptionalRecord(out.metadata);
+  return out;
+}
+
+function parseRegionJson(text){
+  let parsed;
+  try{ parsed=JSON.parse(String(text==null?'':text)); }
+  catch(error){
+    const detail=error && error.message ? error.message : String(error);
+    throw new Error('Malformed region JSON: '+detail);
+  }
+  return normalizeRegion(parsed);
+}
+
+function regionPushError(errors,path,message){ errors.push({path,message,text:(path?path+': ':'')+message}); }
+function regionValidateId(errors,path,value,required=true){
+  if(value==null || value===''){
+    if(required) regionPushError(errors,path,'is required');
+    return false;
+  }
+  if(typeof value!=='string' || !REGION_ID_RE.test(value)){
+    regionPushError(errors,path,'must use lowercase letters, numbers, and internal hyphens');
+    return false;
+  }
+  return true;
+}
+function regionValidatePosition(errors,path,value,required=false){
+  if(value==null){ if(required) regionPushError(errors,path,'is required'); return; }
+  if(!regionIsRecord(value)){ regionPushError(errors,path,'must be an object'); return; }
+  if(!Number.isFinite(value.x)) regionPushError(errors,path+'.x','must be a finite number');
+  if(!Number.isFinite(value.y)) regionPushError(errors,path+'.y','must be a finite number');
+  if(value.z!==undefined && !Number.isFinite(value.z)) regionPushError(errors,path+'.z','must be a finite number');
+}
+function regionValidateArray(errors,path,value){
+  if(!Array.isArray(value)){ regionPushError(errors,path,'must be an array'); return false; }
+  return true;
+}
+function regionValidateRecord(errors,path,value){
+  if(!regionIsRecord(value)){ regionPushError(errors,path,'must be an object'); return false; }
+  return true;
+}
+function regionVisibilityHidden(item){
+  if(!regionIsRecord(item)) return false;
+  if(item.hidden===true || item.revealed===false) return true;
+  const v=typeof item.visibility==='string' ? item.visibility.trim().toLowerCase() : '';
+  return REGION_HIDDEN_VISIBILITIES.includes(v);
+}
+function regionTerrainLayerComplete(layer){
+  if(!regionIsRecord(layer) || typeof layer.format!=='string' || !layer.format.trim()) return false;
+  if(Array.isArray(layer.cells) && layer.cells.length) return true;
+  if(Array.isArray(layer.shapes) && layer.shapes.length) return true;
+  if(Array.isArray(layer.tiles) && layer.tiles.length) return true;
+  if(regionIsRecord(layer.data) && Object.keys(layer.data).length) return true;
+  return false;
+}
+function regionHasCompleteTerrain(region){
+  const terrain=region && region.terrain;
+  if(!regionIsRecord(terrain) || !regionIsRecord(terrain.layers)) return false;
+  const values=Object.values(terrain.layers);
+  return values.length>0 && values.every(regionTerrainLayerComplete);
+}
+function regionHasGenerationProvenance(region){
+  const metadata=region && region.metadata;
+  return regionIsRecord(metadata) && (metadata.seed!==undefined || metadata.generator!==undefined || metadata.generatorVersion!==undefined);
+}
+
+function validateRegion(region,options){
+  const opts=options||{}, errors=[];
+  if(!regionIsRecord(region)){
+    regionPushError(errors,'region','must be a JSON object');
+    return errors;
+  }
+  if(region.schemaVersion!==REGION_SCHEMA_VERSION) regionPushError(errors,'schemaVersion','must equal '+REGION_SCHEMA_VERSION);
+  regionValidateId(errors,'id',region.id,true);
+  if(typeof region.title!=='string' || !region.title.trim()) regionPushError(errors,'title','is required');
+  if(typeof region.campaign!=='string' || !region.campaign.trim()) regionPushError(errors,'campaign','is required');
+  if(opts.expectedCampaign && region.campaign!==opts.expectedCampaign) regionPushError(errors,'campaign','must match selected campaign '+opts.expectedCampaign);
+  if(opts.expectedId && region.id!==opts.expectedId) regionPushError(errors,'id','must match expected region '+opts.expectedId);
+  if(!REGION_COSMIC_LAYERS.includes(region.cosmicLayer)) regionPushError(errors,'cosmicLayer','must be one of: '+REGION_COSMIC_LAYERS.join(', '));
+
+  const allIds=new Map(), layerIds=new Set(), featureIds=new Set();
+  const registerId=(path,id)=>{
+    if(!regionValidateId(errors,path,id,true)) return;
+    if(allIds.has(id)) regionPushError(errors,path,'duplicates '+allIds.get(id));
+    else allIds.set(id,path);
+  };
+
+  if(regionValidateArray(errors,'localLayers',region.localLayers)){
+    region.localLayers.forEach((layer,index)=>{
+      const path='localLayers['+index+']';
+      if(!regionIsRecord(layer)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',layer.id); if(typeof layer.id==='string') layerIds.add(layer.id);
+      if(!REGION_LOCAL_LAYER_TYPES.includes(layer.type)) regionPushError(errors,path+'.type','must be one of: '+REGION_LOCAL_LAYER_TYPES.join(', '));
+      if(typeof layer.label!=='string' || !layer.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(layer.verticalOrder!==undefined && !Number.isFinite(layer.verticalOrder)) regionPushError(errors,path+'.verticalOrder','must be a finite number');
+      if(layer.visible!==undefined && typeof layer.visible!=='boolean') regionPushError(errors,path+'.visible','must be true or false');
+      if(layer.bounds!==undefined && !regionIsRecord(layer.bounds)) regionPushError(errors,path+'.bounds','must be an object');
+      if(layer.featureIds!==undefined && !Array.isArray(layer.featureIds)) regionPushError(errors,path+'.featureIds','must be an array');
+    });
+  }
+
+  if(regionValidateArray(errors,'features',region.features)){
+    region.features.forEach((feature,index)=>{
+      const path='features['+index+']';
+      if(!regionIsRecord(feature)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',feature.id); if(typeof feature.id==='string') featureIds.add(feature.id);
+      if(typeof feature.type!=='string' || !feature.type.trim()) regionPushError(errors,path+'.type','is required');
+      if(typeof feature.label!=='string' || !feature.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(feature.layerId!==undefined && !layerIds.has(feature.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      if(feature.position!==undefined) regionValidatePosition(errors,path+'.position',feature.position,false);
+      if(feature.tags!==undefined && !Array.isArray(feature.tags)) regionPushError(errors,path+'.tags','must be an array');
+      if(feature.notes!==undefined && !Array.isArray(feature.notes)) regionPushError(errors,path+'.notes','must be an array');
+    });
+  }
+
+  if(regionValidateArray(errors,'connections',region.connections)){
+    region.connections.forEach((connection,index)=>{
+      const path='connections['+index+']';
+      if(!regionIsRecord(connection)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',connection.id);
+      if(typeof connection.from!=='string' || !connection.from) regionPushError(errors,path+'.from','is required');
+      if(typeof connection.to!=='string' || !connection.to) regionPushError(errors,path+'.to','is required');
+      const endpoints=new Set([...layerIds,...featureIds]);
+      if(typeof connection.from==='string' && !endpoints.has(connection.from)) regionPushError(errors,path+'.from','references an unknown layer or feature');
+      if(typeof connection.to==='string' && !endpoints.has(connection.to)) regionPushError(errors,path+'.to','references an unknown layer or feature');
+      if(typeof connection.type!=='string' || !connection.type.trim()) regionPushError(errors,path+'.type','is required');
+      if(connection.bidirectional!==undefined && typeof connection.bidirectional!=='boolean') regionPushError(errors,path+'.bidirectional','must be true or false');
+    });
+  }
+
+  if(regionValidateArray(errors,'pins',region.pins)){
+    region.pins.forEach((pin,index)=>{
+      const path='pins['+index+']';
+      if(!regionIsRecord(pin)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',pin.id);
+      if(typeof pin.label!=='string' || !pin.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(!layerIds.has(pin.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      regionValidatePosition(errors,path+'.position',pin.position,true);
+    });
+  }
+
+  if(regionValidateArray(errors,'markers',region.markers)){
+    region.markers.forEach((marker,index)=>{
+      const path='markers['+index+']';
+      if(!regionIsRecord(marker)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',marker.id);
+      regionValidateId(errors,path+'.characterId',marker.characterId,true);
+      if(typeof marker.label!=='string' || !marker.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(!layerIds.has(marker.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      regionValidatePosition(errors,path+'.position',marker.position,true);
+    });
+  }
+
+  if(regionValidateArray(errors,'notes',region.notes)){
+    region.notes.forEach((note,index)=>{
+      const path='notes['+index+']';
+      if(!regionIsRecord(note)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',note.id);
+      if(typeof note.text!=='string' || !note.text.trim()) regionPushError(errors,path+'.text','is required');
+      if(note.text && /[\r\n]{3,}/.test(note.text)) regionPushError(errors,path+'.text','must not contain repeated blank-line payloads');
+    });
+  }
+
+  regionValidateRecord(errors,'terrain',region.terrain);
+  regionValidateRecord(errors,'revealed',region.revealed);
+  regionValidateRecord(errors,'elementalInfluence',region.elementalInfluence);
+  regionValidateRecord(errors,'metadata',region.metadata);
+
+  if(regionIsRecord(region.terrain) && region.terrain.layers!==undefined){
+    if(!regionIsRecord(region.terrain.layers)) regionPushError(errors,'terrain.layers','must be an object keyed by local layer ID');
+    else Object.entries(region.terrain.layers).forEach(([layerId,payload])=>{
+      if(!layerIds.has(layerId)) regionPushError(errors,'terrain.layers.'+layerId,'references an unknown local layer');
+      if(!regionIsRecord(payload)) regionPushError(errors,'terrain.layers.'+layerId,'must be an object');
+      else{
+        if(payload.width!==undefined && (!Number.isInteger(payload.width) || payload.width<=0)) regionPushError(errors,'terrain.layers.'+layerId+'.width','must be a positive integer');
+        if(payload.height!==undefined && (!Number.isInteger(payload.height) || payload.height<=0)) regionPushError(errors,'terrain.layers.'+layerId+'.height','must be a positive integer');
+        if(Array.isArray(payload.cells) && Number.isInteger(payload.width) && Number.isInteger(payload.height) && payload.cells.length!==payload.width*payload.height){
+          regionPushError(errors,'terrain.layers.'+layerId+'.cells','length must equal width × height');
+        }
+      }
+    });
+  }
+
+  if(regionIsRecord(region.revealed) && region.revealed.layers!==undefined){
+    if(!regionIsRecord(region.revealed.layers)) regionPushError(errors,'revealed.layers','must be an object keyed by local layer ID');
+    else Object.entries(region.revealed.layers).forEach(([layerId,value])=>{
+      if(!layerIds.has(layerId)) regionPushError(errors,'revealed.layers.'+layerId,'references an unknown local layer');
+      if(!(regionIsRecord(value) || Array.isArray(value))) regionPushError(errors,'revealed.layers.'+layerId,'must be an object or array');
+    });
+  }
+
+  if(regionHasGenerationProvenance(region) && !regionHasCompleteTerrain(region)){
+    regionPushError(errors,'terrain','generated-region provenance requires complete serialized terrain; a seed alone is not an exact save');
+  }
+  return errors;
+}
+
+function assertRegion(region,options){
+  const normalized=normalizeRegion(region), errors=validateRegion(normalized,options);
+  if(errors.length) throw new Error('Invalid region: '+errors.map(e=>e.text).join('; '));
+  return normalized;
+}
+function assertRegionJson(text,options){ return assertRegion(parseRegionJson(text),options); }
+
+function regionStableValue(value){
+  if(Array.isArray(value)) return value.map(regionStableValue);
+  if(!regionIsRecord(value)) return value;
+  const keys=Object.keys(value).sort();
+  const out={}; keys.forEach(key=>{ out[key]=regionStableValue(value[key]); });
+  return out;
+}
+function regionStableObject(region){
+  const source=regionStableValue(region), out={};
+  REGION_TOP_LEVEL_ORDER.forEach(key=>{ if(Object.prototype.hasOwnProperty.call(source,key)) out[key]=source[key]; });
+  Object.keys(source).sort().forEach(key=>{ if(!Object.prototype.hasOwnProperty.call(out,key)) out[key]=source[key]; });
+  return out;
+}
+function serializeRegion(region){
+  const valid=assertRegion(region);
+  return JSON.stringify(regionStableObject(valid),null,2)+'\n';
+}
+
+function regionSummaryItems(items){ return Array.isArray(items) ? items.filter(item=>!regionVisibilityHidden(item)) : []; }
+function regionSummaryBullet(label,detail){ return '- '+label+(detail?' — '+detail:''); }
+function formatRegionSummary(region,options){
+  const opts=options||{}, valid=assertRegion(region,opts.expectedCampaign?{expectedCampaign:opts.expectedCampaign}:undefined);
+  const layers=regionSummaryItems(valid.localLayers), features=regionSummaryItems(valid.features), connections=regionSummaryItems(valid.connections),
+    pins=regionSummaryItems(valid.pins), markers=regionSummaryItems(valid.markers), notes=regionSummaryItems(valid.notes);
+  const lines=[
+    '# Region — '+valid.title,'',
+    '**Region ID:** '+valid.id,
+    '**Campaign:** '+valid.campaign,
+    '**Cosmic Layer:** '+valid.cosmicLayer.charAt(0).toUpperCase()+valid.cosmicLayer.slice(1),
+    '**Schema Version:** '+valid.schemaVersion,'',
+    '## Local Layers','',
+  ];
+  if(layers.length) layers.forEach(layer=>lines.push(regionSummaryBullet(layer.label,layer.type)));
+  else lines.push('- None recorded');
+
+  const addSection=(title,items,render)=>{
+    lines.push('', '## '+title, '');
+    if(items.length) items.forEach(item=>lines.push(render(item)));
+    else lines.push('- None recorded');
+  };
+  addSection('Major Features',features,item=>regionSummaryBullet(item.label,item.type+(item.layerId?' · '+item.layerId:'')));
+  addSection('Connections',connections,item=>regionSummaryBullet(item.id,item.from+' → '+item.to+(item.type?' · '+item.type:'')));
+  addSection('Pins',pins,item=>regionSummaryBullet(item.label,item.category||item.layerId));
+  addSection('Markers',markers,item=>regionSummaryBullet(item.label,item.status||item.layerId));
+  addSection('Notes',notes,item=>regionSummaryBullet(item.text,item.category||''));
+  return lines.join('\n').replace(/\s+$/,'')+'\n';
+}
+
+function classifyRegionEntries(items,campaignName){
+  const list=Array.isArray(items)?items:[], byBase=new Map(), ignored=[];
+  list.forEach(item=>{
+    if(!item || item.type!=='file' || typeof item.name!=='string'){ ignored.push(item); return; }
+    const match=/^(.+)\.(json|md)$/i.exec(item.name);
+    if(!match){ ignored.push(item); return; }
+    const base=match[1], ext=match[2].toLowerCase();
+    const row=byBase.get(base)||{base,campaign:campaignName||'',json:null,markdown:null};
+    row[ext==='json'?'json':'markdown']={name:item.name,path:item.path||''}; byBase.set(base,row);
+  });
+  const rows=[...byBase.values()].sort((a,b)=>a.base.localeCompare(b.base));
+  return {
+    regions:rows.filter(row=>row.json),
+    orphanMarkdown:rows.filter(row=>!row.json && row.markdown),
+    ignored,
+  };
+}
+
+function regionExpectedPath(campaignName,regionId){ return 'campaign/'+campaignName+'/regions/'+regionId+'.json'; }
+function assertRegionWriteTarget(path,campaignName,region,currentText){
+  const valid=assertRegion(region,{expectedCampaign:campaignName});
+  const expected=regionExpectedPath(campaignName,valid.id);
+  if(path!==expected) throw new Error('Refusing region write: expected '+expected+' but received '+path);
+  if(currentText!=null && String(currentText).trim()){
+    const current=assertRegionJson(currentText,{expectedCampaign:campaignName,expectedId:valid.id});
+    if(current.id!==valid.id) throw new Error('Refusing region write: current region ID changed');
+  }
+  return valid;
+}
+/* ========================================================================== *
    THE GAME SPACE — manage campaigns and hand sessions off to the GM. The
    campaign counterpart to the Canon Studio: a landing that lists your runs, and
    a per-campaign view (Resume / Ledger / Threads / Character) over the repo files.
@@ -4274,6 +4751,453 @@ function startCampaignModal(){
     h('div',null, h('label',null,'Name'), nameIn,
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
+/* REGION TAB — read-only Region Update 1 status view. */
+const CAMPAIGN_REGION_DIR='regions';
+
+function regionDirectoryPath(campaignName){ return CAMP_DIR+'/'+campaignName+'/'+CAMPAIGN_REGION_DIR; }
+function regionArrayCount(value){ return Array.isArray(value)?value.length:0; }
+function regionTerrainStatus(region){
+  if(!regionIsRecord(region&&region.terrain) || !regionIsRecord(region.terrain.layers) || !Object.keys(region.terrain.layers).length){
+    return regionHasGenerationProvenance(region)?'Incomplete generated save':'No serialized terrain';
+  }
+  return regionHasCompleteTerrain(region)?'Complete serialized terrain':'Partial serialized terrain';
+}
+function regionRecordStatus(region,errors,hasMarkdown){
+  const safe=regionIsRecord(region)?region:{};
+  return {
+    title:typeof safe.title==='string'&&safe.title?safe.title:'Unreadable region',
+    id:typeof safe.id==='string'&&safe.id?safe.id:'unknown',
+    schemaVersion:safe.schemaVersion==null?'—':safe.schemaVersion,
+    cosmicLayer:typeof safe.cosmicLayer==='string'&&safe.cosmicLayer?safe.cosmicLayer:'—',
+    layers:regionArrayCount(safe.localLayers),
+    layerLabels:Array.isArray(safe.localLayers)?safe.localLayers.filter(regionIsRecord).map(x=>x.label||x.id||x.type).filter(Boolean):[],
+    terrain:regionTerrainStatus(safe),
+    features:regionArrayCount(safe.features), connections:regionArrayCount(safe.connections),
+    pins:regionArrayCount(safe.pins), markers:regionArrayCount(safe.markers), notes:regionArrayCount(safe.notes),
+    hasMarkdown:!!hasMarkdown, errors:Array.isArray(errors)?errors:[], valid:!errors||errors.length===0,
+  };
+}
+
+async function campaignRegionEntries(cfg,campaignName){
+  try{ return classifyRegionEntries(await ghList(cfg,regionDirectoryPath(campaignName)),campaignName); }
+  catch(error){
+    const message=String(error&&error.message||error);
+    if(/404|not found|does not exist/i.test(message)) return {regions:[],orphanMarkdown:[],ignored:[]};
+    throw error;
+  }
+}
+
+async function loadCampaignRegions(cfg,campaignName){
+  const discovered=await campaignRegionEntries(cfg,campaignName), loaded=[];
+  for(const entry of discovered.regions){
+    let region=null, errors=[];
+    try{
+      const response=await ghGetText(cfg,entry.json.path);
+      if(!response) throw new Error('Region JSON could not be read');
+      region=parseRegionJson(response.text);
+      errors=validateRegion(region,{expectedCampaign:campaignName});
+    }catch(error){
+      const message=String(error&&error.message||error);
+      errors=[{path:entry.json.path,message,text:message}];
+    }
+    loaded.push({...entry,region,errors});
+  }
+  const ids=new Map();
+  loaded.forEach(entry=>{
+    if(!entry.region||typeof entry.region.id!=='string'||!entry.region.id) return;
+    if(ids.has(entry.region.id)){
+      const first=ids.get(entry.region.id);
+      entry.errors.push({path:'id',message:'duplicate region ID',text:'id: duplicates '+first.json.name});
+      first.errors.push({path:'id',message:'duplicate region ID',text:'id: duplicates '+entry.json.name});
+    }else ids.set(entry.region.id,entry);
+  });
+  return {...discovered,regions:loaded};
+}
+
+function regionStatusRow(label,value){
+  return h('div',{class:'region-stat'},h('span',{class:'region-stat-label'},label),h('b',null,String(value)));
+}
+function regionValidationBlock(errors){
+  if(!errors.length) return h('p',{class:'region-valid'},'Valid region save');
+  return h('div',{class:'region-invalid'},
+    h('b',null,errors.length+' validation issue'+(errors.length===1?'':'s')),
+    h('ul',null,...errors.map(error=>h('li',null,error.text||error.message||String(error)))));
+}
+function regionStatusCard(entry){
+  const status=regionRecordStatus(entry.region,entry.errors,entry.markdown);
+  return h('section',{class:'region-card'},
+    h('div',{class:'region-card-head'},
+      h('div',null,h('h3',null,status.title),h('p',{class:'hint'},entry.json.name)),
+      h('span',{class:'region-badge '+(status.valid?'ok':'bad')},status.valid?'VALID':'NEEDS ATTENTION')),
+    h('div',{class:'region-stats'},
+      regionStatusRow('Region ID',status.id), regionStatusRow('Schema',status.schemaVersion),
+      regionStatusRow('Cosmic layer',status.cosmicLayer), regionStatusRow('Local layers',status.layers),
+      regionStatusRow('Terrain',status.terrain), regionStatusRow('Features',status.features),
+      regionStatusRow('Connections',status.connections), regionStatusRow('Pins',status.pins),
+      regionStatusRow('Markers',status.markers), regionStatusRow('Notes',status.notes),
+      regionStatusRow('Markdown summary',status.hasMarkdown?'Present':'Not present')),
+    h('p',{class:'region-layer-list'},h('b',null,'Local layer labels: '),status.layerLabels.length?status.layerLabels.join(', '):'None recorded'),
+    regionValidationBlock(status.errors));
+}
+
+async function campRegion(host,name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint',style:{textAlign:'center'}},'Loading saved regions…'));
+  try{
+    const result=await loadCampaignRegions(cfg,name);
+    const wrap=h('div',{class:'region-view'},
+      h('div',{class:'region-readonly'},h('b',null,'Region foundation · read only'),
+        h('span',null,'This update validates saved region data. Map rendering and editing arrive later.')));
+    if(!result.regions.length){
+      wrap.append(h('div',{class:'region-empty'},h('h3',null,'No saved regions'),
+        h('p',{class:'hint'},'No saved regions exist for this campaign yet. Region creation and map rendering will arrive in a later update.')));
+    }else result.regions.forEach(entry=>wrap.append(regionStatusCard(entry)));
+    if(result.orphanMarkdown.length){
+      wrap.append(h('div',{class:'region-warning'},h('b',null,'Markdown summaries without JSON'),
+        h('ul',null,...result.orphanMarkdown.map(entry=>h('li',null,entry.markdown.name)))));
+    }
+    host.replaceChildren(wrap);
+  }catch(error){
+    host.replaceChildren(h('p',{class:'hint'},'Region data unavailable: '+String(error&&error.message||error)));
+  }
+}
+
+// Extend the existing campaign screen after campaign.js loads. Existing tabs continue to
+// use the original view; only the new Region tab uses this focused read-only view.
+if(!CAMP_TABS.some(tab=>tab[0]==='region')){
+  CAMP_TABS.push(['region','Region','Saved regional geography, layers, connections, markers, and validation status.']);
+}
+const viewCampaignBeforeRegion=viewCampaign;
+viewCampaign=function(name,tab){
+  if(tab!=='region') return viewCampaignBeforeRegion(name,tab);
+  const f=framed(name,'idea → ledger → (audit) → canon','campaign-only until it’s audited into the queue');
+  const body=f.querySelector('.framed-body');
+  if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
+  body.append(h('div',{class:'toolrow',style:{marginBottom:'4px'}},h('button',{class:'navbtn',onclick:()=>go('campaigns')},'← All campaigns')));
+  const tabs=h('div',{class:'studio-tabs'});
+  CAMP_TABS.forEach(([key,label])=>tabs.append(h('button',{class:'tab'+(key==='region'?' on':''),'aria-pressed':key==='region'?'true':'false',onclick:()=>go('campaign',{camp:name,tab:key})},label)));
+  body.append(tabs,h('p',{class:'hint',style:{textAlign:'center',margin:'8px auto 16px',maxWidth:'52ch'}},CAMP_TABS.find(tab=>tab[0]==='region')[2]));
+  const host=h('div'); body.append(host); campRegion(host,name); return f;
+};
+/* ========================================================================== *
+   REGION RENDER — Region Update 2: a deterministic, read-only layered map.
+
+   Renders ONLY the exact serialized terrain state of a saved region. It never
+   mutates, regenerates, or writes region data; switching layers, panning, and
+   zooming change the view, not the file. Explicitly GM-only and unrevealed
+   (fog) information is hidden. Pin, marker, fog, and terrain EDITING are out of
+   scope and intentionally deferred to later focused updates.
+
+   Cosmic Cloudsea placement (top / middle / bottom) styles the frame; local
+   vertical layers (surface, caves, …) are an independent elevation axis. The
+   two never blur together.
+
+   Layered onto the Region tab by replacing campRegion (defined in region.js);
+   the pure geometry/masking helpers below are DOM-free and unit-tested.
+ * ========================================================================== */
+const REGION_MAP_MIN_SCALE = 0.25;
+const REGION_MAP_MAX_SCALE = 8;
+const REGION_MAP_PAD = 0.5;            // cells of breathing room around content
+const REGION_MAP_NS = 'http://www.w3.org/2000/svg';
+const REGION_TERRAIN_COLORS = {
+  grass:'#9bbf7a', meadow:'#a8c98a', plain:'#bcc98c', plains:'#bcc98c',
+  forest:'#5f8c53', wood:'#5f8c53', jungle:'#4f7d45', swamp:'#6f7a4a', marsh:'#7c8551', mud:'#8a7350',
+  dirt:'#b08a5e', soil:'#a07c4f', loam:'#967048', sand:'#e3d59a', desert:'#e6d79b',
+  stone:'#b8b2a6', rock:'#a39d92', cliff:'#8f897e', mountain:'#9a9488', peak:'#cfcabf',
+  cave:'#5b5448', 'cave-floor':'#6a6253', cavern:'#544d42', tunnel:'#4f4940',
+  water:'#7fb4d4', sea:'#5f9fc6', lake:'#82b8d8', river:'#88bcd9', deep:'#3f6f93',
+  ice:'#cfe6ef', snow:'#eef4f6', frost:'#dceaf0',
+  lava:'#cf5b3a', ash:'#7a716a', void:'#2c2a33', dimensional:'#6a5acd',
+  path:'#cdbf99', road:'#c4b486', bridge:'#b59a6a',
+};
+
+function regionMapRound(n){ return Math.round((Number.isFinite(n)?n:0) * 1e4) / 1e4; }
+function regionClampScale(scale){
+  const s = Number.isFinite(scale) ? scale : 1;
+  return Math.min(REGION_MAP_MAX_SCALE, Math.max(REGION_MAP_MIN_SCALE, s));
+}
+function regionCosmicLabel(region){
+  const c = region && typeof region.cosmicLayer === 'string' ? region.cosmicLayer : '';
+  return c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Unknown';
+}
+
+// Local layers a player may switch between: visible, GM-hidden excluded, sorted
+// so higher elevation lands first; ties keep the original (stable) order.
+function regionMapLayers(region){
+  const layers = (region && Array.isArray(region.localLayers)) ? region.localLayers : [];
+  return layers
+    .map((layer, index) => ({ layer, index }))
+    .filter(({ layer }) => regionIsRecord(layer) && layer.visible !== false && !regionVisibilityHidden(layer))
+    .sort((a, b) => {
+      const av = Number.isFinite(a.layer.verticalOrder) ? a.layer.verticalOrder : 0;
+      const bv = Number.isFinite(b.layer.verticalOrder) ? b.layer.verticalOrder : 0;
+      if (av !== bv) return bv - av;
+      return a.index - b.index;
+    })
+    .map(({ layer }) => layer);
+}
+
+function regionTerrainLayer(region, layerId){
+  const terrain = region && region.terrain;
+  if (!regionIsRecord(terrain) || !regionIsRecord(terrain.layers)) return null;
+  const payload = terrain.layers[layerId];
+  return regionIsRecord(payload) ? payload : null;
+}
+
+// Exact cell-grid terrain -> deterministic cells. Returns null when the layer
+// has no renderable serialized grid; we never invent or regenerate terrain.
+function regionTerrainGrid(region, layerId){
+  const payload = regionTerrainLayer(region, layerId);
+  if (!payload) return null;
+  const width = payload.width, height = payload.height;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  if (!Array.isArray(payload.cells) || payload.cells.length !== width * height) return null;
+  const cells = payload.cells.map((value, i) => ({ index:i, x:i % width, y:Math.floor(i / width), value }));
+  return { width, height, format: payload.format, cells };
+}
+
+// Reveal/fog mask for a layer. Explicit fog hides; the ABSENCE of a mask shows
+// everything (a GM who set no fog has not hidden anything).
+function regionRevealMask(region, layerId){
+  const revealed = region && region.revealed;
+  if (!regionIsRecord(revealed) || !regionIsRecord(revealed.layers)) return null;
+  const value = revealed.layers[layerId];
+  if (Array.isArray(value)) return value;
+  if (regionIsRecord(value) && Array.isArray(value.cells)) return value.cells;
+  return null;
+}
+function regionCellRevealed(mask, index){
+  if (!Array.isArray(mask)) return true;
+  const v = mask[index];
+  return !(v === 0 || v === false || v == null);
+}
+
+function regionFeatureHidden(feature, grid, mask){
+  if (!regionIsRecord(feature) || regionVisibilityHidden(feature)) return true;
+  if (!grid || !Array.isArray(mask)) return false;
+  const p = feature.position;
+  if (!regionIsRecord(p) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return false;
+  const x = Math.floor(p.x), y = Math.floor(p.y);
+  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return false;  // off-grid: no fog basis
+  return !regionCellRevealed(mask, y * grid.width + x);
+}
+
+function regionMapVisibleFeatures(region, layerId, grid, mask){
+  const features = (region && Array.isArray(region.features)) ? region.features : [];
+  return features.filter(f =>
+    regionIsRecord(f) && f.layerId === layerId &&
+    regionIsRecord(f.position) && Number.isFinite(f.position.x) && Number.isFinite(f.position.y) &&
+    !regionFeatureHidden(f, grid, mask));
+}
+
+// Drawable connection lines: only between two visible features on this layer
+// (both endpoint positions are known). Cross-layer connections are listed
+// textually instead — see regionMapConnectionList.
+function regionMapConnectionLines(region, layerId, posById){
+  const conns = (region && Array.isArray(region.connections)) ? region.connections : [];
+  const get = id => posById && (posById instanceof Map ? posById.get(id) : posById[id]);
+  return conns
+    .filter(c => regionIsRecord(c) && !regionVisibilityHidden(c) && get(c.from) && get(c.to))
+    .map(c => ({ id:c.id, type:c.type, from:get(c.from), to:get(c.to) }));
+}
+function regionMapConnectionList(region, layerId, visibleFeatureIds){
+  const ids = new Set(visibleFeatureIds || []);
+  const conns = (region && Array.isArray(region.connections)) ? region.connections : [];
+  return conns.filter(c => regionIsRecord(c) && !regionVisibilityHidden(c) &&
+    (c.from === layerId || c.to === layerId || ids.has(c.from) || ids.has(c.to)));
+}
+
+// Content bounding box (cells + features) with padding, for fit-to-view.
+function regionMapBounds(grid, features){
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  if (grid){ minX = Math.min(minX, 0); minY = Math.min(minY, 0); maxX = Math.max(maxX, grid.width); maxY = Math.max(maxY, grid.height); }
+  (features || []).forEach(f => {
+    const p = f && f.position;
+    if (regionIsRecord(p) && Number.isFinite(p.x) && Number.isFinite(p.y)){
+      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+      maxX = Math.max(maxX, p.x + 1); maxY = Math.max(maxY, p.y + 1);
+    }
+  });
+  if (!Number.isFinite(minX)) return null;
+  return { minX:minX - REGION_MAP_PAD, minY:minY - REGION_MAP_PAD, maxX:maxX + REGION_MAP_PAD, maxY:maxY + REGION_MAP_PAD };
+}
+
+// Deterministic SVG viewBox string from content bounds + viewport state. Larger
+// scale -> smaller viewBox (more zoom); pan shifts the centre.
+function regionMapViewBox(bounds, viewport){
+  const v = viewport || {}, scale = regionClampScale(v.scale);
+  const w0 = bounds.maxX - bounds.minX, h0 = bounds.maxY - bounds.minY;
+  const w = w0 / scale, h = h0 / scale;
+  const cx = (bounds.minX + bounds.maxX) / 2 + (Number.isFinite(v.panX) ? v.panX : 0);
+  const cy = (bounds.minY + bounds.maxY) / 2 + (Number.isFinite(v.panY) ? v.panY : 0);
+  return [regionMapRound(cx - w / 2), regionMapRound(cy - h / 2), regionMapRound(w), regionMapRound(h)].join(' ');
+}
+
+// Deterministic terrain colour: known terrain words map to a fixed palette;
+// anything else hashes to a stable pastel so the same value always paints alike.
+function regionCellColor(value){
+  const key = String(value == null ? '' : value).toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(REGION_TERRAIN_COLORS, key)) return REGION_TERRAIN_COLORS[key];
+  let hash = 0; for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  return 'hsl(' + (hash % 360) + ' 42% 76%)';
+}
+
+function regionSvg(tag, attrs, ...kids){
+  const el = document.createElementNS(REGION_MAP_NS, tag);
+  if (attrs) for (const k in attrs){ const v = attrs[k]; if (v == null || v === false) continue; el.setAttribute(k, String(v)); }
+  for (const kid of kids.flat()){ if (kid == null || kid === false) continue; el.append(kid.nodeType ? kid : document.createTextNode(String(kid))); }
+  return el;
+}
+
+// Build the read-only SVG for one local layer at a given viewport. Pure of any
+// writes; honours fog and GM-only hiding via the helpers above.
+function regionMapSvg(region, layerId, viewport){
+  const grid = regionTerrainGrid(region, layerId);
+  const mask = regionRevealMask(region, layerId);
+  const features = regionMapVisibleFeatures(region, layerId, grid, mask);
+  const bounds = regionMapBounds(grid, features);
+  const layer = (region && Array.isArray(region.localLayers) ? region.localLayers : []).find(l => regionIsRecord(l) && l.id === layerId);
+  const label = (region && region.title ? region.title : 'Region') + ' — ' + ((layer && layer.label) || layerId) + ' map';
+  const svg = regionSvg('svg', { class:'region-map-svg', role:'img', 'aria-label':label, preserveAspectRatio:'xMidYMid meet' });
+  if (!bounds){
+    svg.setAttribute('viewBox', '0 0 10 6');
+    svg.append(regionSvg('text', { x:5, y:3, 'text-anchor':'middle', class:'region-map-empty-text' }, 'Nothing to render for this layer'));
+    return svg;
+  }
+  svg.setAttribute('viewBox', regionMapViewBox(bounds, viewport));
+  if (grid){
+    const g = regionSvg('g', { class:'region-cells' });
+    grid.cells.forEach(cell => {
+      if (regionCellRevealed(mask, cell.index))
+        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-cell', fill:regionCellColor(cell.value) }));
+      else
+        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-fog' }));
+    });
+    svg.append(g);
+  }
+  const posById = {}; features.forEach(f => { posById[f.id] = f.position; });
+  const lines = regionMapConnectionLines(region, layerId, posById);
+  if (lines.length){
+    const g = regionSvg('g', { class:'region-conns' });
+    lines.forEach(l => g.append(regionSvg('line', { x1:l.from.x + 0.5, y1:l.from.y + 0.5, x2:l.to.x + 0.5, y2:l.to.y + 0.5, class:'region-conn-line' })));
+    svg.append(g);
+  }
+  if (features.length){
+    const g = regionSvg('g', { class:'region-features' });
+    features.forEach(f => {
+      const cx = f.position.x + 0.5, cy = f.position.y + 0.5;
+      g.append(regionSvg('circle', { cx, cy, r:0.22, class:'region-feature-dot' }));
+      if (f.label) g.append(regionSvg('text', { x:cx, y:cy - 0.35, 'text-anchor':'middle', class:'region-feature-label' }, f.label));
+    });
+    svg.append(g);
+  }
+  return svg;
+}
+
+// The interactive, read-only map panel for one validated region entry.
+function regionMapPanel(entry){
+  const region = entry && entry.region;
+  const layers = regionMapLayers(region);
+  const panel = h('div', { class:'region-map cosmic-' + (region && typeof region.cosmicLayer === 'string' ? region.cosmicLayer : 'middle') });
+  panel.append(h('div', { class:'region-map-head' },
+    h('h3', null, 'Region map'),
+    h('span', { class:'hint' }, 'Cosmic layer: ' + regionCosmicLabel(region) + ' · local elevation is a separate axis')));
+  if (!layers.length){ panel.append(h('p', { class:'hint' }, 'No visible local layers to map.')); return panel; }
+
+  const state = { layerId:layers[0].id, viewport:{ scale:1, panX:0, panY:0 }, showText:false };
+
+  const switchRow = h('div', { class:'region-layer-switch', role:'group', 'aria-label':'Local layer' });
+  const switchBtns = layers.map(layer => {
+    const b = h('button', { class:'tab', type:'button', 'aria-pressed':layer.id === state.layerId ? 'true' : 'false',
+      onclick:() => { state.layerId = layer.id; state.viewport = { scale:1, panX:0, panY:0 }; draw(); } }, layer.label || layer.id);
+    return { id:layer.id, b };
+  });
+  switchBtns.forEach(x => switchRow.append(x.b));
+
+  const zoom = f => { state.viewport.scale = regionClampScale(state.viewport.scale * f); draw(); };
+  const fit = () => { state.viewport = { scale:1, panX:0, panY:0 }; draw(); };
+  const toolbar = h('div', { class:'region-map-toolbar' },
+    h('button', { class:'navbtn', type:'button', title:'Zoom out', 'aria-label':'Zoom out', onclick:() => zoom(1 / 1.5) }, '−'),
+    h('button', { class:'navbtn', type:'button', title:'Zoom in', 'aria-label':'Zoom in', onclick:() => zoom(1.5) }, '+'),
+    h('button', { class:'navbtn', type:'button', onclick:fit }, 'Fit'),
+    h('button', { class:'navbtn', type:'button', onclick:() => { state.layerId = layers[0].id; fit(); } }, 'Reset'),
+    h('button', { class:'navbtn', type:'button', 'aria-pressed':'false', onclick(){ state.showText = !state.showText; this.setAttribute('aria-pressed', state.showText ? 'true' : 'false'); draw(); } }, 'Text summary'));
+
+  const stage = h('div', { class:'region-map-stage' });
+  const meta = h('div', { class:'region-map-meta' });
+  const textBox = h('pre', { class:'region-map-text', style:{ display:'none' } });
+
+  function attachPan(svg){
+    let active = false, sx = 0, sy = 0, box = null;
+    svg.addEventListener('pointerdown', e => { active = true; sx = e.clientX; sy = e.clientY; box = svg.getBoundingClientRect && svg.getBoundingClientRect(); });
+    svg.addEventListener('pointermove', e => {
+      if (!active || !box || !box.width || !box.height) return;
+      const grid = regionTerrainGrid(region, state.layerId);
+      const bounds = regionMapBounds(grid, regionMapVisibleFeatures(region, state.layerId, grid, regionRevealMask(region, state.layerId)));
+      if (!bounds) return;
+      const s = regionClampScale(state.viewport.scale);
+      const w = (bounds.maxX - bounds.minX) / s, hh = (bounds.maxY - bounds.minY) / s;
+      state.viewport.panX -= (e.clientX - sx) * (w / box.width);
+      state.viewport.panY -= (e.clientY - sy) * (hh / box.height);
+      sx = e.clientX; sy = e.clientY;
+      svg.setAttribute('viewBox', regionMapViewBox(bounds, state.viewport));
+    });
+    const end = () => { active = false; };
+    svg.addEventListener('pointerup', end); svg.addEventListener('pointerleave', end);
+  }
+
+  function draw(){
+    switchBtns.forEach(x => x.b.setAttribute('aria-pressed', x.id === state.layerId ? 'true' : 'false'));
+    const grid = regionTerrainGrid(region, state.layerId);
+    const mask = regionRevealMask(region, state.layerId);
+    const features = regionMapVisibleFeatures(region, state.layerId, grid, mask);
+    const svg = regionMapSvg(region, state.layerId, state.viewport);
+    stage.replaceChildren(svg); attachPan(svg);
+    const conns = regionMapConnectionList(region, state.layerId, features.map(f => f.id));
+    meta.replaceChildren(h('p', { class:'hint' },
+      features.length + ' feature' + (features.length === 1 ? '' : 's') + ' · ' +
+      conns.length + ' connection' + (conns.length === 1 ? '' : 's') + ' on this layer' +
+      (grid ? '' : ' · no serialized terrain for this layer')));
+    if (conns.length)
+      meta.append(h('ul', { class:'region-conn-list' }, ...conns.map(c => h('li', null, (c.type ? c.type + ': ' : '') + c.from + ' → ' + c.to))));
+    if (state.showText){
+      try { textBox.textContent = formatRegionSummary(region); } catch (e){ textBox.textContent = 'Summary unavailable: ' + e.message; }
+      textBox.style.display = 'block';
+    } else { textBox.style.display = 'none'; }
+  }
+
+  panel.append(switchRow, toolbar, stage, meta, textBox,
+    h('p', { class:'region-readonly-note hint' }, 'Read-only view of saved data. Editing pins, markers, fog, and terrain comes in a later update.'));
+  draw();
+  return panel;
+}
+
+// Replace the Region tab body (defined in region.js) with the map view: each
+// readable region keeps its validation card and gains an interactive map.
+campRegion = async function(host, name){
+  const cfg = ghCfg();
+  host.append(h('p', { class:'hint', style:{ textAlign:'center' } }, 'Loading saved regions…'));
+  try{
+    const result = await loadCampaignRegions(cfg, name);
+    const wrap = h('div', { class:'region-view' },
+      h('div', { class:'region-readonly' }, h('b', null, 'Region map · read only'),
+        h('span', null, 'Renders only saved terrain. Switch layers, pan, and zoom — nothing here changes your data.')));
+    if (!result.regions.length){
+      wrap.append(h('div', { class:'region-empty' }, h('h3', null, 'No saved regions'),
+        h('p', { class:'hint' }, 'No saved regions exist for this campaign yet. Add a region JSON under campaign/' + name + '/regions/ to see it mapped here.')));
+    } else result.regions.forEach(entry => {
+      wrap.append(regionStatusCard(entry));
+      if (entry.region && (!entry.errors || !entry.errors.length)) wrap.append(regionMapPanel(entry));
+    });
+    if (result.orphanMarkdown.length){
+      wrap.append(h('div', { class:'region-warning' }, h('b', null, 'Markdown summaries without JSON'),
+        h('ul', null, ...result.orphanMarkdown.map(entry => h('li', null, entry.markdown.name)))));
+    }
+    host.replaceChildren(wrap);
+  }catch(error){
+    host.replaceChildren(h('p', { class:'hint' }, 'Region data unavailable: ' + String(error && error.message || error)));
+  }
+};
 /* ========================================================================== *
    GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
    the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
