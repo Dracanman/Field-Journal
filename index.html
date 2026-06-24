@@ -350,24 +350,28 @@
   /* ---------- Game space (campaigns) — reuses studio/board/canon-doc styles ---------- */
   .profile-game .maker-only{ display:none !important; }
 
-  .survival-panel{
+  /* shared gauge panel — used by BOTH the Runtime gauges and Mortal survival panels */
+  .gauge-panel{
     margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:12px;
     background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
   }
-  .survival-title{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
-  .survival-title h3{ font-size:25px; }
-  .survival-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-top:14px; }
-  .survival-gauge{ padding:12px; border:1px solid #e7dcc4; border-radius:10px; background:#fffaf0; }
-  .survival-gauge-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
-  .survival-gauge-head span{ display:flex; align-items:center; gap:4px; color:var(--hint); }
-  .survival-number{
+  .gauge-title{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  .gauge-title h3{ font-size:25px; }
+  .gauge-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-top:14px; }
+  .gauge{ padding:12px; border:1px solid #e7dcc4; border-radius:10px; background:#fffaf0; }
+  .gauge-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+  .gauge-readout{ display:flex; align-items:center; gap:4px; color:var(--hint); }
+  .gauge-number{
     width:64px; border:1px solid var(--gold-soft); border-radius:7px; background:#fffdf7;
     color:var(--ink); font:inherit; padding:4px 6px; text-align:right;
   }
-  .survival-track{ height:9px; overflow:hidden; border-radius:999px; background:var(--paper-slot); border:1px solid #e7dcc4; }
-  .survival-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--green)); transition:width .15s ease; }
-  .survival-nudges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
-  .survival-nudges .toolbtn{ flex:1 1 38px; padding:4px 7px; }
+  .gauge-track{ height:9px; overflow:hidden; border-radius:999px; background:var(--paper-slot); border:1px solid #e7dcc4; }
+  .gauge-fill{ height:100%; width:0; background:linear-gradient(90deg,var(--gold),var(--green)); transition:width .15s ease; }
+  .gauge-nudges{ display:flex; gap:6px; flex-wrap:wrap; margin-top:9px; }
+  .gauge-nudges .toolbtn{ flex:1 1 38px; padding:4px 7px; }
+  .gauge-status{ margin-top:8px; }
+
+  /* mortal survival — the named-conditions editor (survival-specific) */
   .survival-condition-editor{ margin-top:16px; }
   .survival-condition-editor > label{ display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:7px; }
   .survival-conditions{ display:flex; flex-wrap:wrap; gap:8px; min-height:34px; align-items:center; }
@@ -375,10 +379,9 @@
   .condition-chip button{ border:0; background:transparent; color:#a85c45; font-size:18px; line-height:1; padding:0; }
   .survival-add{ display:flex; gap:8px; margin-top:10px; }
   .survival-add input{ flex:1 1 240px; min-width:0; border:1px solid var(--gold-soft); border-radius:8px; background:#fffdf7; color:var(--ink); font:inherit; padding:8px 10px; }
-  .survival-status{ margin-top:8px; }
   @media (max-width:620px){
-    .survival-panel{ padding:14px; }
-    .survival-grid{ grid-template-columns:1fr; }
+    .gauge-panel{ padding:14px; }
+    .gauge-grid{ grid-template-columns:1fr; }
     .survival-add{ flex-direction:column; }
   }
   /* ---------- Code Practice (Apprentice profile) ---------- */
@@ -3870,6 +3873,95 @@ function updateSurvivalState(text,state){
   }
   return t.replace(/\s*$/,'')+'\n\n---\n\n'+section+'\n';
 }
+
+// ---- runtime gauges (Personal Mana / Divine Mana / Divine Hunger / Strain) ----
+// A SEPARATE layer from mortal survival — the magical/divine runtime state the tracker
+// already records. Manual editing only: no automatic costs, regen, or 3d6 here.
+const RUNTIME_GAUGES = [
+  { key:'personalMana', label:'Personal Mana' },
+  { key:'divineMana',   label:'Divine Mana' },
+  { key:'divineHunger', label:'Divine Hunger' },
+  { key:'strain',       label:'Strain' },
+];
+// Documented fallback maximum: the trackers and template state these gauges run 0–100
+// ("Magical/divine gauges 0-100"), matching the survival reserves. Not a new canon rule —
+// just the existing display convention, used only when a line omits its own max.
+const RUNTIME_FALLBACK_MAX = 100;
+const RUNTIME_HEADING_RE = /^##\s+.*RUNTIME STATE\b/im;
+
+// One gauge's value text -> { current, max }. Reads only the leading value token (before
+// any "(comment)"); tolerates "~50", "14 / 50", a bare "4", optional bullets/spaces.
+// Preserves an explicit max, else falls back to RUNTIME_FALLBACK_MAX; clamps current to
+// 0..max. Never throws on junk — worst case it reads as 0 / fallback.
+function parseRuntimeGaugeValue(raw, fallbackMax){
+  let fb = Math.round(Number(fallbackMax));
+  if(!Number.isFinite(fb) || fb<=0) fb = RUNTIME_FALLBACK_MAX;
+  const valuePart = String(raw==null?'':raw).split('(')[0];
+  const nums = valuePart.match(/-?\d+(?:\.\d+)?/g) || [];
+  let max = nums.length>1 ? Number(nums[1]) : fb;
+  if(!Number.isFinite(max) || max<=0) max = fb;
+  max = Math.round(max);
+  let current = nums.length ? Number(nums[0]) : 0;
+  if(!Number.isFinite(current)) current = 0;
+  current = Math.max(0, Math.min(max, Math.round(current)));
+  return { current, max };
+}
+function runtimeGaugeRaw(sectionBody, label){
+  const m = new RegExp('^[ \\t]*[-*]?[ \\t]*'+escapeRegExp(label)+':[ \\t]*(.*)$','mi').exec(String(sectionBody||''));
+  return m ? m[1] : null;
+}
+function parseRuntime(text){
+  const sec = trackerSection(text, RUNTIME_HEADING_RE);
+  const out = { present: !!sec };
+  RUNTIME_GAUGES.forEach(g=>{
+    const raw = sec ? runtimeGaugeRaw(sec.body, g.label) : null;
+    const present = raw!=null && String(raw).trim()!=='';
+    const v = parseRuntimeGaugeValue(present ? raw : '', RUNTIME_FALLBACK_MAX);
+    out[g.key] = { current:v.current, max:v.max, present };
+  });
+  return out;
+}
+// Write guard: confirm the file really is a Campaign State Tracker with a runtime layer
+// before writing back — three independent markers (heading, runtime section, a field).
+function assertRuntimeTracker(text){
+  const t = String(text==null?'':text);
+  const heading = /Campaign State Tracker/i.test(t);
+  const section = RUNTIME_HEADING_RE.test(t);
+  const field = /^[ \t]*[-*]?[ \t]*(?:Personal Mana|Divine Mana|Divine Hunger|Strain)[ \t]*:/im.test(t);
+  if(!(heading && section && field)) throw new Error('refusing to write — that file isn’t a campaign state tracker with a runtime state section');
+  return t;
+}
+// Surgically update ONLY the four runtime gauge value tokens, in place, inside the runtime
+// section. Preserves the label, bullet, spacing, and any trailing "(comment)" on the line,
+// and every other line (scene, location, status, core/body, survival, notes, unknown
+// fields). A gauge with no existing line is appended to the section so an edit is never
+// silently lost — the section is otherwise left untouched.
+function updateRuntimeState(text, gauges){
+  const t = assertRuntimeTracker(text);
+  const sec = trackerSection(t, RUNTIME_HEADING_RE);
+  if(!sec) throw new Error('refusing to write — no runtime state section in the tracker');
+  const lines = sec.lines.slice();
+  const cr = /\r\n/.test(t) ? '\r' : '';   // preserve the file's line ending (CRLF trackers)
+  let end = sec.end;
+  RUNTIME_GAUGES.forEach(g=>{
+    const src = gauges && gauges[g.key];
+    if(src==null) return;                        // only touch gauges the caller actually provided
+    const v = parseRuntimeGaugeValue((src.current==null?0:src.current)+' / '+(src.max==null?RUNTIME_FALLBACK_MAX:src.max), RUNTIME_FALLBACK_MAX);
+    const labelRe = new RegExp('^([ \\t]*[-*]?[ \\t]*'+escapeRegExp(g.label)+':[ \\t]*)(.*)$','i');
+    let done = false;
+    for(let i=sec.start+1; i<end; i++){
+      const eol = lines[i].endsWith('\r') ? '\r' : '';
+      const m = labelRe.exec(eol ? lines[i].slice(0,-1) : lines[i]);
+      if(m){
+        const cm = m[2].match(/\s*\(.*$/);            // keep any trailing parenthetical note
+        lines[i] = m[1] + v.current + ' / ' + v.max + (cm ? cm[0] : '') + eol;
+        done = true; break;
+      }
+    }
+    if(!done){ lines.splice(end, 0, '- '+g.label+': '+v.current+' / '+v.max+cr); end++; }
+  });
+  return lines.join('\n');
+}
 function parseTracker(text){
   const t=String(text||'');
   const one=re=>{ const m=re.exec(t); return m? m[1].trim() : ''; };
@@ -4183,6 +4275,99 @@ function startCampaignModal(){
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
 /* ========================================================================== *
+   GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
+   the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
+   no parsing or network. Each control returns its node plus read() -> the
+   clamped { current, max }. Clamping and the meter ARIA live here so the two
+   panels can't drift apart.
+ * ========================================================================== */
+function gaugeClampInt(value, max){
+  let n = Math.round(Number(value));
+  if(!Number.isFinite(n)) n = 0;
+  return Math.max(0, Math.min(max, n));
+}
+
+// opts: { label, current, max } -> { node, read }
+function gaugeControl(opts){
+  const o = opts || {};
+  const label = String(o.label || '');
+  const max = Math.max(1, Math.round(Number(o.max)) || 100);
+  const number = h('input', { class:'gauge-number', type:'number', min:'0', max:String(max), step:'1',
+    inputmode:'numeric', 'aria-label':label, value:String(gaugeClampInt(o.current, max)) });
+  const fill = h('div', { class:'gauge-fill' });
+  const track = h('div', { class:'gauge-track', role:'meter', 'aria-label':label,
+    'aria-valuemin':'0', 'aria-valuemax':String(max), 'aria-valuenow':String(gaugeClampInt(o.current, max)) }, fill);
+  const paint = ()=>{ const n = gaugeClampInt(number.value, max); number.value = String(n);
+    fill.style.width = ((n/max)*100)+'%'; track.setAttribute('aria-valuenow', String(n)); };
+  const nudge = d=>{ number.value = String((Number(number.value)||0) + d); paint(); };
+  number.oninput = paint; number.onchange = paint; paint();
+  const node = h('div', { class:'gauge' },
+    h('div', { class:'gauge-head' }, h('b', null, label),
+      h('span', { class:'gauge-readout' }, number, ' / '+max)),
+    track,
+    h('div', { class:'gauge-nudges' },
+      h('button', { class:'toolbtn', type:'button', 'aria-label':'−5 '+label, onclick:()=>nudge(-5) }, '−5'),
+      h('button', { class:'toolbtn', type:'button', 'aria-label':'−1 '+label, onclick:()=>nudge(-1) }, '−1'),
+      h('button', { class:'toolbtn', type:'button', 'aria-label':'+1 '+label, onclick:()=>nudge(1) }, '+1'),
+      h('button', { class:'toolbtn', type:'button', 'aria-label':'+5 '+label, onclick:()=>nudge(5) }, '+5')));
+  return { node, read:()=>({ current: gaugeClampInt(number.value, max), max }) };
+}
+/* ========================================================================== *
+   RUNTIME GAUGES — a manual editor for the four magical/divine runtime gauges
+   (Personal Mana, Divine Mana, Divine Hunger, Strain) stored in the selected
+   campaign's Campaign State Tracker. A SEPARATE layer from the mortal survival
+   reserves; this panel never touches survival. No automatic mechanics: it only
+   reads and writes the four runtime gauge lines. Parsing/writing live in
+   campaign-parse.js; the gauge control is shared from gauge-controls.js.
+
+   Layered onto the Resume view by wrapping campResume. It loads BEFORE
+   survival.js so the panel order is: Where We Are -> Runtime gauges ->
+   Mortal survival.
+ * ========================================================================== */
+const campResumeBeforeRuntime = campResume;
+
+function runtimeEditor(cfg, trackerPath, parsed, host, campaignName){
+  const state = parsed || {};
+  const reads = {};
+  const grid = h('div', { class:'gauge-grid' });
+  RUNTIME_GAUGES.forEach(g=>{
+    const gv = state[g.key] || { current:0, max:RUNTIME_FALLBACK_MAX };
+    const ctl = gaugeControl({ label:g.label, current:gv.current, max:gv.max });
+    reads[g.key] = ctl.read;
+    grid.append(ctl.node);
+  });
+
+  const status = h('div', { class:'gauge-status hint' });
+  const save = h('button', { class:'navbtn primary', type:'button' }, 'Save runtime gauges');
+  save.onclick = async ()=>{
+    save.disabled = true; status.textContent = 'Saving to the campaign tracker…';
+    const next = {};
+    RUNTIME_GAUGES.forEach(g=>{ next[g.key] = reads[g.key](); });
+    try{
+      await ghUpdate(cfg, trackerPath, text=>updateRuntimeState(text, next), 'Update runtime gauges via Game', { guard:assertRuntimeTracker });
+      toast('Runtime gauges saved.'); host.replaceChildren(); await campResume(host, campaignName);
+    }catch(e){ status.textContent = 'Failed: '+e.message; save.disabled = false; }
+  };
+
+  return h('div', { class:'gauge-panel runtime-panel' },
+    h('div', { class:'gauge-title' }, h('h3', null, 'Runtime gauges'),
+      h('span', { class:'hint' }, 'magical & divine runtime state')),
+    h('p', { class:'hint' }, 'Magical and divine runtime state. These values are separate from the mortal survival reserves.'),
+    grid,
+    h('div', { class:'toolrow' }, save), status);
+}
+
+campResume = async function(host, name){
+  await campResumeBeforeRuntime(host, name);
+  if(!ghReady()) return;
+  try{
+    const cfg = ghCfg(), files = await campaignFiles(cfg, name);
+    if(!files.tracker) return;
+    const r = await ghGetText(cfg, files.tracker); if(!r) return;
+    host.append(runtimeEditor(cfg, files.tracker, parseRuntime(r.text), host, name));
+  }catch(e){ host.append(h('p', { class:'hint' }, 'Runtime gauges unavailable: '+e.message)); }
+};
+/* ========================================================================== *
    SURVIVAL STATE — a small, manual editor layered onto the Game Resume view.
    No automatic penalties yet: this only reads/writes the campaign tracker.
  * ========================================================================== */
@@ -4190,32 +4375,16 @@ const campResumeWithoutSurvival=campResume;
 
 function survivalEditor(cfg, trackerPath, parsed, host, campaignName){
   const state=normalizeSurvivalState(parsed.survival);
-  const values={};
+  const reads={};
   let conditions=state.conditions.slice();
-  const status=h('div',{class:'hint survival-status'});
-  const grid=h('div',{class:'survival-grid'});
+  const status=h('div',{class:'hint gauge-status'});
+  const grid=h('div',{class:'gauge-grid'});
 
   SURVIVAL_GAUGES.forEach(g=>{
     const gauge=state[g.key];
-    const number=h('input',{class:'survival-number', type:'number', min:'0', max:String(gauge.max), value:String(gauge.current), inputmode:'numeric', 'aria-label':g.label});
-    const fill=h('div',{class:'survival-fill'});
-    const track=h('div',{class:'survival-track', role:'meter', 'aria-label':g.label, 'aria-valuemin':'0', 'aria-valuemax':String(gauge.max)} , fill);
-    const paint=()=>{
-      let n=Math.round(Number(number.value)); if(!Number.isFinite(n)) n=0;
-      n=Math.max(0,Math.min(gauge.max,n)); number.value=String(n);
-      fill.style.width=((n/gauge.max)*100)+'%'; track.setAttribute('aria-valuenow',String(n));
-    };
-    const nudge=delta=>{ number.value=String(Number(number.value||0)+delta); paint(); };
-    number.oninput=paint; number.onchange=paint; paint();
-    values[g.key]={number,max:gauge.max};
-    grid.append(h('div',{class:'survival-gauge'},
-      h('div',{class:'survival-gauge-head'}, h('b',null,g.label), h('span',null,number,' / '+gauge.max)),
-      track,
-      h('div',{class:'survival-nudges'},
-        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(-5)},'−5'),
-        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(-1)},'−1'),
-        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(1)},'+1'),
-        h('button',{class:'toolbtn', type:'button', onclick:()=>nudge(5)},'+5'))));
+    const ctl=gaugeControl({ label:g.label, current:gauge.current, max:gauge.max });
+    reads[g.key]=ctl.read;
+    grid.append(ctl.node);
   });
 
   const conditionList=h('div',{class:'survival-conditions'});
@@ -4239,15 +4408,15 @@ function survivalEditor(cfg, trackerPath, parsed, host, campaignName){
   save.onclick=async()=>{
     save.disabled=true; status.textContent='Saving to the campaign tracker…';
     const next={conditions};
-    SURVIVAL_GAUGES.forEach(g=>{ next[g.key]={current:Number(values[g.key].number.value),max:values[g.key].max}; });
+    SURVIVAL_GAUGES.forEach(g=>{ next[g.key]=reads[g.key](); });
     try{
       await ghUpdate(cfg, trackerPath, text=>updateSurvivalState(text,next), 'Update survival state via Game', {guard:assertTracker});
       toast('Survival state saved.'); host.replaceChildren(); await campResume(host,campaignName);
     }catch(e){ status.textContent='Failed: '+e.message; save.disabled=false; }
   };
 
-  return h('div',{class:'survival-panel'},
-    h('div',{class:'survival-title'}, h('h3',null,'Mortal survival'), h('span',{class:'hint'},'manual state · higher reserves are better')),
+  return h('div',{class:'gauge-panel survival-panel'},
+    h('div',{class:'gauge-title'}, h('h3',null,'Mortal survival'), h('span',{class:'hint'},'manual state · higher reserves are better')),
     h('p',{class:'hint'}, state.present
       ? 'These values describe the body. They are separate from Personal Mana, Divine Mana, Divine Hunger, and Strain.'
       : 'This tracker predates survival gauges. Saving will initialize the five reserves at 100 without adding automatic penalties.'),
