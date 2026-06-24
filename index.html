@@ -384,6 +384,29 @@
     .gauge-grid{ grid-template-columns:1fr; }
     .survival-add{ flex-direction:column; }
   }
+/* ---------- Region Update 1: read-only saved-region status ---------- */
+.region-view{display:grid;gap:14px}
+.region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
+.region-readonly b{color:var(--ink)}
+.region-readonly span{color:var(--hint);font-style:italic}
+.region-empty,.region-warning{padding:20px;border:1px dashed var(--gold-soft);border-radius:10px;background:var(--paper-card);text-align:center}
+.region-warning{text-align:left;border-style:solid;background:#fff8ef}
+.region-card{padding:18px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+.region-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+.region-card-head h3{font-size:25px}
+.region-card-head p{margin:2px 0 0}
+.region-badge{display:inline-flex;align-items:center;border-radius:999px;padding:4px 9px;font-family:system-ui,sans-serif;font-size:11px;font-weight:700;letter-spacing:.08em}
+.region-badge.ok{background:#e7efe2;color:#436047;border:1px solid #bfd0b8}
+.region-badge.bad{background:#f8e8e2;color:#8b4b3d;border:1px solid #e1b8aa}
+.region-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-top:14px}
+.region-stat{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0}
+.region-stat-label{color:var(--hint)}
+.region-stat b{text-align:right;color:var(--ink);font-weight:600}
+.region-layer-list{margin:14px 0 8px}
+.region-valid{margin:10px 0 0;color:var(--green);font-weight:600}
+.region-invalid{margin-top:12px;padding:12px;border:1px solid #e1b8aa;border-radius:8px;background:#fff4ef;color:#7f493d}
+.region-invalid ul{margin:7px 0 0;padding-left:20px}
+@media(max-width:620px){.region-card{padding:14px}.region-stat{align-items:flex-start;flex-direction:column}.region-stat b{text-align:left}}
   /* ---------- Code Practice (Apprentice profile) ---------- */
   .prc{ max-width:760px; margin:0 auto; }
   .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
@@ -4078,6 +4101,435 @@ function sessionZeroHandoff(name){
   ].join('\n');
 }
 /* ========================================================================== *
+   REGION DATA FOUNDATION — schema, normalization, validation, stable JSON,
+   human-readable summaries, discovery classification, and future write guards.
+
+   This module intentionally does NOT render maps or mutate campaign files.
+   Cosmic Cloudsea placement and local traversable geography are independent.
+ * ========================================================================== */
+const REGION_SCHEMA_VERSION = 1;
+const REGION_COSMIC_LAYERS = ['top','middle','bottom'];
+const REGION_LOCAL_LAYER_TYPES = [
+  'high-airspace',
+  'floating-islands',
+  'peaks-canopy',
+  'surface',
+  'cliffs-ravines',
+  'caves',
+  'deep-caverns',
+  'dimensional-interiors',
+];
+const REGION_ID_RE = /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
+const REGION_HIDDEN_VISIBILITIES = ['gm','gm-only','hidden','private'];
+const REGION_TOP_LEVEL_ORDER = [
+  'schemaVersion','id','title','campaign','cosmicLayer','localLayers','features',
+  'connections','terrain','revealed','pins','markers','elementalInfluence','notes','metadata',
+];
+
+function regionIsRecord(value){ return !!value && typeof value==='object' && !Array.isArray(value); }
+function regionClone(value){ return value===undefined ? undefined : JSON.parse(JSON.stringify(value)); }
+function regionTrim(value){ return typeof value==='string' ? value.trim() : value; }
+function regionFiniteNumber(value){
+  if(typeof value==='number') return Number.isFinite(value) ? value : value;
+  if(typeof value==='string' && value.trim()!==''){
+    const n=Number(value); if(Number.isFinite(n)) return n;
+  }
+  return value;
+}
+function regionOptionalArray(value){ return value==null ? [] : value; }
+function regionOptionalRecord(value){ return value==null ? {} : value; }
+function regionNormalizeId(value){ return typeof value==='string' ? value.trim() : value; }
+function regionNormalizePosition(position){
+  if(!regionIsRecord(position)) return position;
+  const out={...position};
+  ['x','y','z'].forEach(k=>{ if(k in out) out[k]=regionFiniteNumber(out[k]); });
+  return out;
+}
+function regionNormalizeBounds(bounds){
+  if(!regionIsRecord(bounds)) return bounds;
+  const out={...bounds};
+  ['x','y','z','width','height','depth','minX','minY','minZ','maxX','maxY','maxZ'].forEach(k=>{
+    if(k in out) out[k]=regionFiniteNumber(out[k]);
+  });
+  return out;
+}
+function regionNormalizeList(value, mapper){
+  if(value==null) return [];
+  if(!Array.isArray(value)) return value;
+  return value.map(item=>mapper(regionClone(item)));
+}
+
+function normalizeRegion(region){
+  const src=regionClone(region);
+  if(!regionIsRecord(src)) return src;
+  const out={...src};
+  if('schemaVersion' in out) out.schemaVersion=regionFiniteNumber(out.schemaVersion);
+  if('id' in out) out.id=regionNormalizeId(out.id);
+  if('title' in out) out.title=regionTrim(out.title);
+  if('campaign' in out) out.campaign=regionTrim(out.campaign);
+  if(typeof out.cosmicLayer==='string') out.cosmicLayer=out.cosmicLayer.trim().toLowerCase();
+
+  out.localLayers=regionNormalizeList(out.localLayers, layer=>{
+    if(!regionIsRecord(layer)) return layer;
+    const next={...layer};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if(typeof next.type==='string') next.type=next.type.trim().toLowerCase();
+    if('label' in next) next.label=regionTrim(next.label);
+    if('verticalOrder' in next) next.verticalOrder=regionFiniteNumber(next.verticalOrder);
+    if(next.visible===undefined) next.visible=true;
+    if('bounds' in next) next.bounds=regionNormalizeBounds(next.bounds);
+    if('featureIds' in next) next.featureIds=regionOptionalArray(next.featureIds);
+    return next;
+  });
+
+  out.features=regionNormalizeList(out.features, feature=>{
+    if(!regionIsRecord(feature)) return feature;
+    const next={...feature};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('type' in next) next.type=regionTrim(next.type);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('geometry' in next) next.geometry=regionClone(next.geometry);
+    if('tags' in next) next.tags=regionOptionalArray(next.tags);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.connections=regionNormalizeList(out.connections, connection=>{
+    if(!regionIsRecord(connection)) return connection;
+    const next={...connection};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('from' in next) next.from=regionNormalizeId(next.from);
+    if('to' in next) next.to=regionNormalizeId(next.to);
+    if('type' in next) next.type=regionTrim(next.type);
+    if('status' in next) next.status=regionTrim(next.status);
+    if(next.bidirectional===undefined) next.bidirectional=false;
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.pins=regionNormalizeList(out.pins, pin=>{
+    if(!regionIsRecord(pin)) return pin;
+    const next={...pin};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('category' in next) next.category=regionTrim(next.category);
+    if('iconLabel' in next) next.iconLabel=regionTrim(next.iconLabel);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.markers=regionNormalizeList(out.markers, marker=>{
+    if(!regionIsRecord(marker)) return marker;
+    const next={...marker};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('characterId' in next) next.characterId=regionNormalizeId(next.characterId);
+    if('label' in next) next.label=regionTrim(next.label);
+    if('layerId' in next) next.layerId=regionNormalizeId(next.layerId);
+    if('status' in next) next.status=regionTrim(next.status);
+    if('position' in next) next.position=regionNormalizePosition(next.position);
+    if('notes' in next) next.notes=regionOptionalArray(next.notes);
+    return next;
+  });
+
+  out.notes=regionNormalizeList(out.notes, note=>{
+    if(!regionIsRecord(note)) return note;
+    const next={...note};
+    if('id' in next) next.id=regionNormalizeId(next.id);
+    if('text' in next) next.text=regionTrim(next.text);
+    if('category' in next) next.category=regionTrim(next.category);
+    if('visibility' in next) next.visibility=regionTrim(next.visibility);
+    return next;
+  });
+
+  out.terrain=regionOptionalRecord(out.terrain);
+  out.revealed=regionOptionalRecord(out.revealed);
+  out.elementalInfluence=regionOptionalRecord(out.elementalInfluence);
+  out.metadata=regionOptionalRecord(out.metadata);
+  return out;
+}
+
+function parseRegionJson(text){
+  let parsed;
+  try{ parsed=JSON.parse(String(text==null?'':text)); }
+  catch(error){
+    const detail=error && error.message ? error.message : String(error);
+    throw new Error('Malformed region JSON: '+detail);
+  }
+  return normalizeRegion(parsed);
+}
+
+function regionPushError(errors,path,message){ errors.push({path,message,text:(path?path+': ':'')+message}); }
+function regionValidateId(errors,path,value,required=true){
+  if(value==null || value===''){
+    if(required) regionPushError(errors,path,'is required');
+    return false;
+  }
+  if(typeof value!=='string' || !REGION_ID_RE.test(value)){
+    regionPushError(errors,path,'must use lowercase letters, numbers, and internal hyphens');
+    return false;
+  }
+  return true;
+}
+function regionValidatePosition(errors,path,value,required=false){
+  if(value==null){ if(required) regionPushError(errors,path,'is required'); return; }
+  if(!regionIsRecord(value)){ regionPushError(errors,path,'must be an object'); return; }
+  if(!Number.isFinite(value.x)) regionPushError(errors,path+'.x','must be a finite number');
+  if(!Number.isFinite(value.y)) regionPushError(errors,path+'.y','must be a finite number');
+  if(value.z!==undefined && !Number.isFinite(value.z)) regionPushError(errors,path+'.z','must be a finite number');
+}
+function regionValidateArray(errors,path,value){
+  if(!Array.isArray(value)){ regionPushError(errors,path,'must be an array'); return false; }
+  return true;
+}
+function regionValidateRecord(errors,path,value){
+  if(!regionIsRecord(value)){ regionPushError(errors,path,'must be an object'); return false; }
+  return true;
+}
+function regionVisibilityHidden(item){
+  if(!regionIsRecord(item)) return false;
+  if(item.hidden===true || item.revealed===false) return true;
+  const v=typeof item.visibility==='string' ? item.visibility.trim().toLowerCase() : '';
+  return REGION_HIDDEN_VISIBILITIES.includes(v);
+}
+function regionTerrainLayerComplete(layer){
+  if(!regionIsRecord(layer) || typeof layer.format!=='string' || !layer.format.trim()) return false;
+  if(Array.isArray(layer.cells) && layer.cells.length) return true;
+  if(Array.isArray(layer.shapes) && layer.shapes.length) return true;
+  if(Array.isArray(layer.tiles) && layer.tiles.length) return true;
+  if(regionIsRecord(layer.data) && Object.keys(layer.data).length) return true;
+  return false;
+}
+function regionHasCompleteTerrain(region){
+  const terrain=region && region.terrain;
+  if(!regionIsRecord(terrain) || !regionIsRecord(terrain.layers)) return false;
+  const values=Object.values(terrain.layers);
+  return values.length>0 && values.every(regionTerrainLayerComplete);
+}
+function regionHasGenerationProvenance(region){
+  const metadata=region && region.metadata;
+  return regionIsRecord(metadata) && (metadata.seed!==undefined || metadata.generator!==undefined || metadata.generatorVersion!==undefined);
+}
+
+function validateRegion(region,options){
+  const opts=options||{}, errors=[];
+  if(!regionIsRecord(region)){
+    regionPushError(errors,'region','must be a JSON object');
+    return errors;
+  }
+  if(region.schemaVersion!==REGION_SCHEMA_VERSION) regionPushError(errors,'schemaVersion','must equal '+REGION_SCHEMA_VERSION);
+  regionValidateId(errors,'id',region.id,true);
+  if(typeof region.title!=='string' || !region.title.trim()) regionPushError(errors,'title','is required');
+  if(typeof region.campaign!=='string' || !region.campaign.trim()) regionPushError(errors,'campaign','is required');
+  if(opts.expectedCampaign && region.campaign!==opts.expectedCampaign) regionPushError(errors,'campaign','must match selected campaign '+opts.expectedCampaign);
+  if(opts.expectedId && region.id!==opts.expectedId) regionPushError(errors,'id','must match expected region '+opts.expectedId);
+  if(!REGION_COSMIC_LAYERS.includes(region.cosmicLayer)) regionPushError(errors,'cosmicLayer','must be one of: '+REGION_COSMIC_LAYERS.join(', '));
+
+  const allIds=new Map(), layerIds=new Set(), featureIds=new Set();
+  const registerId=(path,id)=>{
+    if(!regionValidateId(errors,path,id,true)) return;
+    if(allIds.has(id)) regionPushError(errors,path,'duplicates '+allIds.get(id));
+    else allIds.set(id,path);
+  };
+
+  if(regionValidateArray(errors,'localLayers',region.localLayers)){
+    region.localLayers.forEach((layer,index)=>{
+      const path='localLayers['+index+']';
+      if(!regionIsRecord(layer)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',layer.id); if(typeof layer.id==='string') layerIds.add(layer.id);
+      if(!REGION_LOCAL_LAYER_TYPES.includes(layer.type)) regionPushError(errors,path+'.type','must be one of: '+REGION_LOCAL_LAYER_TYPES.join(', '));
+      if(typeof layer.label!=='string' || !layer.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(layer.verticalOrder!==undefined && !Number.isFinite(layer.verticalOrder)) regionPushError(errors,path+'.verticalOrder','must be a finite number');
+      if(layer.visible!==undefined && typeof layer.visible!=='boolean') regionPushError(errors,path+'.visible','must be true or false');
+      if(layer.bounds!==undefined && !regionIsRecord(layer.bounds)) regionPushError(errors,path+'.bounds','must be an object');
+      if(layer.featureIds!==undefined && !Array.isArray(layer.featureIds)) regionPushError(errors,path+'.featureIds','must be an array');
+    });
+  }
+
+  if(regionValidateArray(errors,'features',region.features)){
+    region.features.forEach((feature,index)=>{
+      const path='features['+index+']';
+      if(!regionIsRecord(feature)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',feature.id); if(typeof feature.id==='string') featureIds.add(feature.id);
+      if(typeof feature.type!=='string' || !feature.type.trim()) regionPushError(errors,path+'.type','is required');
+      if(typeof feature.label!=='string' || !feature.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(feature.layerId!==undefined && !layerIds.has(feature.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      if(feature.position!==undefined) regionValidatePosition(errors,path+'.position',feature.position,false);
+      if(feature.tags!==undefined && !Array.isArray(feature.tags)) regionPushError(errors,path+'.tags','must be an array');
+      if(feature.notes!==undefined && !Array.isArray(feature.notes)) regionPushError(errors,path+'.notes','must be an array');
+    });
+  }
+
+  if(regionValidateArray(errors,'connections',region.connections)){
+    region.connections.forEach((connection,index)=>{
+      const path='connections['+index+']';
+      if(!regionIsRecord(connection)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',connection.id);
+      if(typeof connection.from!=='string' || !connection.from) regionPushError(errors,path+'.from','is required');
+      if(typeof connection.to!=='string' || !connection.to) regionPushError(errors,path+'.to','is required');
+      const endpoints=new Set([...layerIds,...featureIds]);
+      if(typeof connection.from==='string' && !endpoints.has(connection.from)) regionPushError(errors,path+'.from','references an unknown layer or feature');
+      if(typeof connection.to==='string' && !endpoints.has(connection.to)) regionPushError(errors,path+'.to','references an unknown layer or feature');
+      if(typeof connection.type!=='string' || !connection.type.trim()) regionPushError(errors,path+'.type','is required');
+      if(connection.bidirectional!==undefined && typeof connection.bidirectional!=='boolean') regionPushError(errors,path+'.bidirectional','must be true or false');
+    });
+  }
+
+  if(regionValidateArray(errors,'pins',region.pins)){
+    region.pins.forEach((pin,index)=>{
+      const path='pins['+index+']';
+      if(!regionIsRecord(pin)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',pin.id);
+      if(typeof pin.label!=='string' || !pin.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(!layerIds.has(pin.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      regionValidatePosition(errors,path+'.position',pin.position,true);
+    });
+  }
+
+  if(regionValidateArray(errors,'markers',region.markers)){
+    region.markers.forEach((marker,index)=>{
+      const path='markers['+index+']';
+      if(!regionIsRecord(marker)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',marker.id);
+      regionValidateId(errors,path+'.characterId',marker.characterId,true);
+      if(typeof marker.label!=='string' || !marker.label.trim()) regionPushError(errors,path+'.label','is required');
+      if(!layerIds.has(marker.layerId)) regionPushError(errors,path+'.layerId','references an unknown local layer');
+      regionValidatePosition(errors,path+'.position',marker.position,true);
+    });
+  }
+
+  if(regionValidateArray(errors,'notes',region.notes)){
+    region.notes.forEach((note,index)=>{
+      const path='notes['+index+']';
+      if(!regionIsRecord(note)){ regionPushError(errors,path,'must be an object'); return; }
+      registerId(path+'.id',note.id);
+      if(typeof note.text!=='string' || !note.text.trim()) regionPushError(errors,path+'.text','is required');
+      if(note.text && /[\r\n]{3,}/.test(note.text)) regionPushError(errors,path+'.text','must not contain repeated blank-line payloads');
+    });
+  }
+
+  regionValidateRecord(errors,'terrain',region.terrain);
+  regionValidateRecord(errors,'revealed',region.revealed);
+  regionValidateRecord(errors,'elementalInfluence',region.elementalInfluence);
+  regionValidateRecord(errors,'metadata',region.metadata);
+
+  if(regionIsRecord(region.terrain) && region.terrain.layers!==undefined){
+    if(!regionIsRecord(region.terrain.layers)) regionPushError(errors,'terrain.layers','must be an object keyed by local layer ID');
+    else Object.entries(region.terrain.layers).forEach(([layerId,payload])=>{
+      if(!layerIds.has(layerId)) regionPushError(errors,'terrain.layers.'+layerId,'references an unknown local layer');
+      if(!regionIsRecord(payload)) regionPushError(errors,'terrain.layers.'+layerId,'must be an object');
+      else{
+        if(payload.width!==undefined && (!Number.isInteger(payload.width) || payload.width<=0)) regionPushError(errors,'terrain.layers.'+layerId+'.width','must be a positive integer');
+        if(payload.height!==undefined && (!Number.isInteger(payload.height) || payload.height<=0)) regionPushError(errors,'terrain.layers.'+layerId+'.height','must be a positive integer');
+        if(Array.isArray(payload.cells) && Number.isInteger(payload.width) && Number.isInteger(payload.height) && payload.cells.length!==payload.width*payload.height){
+          regionPushError(errors,'terrain.layers.'+layerId+'.cells','length must equal width × height');
+        }
+      }
+    });
+  }
+
+  if(regionIsRecord(region.revealed) && region.revealed.layers!==undefined){
+    if(!regionIsRecord(region.revealed.layers)) regionPushError(errors,'revealed.layers','must be an object keyed by local layer ID');
+    else Object.entries(region.revealed.layers).forEach(([layerId,value])=>{
+      if(!layerIds.has(layerId)) regionPushError(errors,'revealed.layers.'+layerId,'references an unknown local layer');
+      if(!(regionIsRecord(value) || Array.isArray(value))) regionPushError(errors,'revealed.layers.'+layerId,'must be an object or array');
+    });
+  }
+
+  if(regionHasGenerationProvenance(region) && !regionHasCompleteTerrain(region)){
+    regionPushError(errors,'terrain','generated-region provenance requires complete serialized terrain; a seed alone is not an exact save');
+  }
+  return errors;
+}
+
+function assertRegion(region,options){
+  const normalized=normalizeRegion(region), errors=validateRegion(normalized,options);
+  if(errors.length) throw new Error('Invalid region: '+errors.map(e=>e.text).join('; '));
+  return normalized;
+}
+function assertRegionJson(text,options){ return assertRegion(parseRegionJson(text),options); }
+
+function regionStableValue(value){
+  if(Array.isArray(value)) return value.map(regionStableValue);
+  if(!regionIsRecord(value)) return value;
+  const keys=Object.keys(value).sort();
+  const out={}; keys.forEach(key=>{ out[key]=regionStableValue(value[key]); });
+  return out;
+}
+function regionStableObject(region){
+  const source=regionStableValue(region), out={};
+  REGION_TOP_LEVEL_ORDER.forEach(key=>{ if(Object.prototype.hasOwnProperty.call(source,key)) out[key]=source[key]; });
+  Object.keys(source).sort().forEach(key=>{ if(!Object.prototype.hasOwnProperty.call(out,key)) out[key]=source[key]; });
+  return out;
+}
+function serializeRegion(region){
+  const valid=assertRegion(region);
+  return JSON.stringify(regionStableObject(valid),null,2)+'\n';
+}
+
+function regionSummaryItems(items){ return Array.isArray(items) ? items.filter(item=>!regionVisibilityHidden(item)) : []; }
+function regionSummaryBullet(label,detail){ return '- '+label+(detail?' — '+detail:''); }
+function formatRegionSummary(region,options){
+  const opts=options||{}, valid=assertRegion(region,opts.expectedCampaign?{expectedCampaign:opts.expectedCampaign}:undefined);
+  const layers=regionSummaryItems(valid.localLayers), features=regionSummaryItems(valid.features), connections=regionSummaryItems(valid.connections),
+    pins=regionSummaryItems(valid.pins), markers=regionSummaryItems(valid.markers), notes=regionSummaryItems(valid.notes);
+  const lines=[
+    '# Region — '+valid.title,'',
+    '**Region ID:** '+valid.id,
+    '**Campaign:** '+valid.campaign,
+    '**Cosmic Layer:** '+valid.cosmicLayer.charAt(0).toUpperCase()+valid.cosmicLayer.slice(1),
+    '**Schema Version:** '+valid.schemaVersion,'',
+    '## Local Layers','',
+  ];
+  if(layers.length) layers.forEach(layer=>lines.push(regionSummaryBullet(layer.label,layer.type)));
+  else lines.push('- None recorded');
+
+  const addSection=(title,items,render)=>{
+    lines.push('', '## '+title, '');
+    if(items.length) items.forEach(item=>lines.push(render(item)));
+    else lines.push('- None recorded');
+  };
+  addSection('Major Features',features,item=>regionSummaryBullet(item.label,item.type+(item.layerId?' · '+item.layerId:'')));
+  addSection('Connections',connections,item=>regionSummaryBullet(item.id,item.from+' → '+item.to+(item.type?' · '+item.type:'')));
+  addSection('Pins',pins,item=>regionSummaryBullet(item.label,item.category||item.layerId));
+  addSection('Markers',markers,item=>regionSummaryBullet(item.label,item.status||item.layerId));
+  addSection('Notes',notes,item=>regionSummaryBullet(item.text,item.category||''));
+  return lines.join('\n').replace(/\s+$/,'')+'\n';
+}
+
+function classifyRegionEntries(items,campaignName){
+  const list=Array.isArray(items)?items:[], byBase=new Map(), ignored=[];
+  list.forEach(item=>{
+    if(!item || item.type!=='file' || typeof item.name!=='string'){ ignored.push(item); return; }
+    const match=/^(.+)\.(json|md)$/i.exec(item.name);
+    if(!match){ ignored.push(item); return; }
+    const base=match[1], ext=match[2].toLowerCase();
+    const row=byBase.get(base)||{base,campaign:campaignName||'',json:null,markdown:null};
+    row[ext==='json'?'json':'markdown']={name:item.name,path:item.path||''}; byBase.set(base,row);
+  });
+  const rows=[...byBase.values()].sort((a,b)=>a.base.localeCompare(b.base));
+  return {
+    regions:rows.filter(row=>row.json),
+    orphanMarkdown:rows.filter(row=>!row.json && row.markdown),
+    ignored,
+  };
+}
+
+function regionExpectedPath(campaignName,regionId){ return 'campaign/'+campaignName+'/regions/'+regionId+'.json'; }
+function assertRegionWriteTarget(path,campaignName,region,currentText){
+  const valid=assertRegion(region,{expectedCampaign:campaignName});
+  const expected=regionExpectedPath(campaignName,valid.id);
+  if(path!==expected) throw new Error('Refusing region write: expected '+expected+' but received '+path);
+  if(currentText!=null && String(currentText).trim()){
+    const current=assertRegionJson(currentText,{expectedCampaign:campaignName,expectedId:valid.id});
+    if(current.id!==valid.id) throw new Error('Refusing region write: current region ID changed');
+  }
+  return valid;
+}
+/* ========================================================================== *
    THE GAME SPACE — manage campaigns and hand sessions off to the GM. The
    campaign counterpart to the Canon Studio: a landing that lists your runs, and
    a per-campaign view (Resume / Ledger / Threads / Character) over the repo files.
@@ -4274,6 +4726,134 @@ function startCampaignModal(){
     h('div',null, h('label',null,'Name'), nameIn,
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
+/* REGION TAB — read-only Region Update 1 status view. */
+const CAMPAIGN_REGION_DIR='regions';
+
+function regionDirectoryPath(campaignName){ return CAMP_DIR+'/'+campaignName+'/'+CAMPAIGN_REGION_DIR; }
+function regionArrayCount(value){ return Array.isArray(value)?value.length:0; }
+function regionTerrainStatus(region){
+  if(!regionIsRecord(region&&region.terrain) || !regionIsRecord(region.terrain.layers) || !Object.keys(region.terrain.layers).length){
+    return regionHasGenerationProvenance(region)?'Incomplete generated save':'No serialized terrain';
+  }
+  return regionHasCompleteTerrain(region)?'Complete serialized terrain':'Partial serialized terrain';
+}
+function regionRecordStatus(region,errors,hasMarkdown){
+  const safe=regionIsRecord(region)?region:{};
+  return {
+    title:typeof safe.title==='string'&&safe.title?safe.title:'Unreadable region',
+    id:typeof safe.id==='string'&&safe.id?safe.id:'unknown',
+    schemaVersion:safe.schemaVersion==null?'—':safe.schemaVersion,
+    cosmicLayer:typeof safe.cosmicLayer==='string'&&safe.cosmicLayer?safe.cosmicLayer:'—',
+    layers:regionArrayCount(safe.localLayers),
+    layerLabels:Array.isArray(safe.localLayers)?safe.localLayers.filter(regionIsRecord).map(x=>x.label||x.id||x.type).filter(Boolean):[],
+    terrain:regionTerrainStatus(safe),
+    features:regionArrayCount(safe.features), connections:regionArrayCount(safe.connections),
+    pins:regionArrayCount(safe.pins), markers:regionArrayCount(safe.markers), notes:regionArrayCount(safe.notes),
+    hasMarkdown:!!hasMarkdown, errors:Array.isArray(errors)?errors:[], valid:!errors||errors.length===0,
+  };
+}
+
+async function campaignRegionEntries(cfg,campaignName){
+  try{ return classifyRegionEntries(await ghList(cfg,regionDirectoryPath(campaignName)),campaignName); }
+  catch(error){
+    const message=String(error&&error.message||error);
+    if(/404|not found|does not exist/i.test(message)) return {regions:[],orphanMarkdown:[],ignored:[]};
+    throw error;
+  }
+}
+
+async function loadCampaignRegions(cfg,campaignName){
+  const discovered=await campaignRegionEntries(cfg,campaignName), loaded=[];
+  for(const entry of discovered.regions){
+    let region=null, errors=[];
+    try{
+      const response=await ghGetText(cfg,entry.json.path);
+      if(!response) throw new Error('Region JSON could not be read');
+      region=parseRegionJson(response.text);
+      errors=validateRegion(region,{expectedCampaign:campaignName});
+    }catch(error){
+      const message=String(error&&error.message||error);
+      errors=[{path:entry.json.path,message,text:message}];
+    }
+    loaded.push({...entry,region,errors});
+  }
+  const ids=new Map();
+  loaded.forEach(entry=>{
+    if(!entry.region||typeof entry.region.id!=='string'||!entry.region.id) return;
+    if(ids.has(entry.region.id)){
+      const first=ids.get(entry.region.id);
+      entry.errors.push({path:'id',message:'duplicate region ID',text:'id: duplicates '+first.json.name});
+      first.errors.push({path:'id',message:'duplicate region ID',text:'id: duplicates '+entry.json.name});
+    }else ids.set(entry.region.id,entry);
+  });
+  return {...discovered,regions:loaded};
+}
+
+function regionStatusRow(label,value){
+  return h('div',{class:'region-stat'},h('span',{class:'region-stat-label'},label),h('b',null,String(value)));
+}
+function regionValidationBlock(errors){
+  if(!errors.length) return h('p',{class:'region-valid'},'Valid region save');
+  return h('div',{class:'region-invalid'},
+    h('b',null,errors.length+' validation issue'+(errors.length===1?'':'s')),
+    h('ul',null,...errors.map(error=>h('li',null,error.text||error.message||String(error)))));
+}
+function regionStatusCard(entry){
+  const status=regionRecordStatus(entry.region,entry.errors,entry.markdown);
+  return h('section',{class:'region-card'},
+    h('div',{class:'region-card-head'},
+      h('div',null,h('h3',null,status.title),h('p',{class:'hint'},entry.json.name)),
+      h('span',{class:'region-badge '+(status.valid?'ok':'bad')},status.valid?'VALID':'NEEDS ATTENTION')),
+    h('div',{class:'region-stats'},
+      regionStatusRow('Region ID',status.id), regionStatusRow('Schema',status.schemaVersion),
+      regionStatusRow('Cosmic layer',status.cosmicLayer), regionStatusRow('Local layers',status.layers),
+      regionStatusRow('Terrain',status.terrain), regionStatusRow('Features',status.features),
+      regionStatusRow('Connections',status.connections), regionStatusRow('Pins',status.pins),
+      regionStatusRow('Markers',status.markers), regionStatusRow('Notes',status.notes),
+      regionStatusRow('Markdown summary',status.hasMarkdown?'Present':'Not present')),
+    h('p',{class:'region-layer-list'},h('b',null,'Local layer labels: '),status.layerLabels.length?status.layerLabels.join(', '):'None recorded'),
+    regionValidationBlock(status.errors));
+}
+
+async function campRegion(host,name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint',style:{textAlign:'center'}},'Loading saved regions…'));
+  try{
+    const result=await loadCampaignRegions(cfg,name);
+    const wrap=h('div',{class:'region-view'},
+      h('div',{class:'region-readonly'},h('b',null,'Region foundation · read only'),
+        h('span',null,'This update validates saved region data. Map rendering and editing arrive later.')));
+    if(!result.regions.length){
+      wrap.append(h('div',{class:'region-empty'},h('h3',null,'No saved regions'),
+        h('p',{class:'hint'},'No saved regions exist for this campaign yet. Region creation and map rendering will arrive in a later update.')));
+    }else result.regions.forEach(entry=>wrap.append(regionStatusCard(entry)));
+    if(result.orphanMarkdown.length){
+      wrap.append(h('div',{class:'region-warning'},h('b',null,'Markdown summaries without JSON'),
+        h('ul',null,...result.orphanMarkdown.map(entry=>h('li',null,entry.markdown.name)))));
+    }
+    host.replaceChildren(wrap);
+  }catch(error){
+    host.replaceChildren(h('p',{class:'hint'},'Region data unavailable: '+String(error&&error.message||error)));
+  }
+}
+
+// Extend the existing campaign screen after campaign.js loads. Existing tabs continue to
+// use the original view; only the new Region tab uses this focused read-only view.
+if(!CAMP_TABS.some(tab=>tab[0]==='region')){
+  CAMP_TABS.push(['region','Region','Saved regional geography, layers, connections, markers, and validation status.']);
+}
+const viewCampaignBeforeRegion=viewCampaign;
+viewCampaign=function(name,tab){
+  if(tab!=='region') return viewCampaignBeforeRegion(name,tab);
+  const f=framed(name,'idea → ledger → (audit) → canon','campaign-only until it’s audited into the queue');
+  const body=f.querySelector('.framed-body');
+  if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
+  body.append(h('div',{class:'toolrow',style:{marginBottom:'4px'}},h('button',{class:'navbtn',onclick:()=>go('campaigns')},'← All campaigns')));
+  const tabs=h('div',{class:'studio-tabs'});
+  CAMP_TABS.forEach(([key,label])=>tabs.append(h('button',{class:'tab'+(key==='region'?' on':''),'aria-pressed':key==='region'?'true':'false',onclick:()=>go('campaign',{camp:name,tab:key})},label)));
+  body.append(tabs,h('p',{class:'hint',style:{textAlign:'center',margin:'8px auto 16px',maxWidth:'52ch'}},CAMP_TABS.find(tab=>tab[0]==='region')[2]));
+  const host=h('div'); body.append(host); campRegion(host,name); return f;
+};
 /* ========================================================================== *
    GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
    the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
