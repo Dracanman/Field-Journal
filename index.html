@@ -306,6 +306,26 @@
   .board .pcard{ background:#fff8; border:1px solid #e6dcc4; border-radius:7px; padding:8px 10px; margin-bottom:7px; font-size:14px; }
   .board .pcard b{ color:var(--ink); display:block; }
   .board .pcard small{ color:var(--hint); }
+  .pcard-open{display:block;width:100%;border:0;background:transparent;color:inherit;font:inherit;text-align:left;padding:0;white-space:normal;cursor:pointer}
+  .pcard-open:focus-visible{outline:2px solid var(--gold);outline-offset:4px;border-radius:3px}
+  .pcard-open-hint{display:block;margin-top:5px;color:var(--green);font-size:12px;font-weight:600}
+  .card-reader-modal{max-width:760px}
+  .card-reader-meta{display:grid;gap:6px;margin:12px 0 18px}
+  .card-reader-meta div{display:grid;grid-template-columns:90px 1fr;gap:10px}
+  .card-reader-meta dt{color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .card-reader-meta dd{margin:0;color:var(--ink-soft);overflow-wrap:anywhere}
+  .card-reader-section{margin:18px 0}
+  .card-reader-section h3{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--gold);margin:0 0 7px}
+  .card-reader-section p,.card-reader-section li{color:var(--ink-soft);line-height:1.5;overflow-wrap:anywhere}
+  .card-reader-section ul{margin:0;padding-left:20px}
+  .card-reader-checklist{list-style:none;padding-left:0!important}
+  .card-reader-checklist li{display:flex;gap:9px;align-items:flex-start;margin:6px 0}
+  .card-reader-check{flex:0 0 auto;color:var(--green);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700}
+  .card-reader-promoted{padding:18px;border:1px solid #cdd4b9;border-radius:10px;background:#f3f5ea}
+  .card-reader-promoted b{color:var(--green);font-size:18px}
+  .card-reader-promoted p{margin:6px 0 0;color:var(--ink-soft)}
+  .card-reader-actions{margin-top:20px}
+  @media(max-width:620px){.card-reader-meta div{grid-template-columns:1fr;gap:1px}.card-reader-modal{padding:20px 18px}}
   .drafter label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
   .drafter input, .drafter textarea, .drafter select{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   .drafter textarea{ min-height:64px; resize:vertical; }
@@ -371,6 +391,24 @@
   .gauge-nudges .toolbtn{ flex:1 1 38px; padding:4px 7px; }
   .gauge-status{ margin-top:8px; }
 
+  /* non-gauge Campaign State Tracker fields */
+  .tracker-editor{
+    margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:12px;
+    background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .tracker-editor h4{ margin:18px 0 8px; color:var(--gold); font-size:12px; letter-spacing:.13em; text-transform:uppercase; }
+  .tracker-edit-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px 14px; }
+  .tracker-field label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
+  .tracker-field textarea,.tracker-section-editor textarea{
+    width:100%; box-sizing:border-box; resize:vertical; border:1px solid var(--gold-soft); border-radius:8px;
+    background:#fffdf7; color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
+  }
+  .tracker-section-editors{ display:grid; gap:8px; }
+  .tracker-section-editor{ border:1px solid #e7dcc4; border-radius:9px; background:#fffaf0; padding:0 11px 11px; }
+  .tracker-section-editor summary{ cursor:pointer; color:var(--green); font-weight:700; padding:10px 0; touch-action:manipulation; }
+  .tracker-section-editor .hint{ margin:0 0 8px; font-size:12px; }
+  .tracker-save-status{ min-height:1.35em; margin-top:7px; }
+
   /* mortal survival — the named-conditions editor (survival-specific) */
   .survival-condition-editor{ margin-top:16px; }
   .survival-condition-editor > label{ display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:7px; }
@@ -382,6 +420,8 @@
   @media (max-width:620px){
     .gauge-panel{ padding:14px; }
     .gauge-grid{ grid-template-columns:1fr; }
+    .tracker-editor{ padding:14px; }
+    .tracker-edit-grid{ grid-template-columns:1fr; }
     .survival-add{ flex-direction:column; }
   }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
@@ -426,12 +466,104 @@
 .region-conn-line{stroke:#5a4a36;stroke-width:.08;stroke-linecap:round;stroke-dasharray:.22 .18;opacity:.85}
 .region-feature-dot{fill:#7a3b2e;stroke:#fff;stroke-width:.05}
 .region-feature-label{fill:#43331f;font-family:system-ui,sans-serif;font-size:.42px;paint-order:stroke;stroke:#fff8ef;stroke-width:.12}
+.region-map-item{cursor:pointer;outline:none}
+.region-pin-stem{stroke:#683c30;stroke-width:.12;stroke-linecap:round}
+.region-pin-dot{fill:#b55e45;stroke:#fff8ef;stroke-width:.08}
+.region-marker-dot{fill:#456f83;stroke:#fff8ef;stroke-width:.08}
+.region-map-item-label{fill:#30271d;font-family:system-ui,sans-serif;font-size:.38px;font-weight:700;paint-order:stroke;stroke:#fff8ef;stroke-width:.13}
+.region-map-item.selected .region-pin-dot,.region-map-item.selected .region-marker-dot{stroke:#d39d22;stroke-width:.14}
+.region-map-svg.is-placing{cursor:crosshair}
 .region-map-empty-text{fill:var(--hint);font-family:system-ui,sans-serif;font-size:.8px}
 .region-map-meta{margin-top:10px}
 .region-conn-list{margin:6px 0 0;padding-left:20px;color:var(--ink)}
 .region-map-text{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0;white-space:pre-wrap;font-size:13px;max-height:340px;overflow:auto}
 .region-readonly-note{margin:10px 0 0;font-style:italic}
-@media(max-width:620px){.region-map{padding:12px}.region-map-svg{height:54vh}}
+
+/* ---------- Region Update 3: focused pin + marker editor ---------- */
+.region-edit-wrap{display:grid;gap:10px}
+.region-editor{padding:14px 16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:#fffaf0}
+.region-editor-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
+.region-editor-head h3{font-size:20px;margin:0}
+.region-edit-create,.region-edit-inspector{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.region-edit-create label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
+.region-edit-create input,.region-edit-create select,.region-edit-inspector input{min-width:0;border:1px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink);font:inherit;padding:8px 10px}
+.region-edit-create input{flex:1 1 180px}
+.region-edit-inspector{margin-top:10px;padding-top:10px;border-top:1px solid #e7dcc4}
+.region-edit-inspector input{flex:1 1 200px}
+.region-delete{color:#8b4338;border-color:#d8a99d}
+.region-edit-status{min-height:1.3em;margin-top:8px}
+.region-fog-controls .region-editor-head{margin-bottom:8px}
+.region-fog-controls .toolrow{margin-top:0}
+.region-map-svg.is-placing .region-cell,.region-map-svg.is-placing .region-fog{cursor:crosshair}
+@media(max-width:620px){
+  .region-map{padding:12px}.region-map-svg{height:54vh}
+  .region-editor{padding:12px}.region-edit-create,.region-edit-inspector{align-items:stretch;flex-direction:column}
+  .region-edit-create label,.region-edit-create input,.region-edit-create select,.region-edit-create button,
+  .region-edit-inspector input,.region-edit-inspector button{width:100%;box-sizing:border-box}
+  .region-fog-controls .toolrow{align-items:stretch;flex-direction:column}
+  .region-fog-controls .toolrow .navbtn{width:100%}
+}
+/* ---------- Engine settings: device-only profiles, no model calls yet ---------- */
+.engine-settings{display:grid;gap:14px}
+.engine-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#f3f5ea}
+.engine-summary b{color:var(--green)}.engine-summary span{text-align:right;color:var(--ink-soft)}
+.engine-list{display:grid;gap:9px}
+.engine-empty{padding:16px;border:1px dashed var(--gold-soft);border-radius:9px;text-align:center}
+.engine-row{display:flex;align-items:stretch;gap:8px;padding:9px;border:1px solid #e6dcc4;border-radius:10px;background:#fffaf0}
+.engine-row.active{border-color:#aebd94;box-shadow:inset 3px 0 #71835a}
+.engine-select{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;flex:1;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;padding:4px 6px;cursor:pointer}
+.engine-select:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+.engine-name{font-weight:700;color:var(--ink);overflow-wrap:anywhere}
+.engine-type{grid-column:1;color:var(--hint);font-size:13px;overflow-wrap:anywhere}
+.engine-active{grid-column:2;grid-row:1 / span 2;align-self:center;border-radius:999px;padding:3px 7px;background:#e6edda;color:#50643e;font-size:10px;font-weight:800;letter-spacing:.08em}
+.engine-actions{display:flex;align-items:center;gap:6px}.engine-actions .navbtn{padding:5px 9px;font-size:12px}.engine-remove{color:#8b4338}
+.engine-add{margin-top:-2px}
+.engine-form{padding:14px;border:1.5px solid var(--gold-soft);border-radius:11px;background:#fffdf7}
+.engine-form label{display:block;margin:10px 0 4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+.engine-form input,.engine-form select{width:100%;box-sizing:border-box;border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink-soft);font:inherit;padding:9px 11px}
+.engine-secret-note{margin:10px 0;color:var(--hint);font-size:13px;font-style:italic}
+.engine-status,.engine-notice{min-height:1.3em}.engine-form .toolrow{margin-top:10px}
+@media(max-width:620px){
+  .engine-summary{align-items:flex-start;flex-direction:column}.engine-summary span{text-align:left}
+  .engine-row{flex-direction:column}.engine-actions{justify-content:flex-end}
+  .engine-form .toolrow{align-items:stretch;flex-direction:column}.engine-form .toolrow .navbtn{width:100%}
+}
+/* ---------- Spaces: iPad-friendly front door ------------------------------ */
+.spaces-front{max-width:940px;margin:24px auto 0}
+.spaces-intro{text-align:center;padding:18px 14px 24px}
+.spaces-emblem{width:78px;height:78px;color:var(--green);margin:0 auto 10px}
+.spaces-kicker{margin:0 0 4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.18em;text-transform:uppercase}
+.spaces-intro h1{font-size:44px}
+.spaces-intro .hint{max-width:580px;margin:10px auto 0;font-size:16px}
+.spaces-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.space-tile{
+  position:relative;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;
+  min-height:168px;padding:24px;text-align:left;color:var(--ink-soft);font:inherit;
+  border:1.5px solid #e6dcc4;border-radius:14px;background:var(--paper-card);
+  box-shadow:0 14px 30px -26px rgba(var(--shadow)/.45);touch-action:manipulation;
+  transition:transform .08s ease,border-color .12s ease,box-shadow .12s ease;
+}
+.space-tile:hover{transform:translateY(-2px);border-color:var(--gold);box-shadow:0 18px 34px -25px rgba(var(--shadow)/.55)}
+.space-tile:focus-visible{outline:3px solid var(--gold-soft);outline-offset:3px}
+.space-tile.current{border-color:#aebd94;background:#f4f6eb;box-shadow:inset 4px 0 #71835a}
+.space-icon{display:grid;place-items:center;width:54px;height:54px;border:1px solid var(--gold-soft);border-radius:50%;color:var(--green);font-size:27px;background:#fffaf0}
+.space-copy{display:flex;min-width:0;flex-direction:column;gap:4px}
+.space-title{color:var(--ink);font-family:'EB Garamond',serif;font-size:27px;font-weight:600}
+.space-subtitle{color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
+.space-description{margin-top:5px;color:var(--hint);font-size:14px;font-style:italic;line-height:1.4}
+.space-open,.space-current{align-self:start;margin-top:3px;color:var(--green);font-size:12px;font-weight:800;letter-spacing:.08em;white-space:nowrap}
+.space-current{padding:4px 7px;border-radius:999px;background:#e3ead7}
+.spaces-foot{text-align:center;margin:26px 0 0;color:var(--green);font-size:22px}
+.spaces-nav{padding-inline:12px}
+@media(max-width:720px){
+  .spaces-front{margin-top:8px}.spaces-intro h1{font-size:38px}
+  .spaces-grid{grid-template-columns:1fr}.space-tile{min-height:142px;padding:20px}
+}
+@media(max-width:460px){
+  .space-tile{grid-template-columns:auto 1fr;padding:17px;gap:13px}
+  .space-open,.space-current{grid-column:2;margin-top:2px;justify-self:start}
+  .spaces-nav{padding-inline:10px}
+}
   /* ---------- Code Practice (Apprentice profile) ---------- */
   .prc{ max-width:760px; margin:0 auto; }
   .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
@@ -1629,8 +1761,19 @@ function namingDefault(){ return {
 // drill code, flashcard progress, the per-session checklist, the confusion log,
 // and the paste-lock toggle. Free-text inputs live in .fields, keyed by name.
 function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
-function hydrate(d){ const merged=Object.assign(defaults(), d); merged.naming=Object.assign(namingDefault(), d.naming||{}); merged.practice=Object.assign(practiceDefault(), d.practice||{}); return merged; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function hydrate(d){
+  d=d||{};
+  const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
+  merged.openTo=d.openTo==='frontdoor'?'frontdoor':'last';
+  merged.naming=Object.assign(namingDefault(), d.naming||{});
+  merged.practice=Object.assign(practiceDefault(), d.practice||{});
+  merged.engines={
+    activeId:typeof engines.activeId==='string'?engines.activeId:'',
+    profiles:Array.isArray(engines.profiles)?engines.profiles.map(profile=>Object.assign({},profile)) : [],
+  };
+  return merged;
+}
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
   try{
@@ -1652,7 +1795,8 @@ let DB = defaults();   // replaced by loadState() in init() before the first ren
 let _stateT=null;
 function scheduleStateWrite(){ clearTimeout(_stateT); _stateT=setTimeout(flushState, 120); }
 function flushState(){ clearTimeout(_stateT); idbSet(IDB_KEY, DB).catch(()=>{ toast('Could not save to storage.'); }); }
-function saveLocal(){
+function saveLocal(opts){
+  opts=opts||{};
   scheduleStateWrite();                                            // IndexedDB — the real store
   // best-effort recovery mirror; never let a momentarily-empty journal wipe a non-empty
   // backup (guards against a transient blank destroying the only local copy). But a real
@@ -1660,7 +1804,8 @@ function saveLocal(){
   // mirror after storage eviction could resurrect something she removed.
   try{
     const hasWork = (DB.creations&&DB.creations.length) || (DB.tombstones&&Object.keys(DB.tombstones).length);
-    if(hasWork || !localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(DB));
+    const hasDeviceConfig = !!DB.github || !!(DB.engines&&DB.engines.profiles&&DB.engines.profiles.length);
+    if(opts.forceMirror || hasWork || hasDeviceConfig || !localStorage.getItem(KEY)) localStorage.setItem(KEY, JSON.stringify(DB));
   }catch(e){}
 }
 function save(){ saveLocal(); scheduleSync(); }                    // local + a (debounced, de-duped) repo sync
@@ -1730,10 +1875,11 @@ function topbar(){
         h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Field Journal'+count),
         h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'));
   // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
-  // no clip). The Cozy/Full toggle stays out (it's how you toggle). The Maker in Cozy has
-  // no advanced utilities, so no ⋯ shows there.
-  const showMore = world || game || learn || full;
+  // no clip). The Cozy/Full toggle stays out (it's how you toggle). More remains available
+  // in Cozy so device preferences and the deliberate space switch are always reachable.
+  const showMore = true;
   const util = h('div',{class:'navutil'},
+    h('button',{class:'navbtn spaces-nav', title:'all spaces', onclick:()=>go('spaces')}, '⌂ Spaces'),
     (world||game||learn)? null : modeSwitch(full),
     showMore? h('button',{class:'navbtn', 'aria-label':'more', title:'more', onclick:()=>moreMenu()}, '⋯') : null,
   );
@@ -1745,8 +1891,12 @@ function topbar(){
 function moreMenu(){
   let close;
   const item=(label, fn)=> h('button',{class:'navbtn', style:{justifyContent:'flex-start', textAlign:'left'}, onclick:()=>{ close(); fn(); }}, label);
+  const advanced=DB.profile!=='maker'||DB.mode==='full';
   const sheet=h('div',{class:'moremenu'},
-    item('☁ My file', ()=>openGitHubPanel()),
+    advanced?item('☁ My file', ()=>openGitHubPanel()):null,
+    advanced?item('⚙ Engine', ()=>openEngineSettings()):null,
+    item('⌂ On open', ()=>openOpenToSettings()),
+    item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
     item('⇄ Switch space', ()=>switchProfileSheet()),
   );
@@ -2498,16 +2648,27 @@ function setMode(m){ DB.mode=m; save(); applyMode(); if($app.firstChild) $app.re
 /* ---------- first-run flow (profile pick, then the gentle intro) ----------- */
 function firstRun(){ if(!DB.profileChosen){ chooseProfile(); return; } showIntro(false); }
 
-// A deliberate one-time pick — "whose space is this?" — so the Maker's journal and
-// the Worldbuilder's canon studio are genuinely separate, not a one-tap toggle apart.
-function chooseProfile(){
+// A deliberate pick — first-run once, replayable on demand — so the Maker's journal
+// and the Worldbuilder's canon studio remain genuinely separate spaces.
+function applyProfileChoice(p){
+  DB.profile=p; DB.profileChosen=true; if(p!=='maker') DB.mode='full';
+}
+function finishProfileChoice(p, replay){
+  applyProfileChoice(p);
+  save(); applyMode();
+  if(p==='maker') render();
+  else {
+    go(profileLanding(p));
+    toast(p==='worldbuilder'? 'Welcome, Worldbuilder.' : p==='game'? 'Welcome to the Game.' : 'Welcome to Code Practice.');
+  }
+  if(replay || p==='maker') showIntro(true);
+}
+function chooseProfile(options){
+  const replay=!!(options&&options.replay);
   openOverlay(close=>{
     function pick(p){
-      DB.profile=p; DB.profileChosen=true; if(p!=='maker') DB.mode='full';
-      save(); applyMode(); close();
-      if(p==='maker'){ render(); showIntro(true); }
-      else { go(p==='worldbuilder'?'studio':p==='game'?'campaigns':'practice');
-        toast(p==='worldbuilder'? 'Welcome, Worldbuilder.' : p==='game'? 'Welcome to the Game.' : 'Welcome to Code Practice.'); }
+      close();
+      finishProfileChoice(p, replay);
     }
     return h('div',{class:'intro'},
       svgUse('ic-seedling','em'),
@@ -2526,6 +2687,7 @@ function chooseProfile(){
     );
   }, { cls:'intro-bg', dismissible:false });
 }
+function replayWelcome(){ chooseProfile({replay:true}); }
 // Switching sides is possible but deliberate: a small current-side button opens this
 // confirm, rather than a bare toggle sitting in the bar.
 function switchProfileSheet(){
@@ -2560,6 +2722,106 @@ function showIntro(force){
   ), { cls:'intro-bg', onClose:()=>{ DB.seenIntro=true; save(); } });
 }
 
+/* ---------- Spaces: one front door into the four existing profiles -------- */
+const SPACES=[
+  {
+    profile:'maker',
+    icon:'✿',
+    title:'Maker',
+    subtitle:'The field journal',
+    description:'Make Vael folk, places, creatures, keepsakes, and seeds.',
+  },
+  {
+    profile:'worldbuilder',
+    icon:'⚒',
+    title:'Worldbuilder',
+    subtitle:'The canon studio',
+    description:'Browse, draft, triage, and tend the governed world.',
+  },
+  {
+    profile:'game',
+    icon:'♟',
+    title:'Game',
+    subtitle:'Campaigns at the table',
+    description:'Resume a campaign, follow its ledger, and keep its threads moving.',
+  },
+  {
+    profile:'learner',
+    icon:'✶',
+    title:'Apprentice',
+    subtitle:'Code practice',
+    description:'Learn C++ for Unreal through small lessons and drills.',
+  },
+];
+
+function spaceTile(space){
+  const current=DB.profile===space.profile;
+  return h('button',{
+    class:'space-tile'+(current?' current':''),
+    type:'button',
+    'aria-current':current?'page':null,
+    onclick:()=>setProfile(space.profile),
+  },
+    h('span',{class:'space-icon','aria-hidden':'true'},space.icon),
+    h('span',{class:'space-copy'},
+      h('span',{class:'space-title'},space.title),
+      h('span',{class:'space-subtitle'},space.subtitle),
+      h('span',{class:'space-description'},space.description)),
+    current?h('span',{class:'space-current'},'CURRENT'):h('span',{class:'space-open'},'Open →'));
+}
+
+function viewSpaces(){
+  return h('main',{class:'spaces-front'},
+    h('section',{class:'spaces-intro'},
+      svgUse('ic-seedling','spaces-emblem'),
+      h('p',{class:'spaces-kicker'},'The Vael Field Journal'),
+      h('h1',{class:'display'},'Choose a space'),
+      h('p',{class:'hint'},'One front door, four rooms. Your work stays where it is when you move between them.')),
+    h('div',{class:'spaces-grid'},...SPACES.map(spaceTile)),
+    h('p',{class:'spaces-foot hand'},'same trunk, different branches'));
+}
+
+registerView('spaces',()=>viewSpaces());
+/* ---------- device-only opening destination ------------------------------- */
+function normalizeOpenTo(value){ return value==='frontdoor'?'frontdoor':'last'; }
+
+// A missing profile means first-run still owns the opening experience.
+function initialOpenViewName(state){
+  if(!state || !state.profileChosen) return null;
+  return normalizeOpenTo(state.openTo)==='frontdoor'?'spaces':profileLanding(state.profile);
+}
+
+function setOpenTo(value){
+  DB.openTo=normalizeOpenTo(value);
+  saveLocal({forceMirror:true});
+  return DB.openTo;
+}
+
+function openToSettingsPanel(){
+  const root=h('div',{class:'profile-pick'});
+  function draw(){
+    const current=normalizeOpenTo(DB.openTo);
+    const choice=(value,label,description)=>h('button',{
+      class:'navbtn ppick'+(current===value?' primary':''),
+      type:'button',
+      'aria-pressed':current===value?'true':'false',
+      onclick:()=>{
+        setOpenTo(value);
+        toast(value==='frontdoor'?'The front door will open next time.':'Your last space will open next time.');
+        draw();
+      },
+    },h('b',null,label),h('small',null,description));
+    root.replaceChildren(
+      choice('last','Last space','Open the space remembered on this device, just as before.'),
+      choice('frontdoor','The front door','Open Spaces first, then choose Maker, Worldbuilder, Game, or Apprentice.'));
+  }
+  draw();
+  return root;
+}
+
+function openOpenToSettings(){
+  return showModalNode('On open, go to','This preference is kept only on this device.',openToSettingsPanel());
+}
 /* ========================================================================== *
    CODE PRACTICE (Apprentice profile) — learn C++ from Stroustrup's
    "Programming: Principles and Practice Using C++" (3rd ed.). Two tabs:
@@ -3000,9 +3262,9 @@ async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!met
   text=text.replace(/^﻿/,'');   // strip a UTF-8 BOM if present
   return { text, sha:meta.sha }; }
 // Only the *shareable* journal travels to the repo — never device-only flags
-// (token, mode, profile, seenIntro, the GitHub config). That way toggling Cozy/Full,
-// dismissing a dialog, or switching sides never makes a commit, and an unchanged
-// journal produces an identical payload we can skip.
+// (token, engine profiles, mode, profile, seenIntro, the GitHub config). That way
+// settings changes never enter a repo payload, and an unchanged journal produces
+// an identical payload we can skip.
 function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault() }; }
 let syncTimer=null, syncing=false, _lastSyncedJSON=null;
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
@@ -3023,7 +3285,22 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
   }catch(e){ if(!opts.silent) toast('Sync failed: '+e.message); }
   finally{ syncing=false; }
 }
-function stripForBackup(db){ const d=Object.assign({}, db); if(d.github){ d.github=Object.assign({}, d.github); delete d.github.token; } return d; } // never write the token into the repo
+function stripForBackup(db){
+  const d=Object.assign({},db);
+  if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
+  if(d.engines){
+    const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
+    d.engines={
+      activeId:typeof engines.activeId==='string'?engines.activeId:'',
+      profiles:(Array.isArray(engines.profiles)?engines.profiles:[]).map(profile=>({
+        id:String(profile&&profile.id||''),
+        name:String(profile&&profile.name||''),
+        type:String(profile&&profile.type||''),
+      })),
+    };
+  }
+  return d;
+} // never write tokens, engine keys, or engine endpoints into a backup
 // merge an incoming journal (from the repo or a backup file) into DB. Additive for new
 // work (existing items win, new ones appended by id), but deletions are honored via
 // tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
@@ -3050,7 +3327,8 @@ async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silen
 function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
 
 /* ---------- local backup file (a safety net against data eviction) --------- */
-// the journal travels with its images inline; the token is never written into a backup.
+// the journal travels with its images inline; device secrets (GitHub token,
+// engine key, engine endpoint) are never written into a backup.
 function exportBackup(){
   const data=JSON.stringify(stripForBackup(DB), null, 1);
   const b=new Blob([data],{type:'application/json'});
@@ -3117,6 +3395,147 @@ function openGitHubPanel(){
   showModalNode('My file in the world', null, panel);
 }
 
+/* ========================================================================== *
+   ENGINE SETTINGS — storage and switching groundwork only.
+
+   Profiles live in the same device-local state as the GitHub token. This module
+   never calls an endpoint, never logs a key, and never schedules repo sync.
+   syncPayload excludes all engine settings; stripForBackup removes endpoint/key.
+ * ========================================================================== */
+const ENGINE_TYPES=[
+  'Anthropic API',
+  'OpenAI API',
+  'OpenAI-compatible local endpoint',
+  'Other HTTP endpoint',
+];
+
+function normalizeEngineProfile(profile){
+  const p=profile&&typeof profile==='object'?profile:{};
+  return {
+    id:typeof p.id==='string'?p.id:'',
+    name:typeof p.name==='string'?p.name.trim():'',
+    type:typeof p.type==='string'?p.type.trim():'',
+    endpoint:typeof p.endpoint==='string'?p.endpoint.trim():'',
+    key:typeof p.key==='string'?p.key.trim():'',
+  };
+}
+function normalizeEngineSettings(value){
+  const source=value&&typeof value==='object'?value:{};
+  const profiles=Array.isArray(source.profiles)?source.profiles.map(normalizeEngineProfile).filter(p=>p.id):[];
+  const activeId=typeof source.activeId==='string'&&profiles.some(p=>p.id===source.activeId)?source.activeId:'';
+  return {activeId,profiles};
+}
+function engineSettings(){
+  DB.engines=normalizeEngineSettings(DB.engines);
+  return DB.engines;
+}
+function engineProfileId(){
+  return 'engine-'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+}
+function getActiveEngine(){
+  const settings=engineSettings(), profile=settings.profiles.find(p=>p.id===settings.activeId);
+  return profile?Object.freeze(Object.assign({},profile)):null;
+}
+function saveEngineProfile(profile){
+  const next=normalizeEngineProfile(profile);
+  if(!next.name) throw new Error('Engine name is required');
+  if(!next.type) throw new Error('Engine type is required');
+  if(!next.endpoint) throw new Error('Base URL / endpoint is required');
+  if(!next.id) next.id=engineProfileId();
+  const settings=engineSettings(), index=settings.profiles.findIndex(p=>p.id===next.id);
+  if(index>=0) settings.profiles[index]=next; else settings.profiles.push(next);
+  if(!settings.activeId) settings.activeId=next.id;
+  DB.engines=settings; saveLocal({forceMirror:true});
+  return Object.freeze(Object.assign({},next));
+}
+function setActiveEngine(id){
+  const settings=engineSettings();
+  if(!settings.profiles.some(profile=>profile.id===id)) throw new Error('Engine profile not found');
+  settings.activeId=id; DB.engines=settings; saveLocal({forceMirror:true});
+  return getActiveEngine();
+}
+function removeEngineProfile(id){
+  const settings=engineSettings(), index=settings.profiles.findIndex(profile=>profile.id===id);
+  if(index<0) return false;
+  settings.profiles.splice(index,1);
+  if(settings.activeId===id) settings.activeId=settings.profiles[0]?settings.profiles[0].id:'';
+  DB.engines=settings; saveLocal({forceMirror:true});
+  return true;
+}
+
+function engineProfileForm(profile,onDone,onCancel){
+  const current=normalizeEngineProfile(profile);
+  const nameIn=h('input',{value:current.name,placeholder:'Local M5, Claude, Home server…',maxlength:'80'});
+  const typeIn=h('select',null,...ENGINE_TYPES.map(type=>h('option',{value:type},type)));
+  typeIn.value=current.type||ENGINE_TYPES[0];
+  const endpointIn=h('input',{value:current.endpoint,placeholder:'http://127.0.0.1:8000/v1',spellcheck:'false'});
+  const keyIn=h('input',{type:'password',value:current.key,placeholder:'optional for a local endpoint',autocomplete:'off',spellcheck:'false'});
+  const status=h('div',{class:'engine-status hint',role:'status'});
+  const saveBtn=h('button',{class:'navbtn primary',type:'button'},current.id?'Save changes':'Add engine');
+  saveBtn.onclick=()=>{
+    try{
+      const saved=saveEngineProfile({id:current.id,name:nameIn.value,type:typeIn.value,endpoint:endpointIn.value,key:keyIn.value});
+      status.textContent='Saved on this device.'; onDone(saved);
+    }catch(error){ status.textContent=String(error&&error.message||error); }
+  };
+  return h('div',{class:'engine-form'},
+    h('label',null,'Name'),nameIn,
+    h('label',null,'Type'),typeIn,
+    h('label',null,'Base URL / endpoint'),endpointIn,
+    h('label',null,'Key'),keyIn,
+    h('p',{class:'engine-secret-note'},'Endpoint and key stay on this device. They are excluded from repo sync and backup files.'),
+    status,
+    h('div',{class:'toolrow'},
+      saveBtn,
+      h('button',{class:'navbtn',type:'button',onclick:onCancel},'Cancel'),
+      h('button',{class:'navbtn',type:'button',disabled:true,title:'Connection testing arrives with the AI integration.'},'Test connection — later')));
+}
+
+function engineSettingsPanel(){
+  const root=h('div',{class:'engine-settings'});
+  let editing=null, adding=false, notice='';
+  function draw(){
+    const settings=engineSettings(), active=getActiveEngine();
+    const list=h('div',{class:'engine-list'});
+    if(!settings.profiles.length){
+      list.append(h('p',{class:'engine-empty hint'},'No engines saved yet. Add a profile now; model calls come in a later update.'));
+    }else settings.profiles.forEach(profile=>{
+      const isActive=profile.id===settings.activeId;
+      list.append(h('div',{class:'engine-row'+(isActive?' active':'')},
+        h('button',{class:'engine-select',type:'button','aria-pressed':isActive?'true':'false',onclick:()=>{
+          setActiveEngine(profile.id); notice=profile.name+' is active.'; editing=null; adding=false; draw();
+        }},
+          h('span',{class:'engine-name'},profile.name),
+          h('span',{class:'engine-type'},profile.type),
+          isActive?h('span',{class:'engine-active'},'ACTIVE'):null),
+        h('div',{class:'engine-actions'},
+          h('button',{class:'navbtn',type:'button',onclick:()=>{editing=profile.id;adding=false;notice='';draw();}},'Edit'),
+          h('button',{class:'navbtn engine-remove',type:'button',onclick:()=>{
+            if(confirm('Remove '+profile.name+' from this device?')){
+              removeEngineProfile(profile.id); editing=null; adding=false; notice='Removed.'; draw();
+            }
+          }},'Remove'))));
+    });
+    const summary=h('div',{class:'engine-summary'},
+      h('b',null,'Active engine'),
+      h('span',null,active?active.name+' · '+active.type:'None selected'));
+    const add=h('button',{class:'navbtn primary',type:'button',onclick:()=>{adding=true;editing=null;notice='';draw();}},'Add engine');
+    const editProfile=editing?settings.profiles.find(profile=>profile.id===editing):null;
+    const editor=(adding||editProfile)?engineProfileForm(editProfile||{},()=>{editing=null;adding=false;notice='Saved.';draw();},()=>{editing=null;adding=false;draw();}):null;
+    root.replaceChildren(
+      h('p',{class:'hint'},'Choose which connection future in-app AI tools will use. This update stores settings only; it makes no model or network calls.'),
+      summary,
+      list,
+      h('div',{class:'toolrow engine-add'},add),
+      editor,
+      h('div',{class:'engine-notice hint',role:'status'},notice));
+  }
+  draw();
+  return root;
+}
+function openEngineSettings(){
+  return showModalNode('Engine','Profiles and secrets are stored only on this device.',engineSettingsPanel());
+}
 /* ========================================================================== *
    THE VAEL NAMING TREE — an illustrated plate (ported faithfully from the
    Claude-Design artifact in kit/source/naming-tree/, vanilla, no DCLogic).
@@ -3466,7 +3885,8 @@ function parseQueueCards(text){
   const lines=text.split('\n'); const cards=[]; let cur=null, section='';
   for(const ln of lines){ const hm=/^#\s+(.*)/.exec(ln); if(hm) section=hm[1].trim();
     const cm=/^##\s+(.*)/.exec(ln); if(cm){ if(cur) cards.push(cur); cur={title:cm[1].trim(), status:'', section}; continue; }
-    const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim(); }
+    const sm=/^\*\*Status:\*\*\s*(.*)/.exec(ln); if(sm&&cur) cur.status=sm[1].trim();
+    else if(cur && /^\*\*PROMOTED\s*[—-]/i.test(ln)) cur.status='PROMOTED'; }
   if(cur) cards.push(cur);
   // keep only real cards — a ## heading counts only if it has a Status line or an ID-style
   // title (TAG-000). Drops the queue's structural headings (Purpose, Rules, section dividers).
@@ -3535,13 +3955,27 @@ function getQueueCard(text, id){
   const desc=title.replace(/^[A-Z]{3}-\d{3}\s*[—-]\s*/,'');
   const oneLine=re=>{ const l=block.find(x=>re.test(x)); return l? l.replace(re,'').trim() : ''; };
   const sect=name=>{ const i=block.findIndex(l=>new RegExp('^###\\s+'+name,'i').test(l)); if(i<0) return [];
-    const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
-  const destFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(oneLine(/^\*\*Category:\*\*\s*/))||[])[0]||'';
-  return { id, title, desc, status:oneLine(/^\*\*Status:\*\*\s*/), destFile, s, e,
+    const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j]) || /^---\s*$/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
+  const stripBullet=x=>x.replace(/^[-*]\s*/,'');
+  const promotedLine=block.find(x=>/PROMOTED\s*[—-]/i.test(x))||'';
+  const promotedFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(promotedLine)||[])[0]||'';
+  const promotedDate=(/\b\d{4}-\d{2}-\d{2}\b/.exec(promotedLine)||[])[0]||'';
+  const source=oneLine(/^\*\*Source:\*\*\s*/), category=oneLine(/^\*\*Category:\*\*\s*/);
+  const status=oneLine(/^\*\*Status:\*\*\s*/) || (promotedLine?'PROMOTED':'');
+  const requirements=sect('Promotion Requirements').map(x=>{
+    const m=/^[-*]\s*\[([ xX])\]\s*(.*)/.exec(x);
+    return m ? {text:m[2].trim(), checked:m[1].toLowerCase()==='x'} : {text:stripBullet(x).trim(), checked:false};
+  }).filter(x=>x.text);
+  const destFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(category)||[])[0]||promotedFile;
+  return { id, title, desc, status, source, category, destFile, s, e,
+    promoted:!!promotedLine, promotedFile, promotedDate,
     claim:sect('Canon Claim').join(' '),
-    means:sect('What This Means').map(x=>x.replace(/^[-*]\s*/,'')),
-    donot:sect('Do Not Contradict').map(x=>x.replace(/^[-*]\s*/,'')),
-    reqs:sect('Promotion Requirements').map(x=>x.replace(/^[-*]\s*\[[ xX]?\]\s*/,'')).filter(Boolean) };
+    means:sect('What This Means').map(stripBullet),
+    donot:sect('Do Not Contradict').map(stripBullet),
+    flags:sect('Open Flags').map(stripBullet),
+    requirements,
+    reqs:requirements.map(x=>x.text),
+    notes:sect('Notes').map(stripBullet) };
 }
 function buildDomainBlock(card, date){
   const L=['---','', '## '+card.title, '', card.claim||'[canon claim]'];
@@ -3741,6 +4175,62 @@ function studioDrafter(host, prefill){
     }catch(e){ status.textContent='Failed: '+e.message; }
   }
 }
+function studioCardReaderSection(title, content, options){
+  const opts=options||{}, values=Array.isArray(content)?content.filter(Boolean):[];
+  const section=h('section',{class:'card-reader-section'},h('h3',null,title));
+  if(opts.checklist){
+    if(!values.length) section.append(h('p',{class:'hint'},'None recorded.'));
+    else section.append(h('ul',{class:'card-reader-checklist'},...values.map(req=>
+      h('li',null,h('span',{class:'card-reader-check','aria-hidden':'true'},req.checked?'[x]':'[ ]'),h('span',null,req.text)))));
+  }else if(Array.isArray(content)){
+    section.append(values.length?h('ul',null,...values.map(x=>h('li',{html:inlineMd(x)}))):h('p',{class:'hint'},'None recorded.'));
+  }else section.append(h('p',{html:inlineMd(String(content||'None recorded.'))}));
+  return section;
+}
+function studioCardReaderNode(card, close){
+  const body=h('div',{class:'card-reader'});
+  if(!card){
+    body.append(h('p',{class:'hint'},'That card is no longer in the queue.'));
+  }else if(card.promoted){
+    body.append(h('div',{class:'card-reader-promoted'},
+      h('b',null,'Promoted'),
+      h('p',null,'promoted → '+(card.promotedFile||card.destFile||'destination not recorded')+
+        (card.promotedDate?' ('+card.promotedDate+')':''))));
+  }else{
+    body.append(h('dl',{class:'card-reader-meta'},
+      h('div',null,h('dt',null,'Status'),h('dd',null,card.status||'—')),
+      h('div',null,h('dt',null,'Source'),h('dd',null,card.source||'—')),
+      h('div',null,h('dt',null,'Category'),h('dd',null,card.category||'—'))),
+    studioCardReaderSection('Canon Claim',card.claim),
+    studioCardReaderSection('What This Means',card.means),
+    studioCardReaderSection('Do Not Contradict',card.donot),
+    studioCardReaderSection('Open Flags',card.flags),
+    studioCardReaderSection('Promotion Requirements',card.requirements,{checklist:true}),
+    studioCardReaderSection('Notes',card.notes));
+  }
+  body.append(h('div',{class:'toolrow card-reader-actions'},h('button',{class:'navbtn primary',type:'button',onclick:close},'Close')));
+  return body;
+}
+function openStudioCardReader(queueText,id){
+  const card=getQueueCard(queueText,id);
+  return openOverlay(close=>h('div',{class:'modal card-reader-modal'},
+    h('h2',{class:'display'},card?card.title:id),
+    h('p',{class:'hint'},'Read-only Canon Card from 02_PROMOTION_QUEUE.md.'),
+    studioCardReaderNode(card,close)));
+}
+function studioBoardCard(card, queueText){
+  const tile=h('div',{class:'pcard'}), cid=cardId(card.title);
+  if(cid){
+    tile.append(h('button',{class:'pcard-open',type:'button','aria-label':'Read '+card.title,
+      onclick:()=>openStudioCardReader(queueText,cid.id)},
+      h('b',null,card.title),card.status?h('small',null,card.status):null,h('span',{class:'pcard-open-hint'},'Read full card')));
+  }else tile.append(h('b',null,card.title),card.status?h('small',null,card.status):null);
+  if(cid && card.col!=='Promoted' && card.col!=='Raw'){
+    tile.append(h('button',{class:'navbtn',style:{marginTop:'7px',fontSize:'12px',padding:'4px 9px'},
+      onclick:e=>{ e.stopPropagation(); promoteCardModal(cid.id); }},'Promote →'));
+  }
+  return tile;
+}
 function studioBoard(host){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the queue…'));
   (async()=>{ try{ const r=await ghGetText(cfg, QUEUE_PATH); if(!r){ host.replaceChildren(h('p',{class:'hint'},'Queue not found.')); return; }
@@ -3749,9 +4239,7 @@ function studioBoard(host){
     const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
     const board=h('div',{class:'board'});
     cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
-      items.forEach(c=>{ const tile=h('div',{class:'pcard'}, h('b',null,c.title), c.status? h('small',null,c.status):null);
-        const cid=cardId(c.title); if(cid && c.col!=='Promoted' && c.col!=='Raw') tile.append(h('button',{class:'navbtn', style:{marginTop:'7px', fontSize:'12px', padding:'4px 9px'}, onclick:()=>promoteCardModal(cid.id)}, 'Promote →'));
-        col.append(tile); }); board.append(col); });
+      items.forEach(c=>col.append(studioBoardCard(c,r.text))); board.append(col); });
     const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : null;
     const count = cards.length+(cards.length===1?' card':' cards')+' in the queue';
     host.replaceChildren(...[banner, h('p',{class:'hint', style:{textAlign:'center'}}, count), board].filter(Boolean));
@@ -4010,25 +4498,137 @@ function updateRuntimeState(text, gauges){
   });
   return lines.join('\n');
 }
+
+// ---- remaining tracker fields (everything except gauges + survival) -------
+// Field values may wrap across several lines in older trackers. Each definition
+// is scoped to its own section so similarly named prose elsewhere is untouched.
+const TRACKER_DETAIL_FIELDS = [
+  { key:'lastReconciled', label:'Last reconciled', writeLabel:'Last reconciled with domain files', line:/^(\s*Last reconciled with domain files:\s*)(.*)$/i, rows:2, group:'where' },
+  { key:'status', label:'Status', line:/^(\s*Status:\s*)(.*)$/i, rows:3, group:'where' },
+  { key:'scene', label:'Scene', section:/^##\s+WHERE WE ARE\b/i, line:/^(\s*Scene:\s*)(.*)$/i, rows:2, group:'where' },
+  { key:'summary', label:'Current summary', section:/^##\s+WHERE WE ARE\b/i, line:/^(\s*(?:>\s*Current|Current summary):\s*)(.*)$/i, rows:4, group:'where', quote:true },
+  { key:'day', label:'In-world day', section:/^##\s+WHERE WE ARE\b/i, line:/^(\s*In-world day:\s*)(.*)$/i, rows:2, group:'where' },
+  { key:'location', label:'Location', section:/^##\s+WHERE WE ARE\b/i, line:/^(\s*Location:\s*)(.*)$/i, rows:3, group:'where' },
+  { key:'core', label:'Core / Spark display', section:RUNTIME_HEADING_RE, line:/^(\s*(?:The Gem \(core display\)|Gem \(core display\)|Core\s*\/\s*Spark display|Core display)[^:\n]*:\s*)(.*)$/i, rows:4, group:'protagonist' },
+  { key:'body', label:'Body', section:RUNTIME_HEADING_RE, line:/^(\s*Body:\s*)(.*)$/i, rows:4, group:'protagonist' },
+];
+const TRACKER_DETAIL_SECTIONS = [
+  { key:'carries', label:'What the protagonist carries', heading:'## What The Protagonist Carries', section:/^##\s+WHAT\b.*\bCARRIES\b/i, rows:6 },
+  { key:'capabilities', label:'Capabilities', heading:'## Capabilities', section:/^##\s+CAPABILITIES\b/i, rows:7 },
+  { key:'knowledge', label:'Knowledge boundary', heading:'## Knowledge Boundary', section:/^##\s+(?:KNOWLEDGE BOUNDARY|WHAT\b.*\bKNOWS)\b/i, rows:8 },
+  { key:'people', label:'People / bonds', heading:'## People / Bonds', section:/^##\s+(?:PEOPLE(?:\s*\/\s*BONDS)?|THE PEOPLE)\b/i, rows:7 },
+  { key:'clocks', label:'Clocks / pressures', heading:'## Clocks / Pressures', section:/^##\s+(?:CLOCKS?\s*\/\s*PRESSURES|THE CLOCK)\b/i, rows:6 },
+  { key:'sessionLog', label:'Session log', heading:'## Session Log', section:/^##\s+SESSION LOG\b/i, rows:7 },
+  { key:'resumeChecklist', label:'Resume checklist', heading:'## Resume Checklist', section:/^##\s+RESUME CHECKLIST\b/i, rows:7 },
+];
+function trackerRootSection(text){
+  const lines=String(text||'').split('\n');
+  const end=lines.findIndex(line=>/^---\s*$/.test(line.trim()));
+  return {lines,start:-1,end:end<0?lines.length:end};
+}
+function trackerFieldBlock(text,def){
+  const scope=def.section?trackerSection(text,def.section):trackerRootSection(text);
+  if(!scope) return null;
+  for(let i=scope.start+1;i<scope.end;i++){
+    const raw=scope.lines[i], clean=raw.endsWith('\r')?raw.slice(0,-1):raw;
+    const match=def.line.exec(clean);
+    if(!match) continue;
+    let end=i+1;
+    while(end<scope.end){
+      const nextRaw=scope.lines[end], next=nextRaw.endsWith('\r')?nextRaw.slice(0,-1):nextRaw;
+      if(!next.trim() || /^##\s+/.test(next.trim()) || /^---\s*$/.test(next.trim())) break;
+      if(TRACKER_DETAIL_FIELDS.some(other=>other!==def && other.line.test(next))) break;
+      end++;
+    }
+    const values=[match[2]];
+    for(let j=i+1;j<end;j++){
+      let continuation=scope.lines[j].replace(/\r$/,'');
+      if(def.quote) continuation=continuation.replace(/^\s*>\s?/,'');
+      else continuation=continuation.replace(/^ {2}/,'');
+      values.push(continuation);
+    }
+    return {scope,start:i,end,prefix:match[1],value:values.join('\n').trim()};
+  }
+  return null;
+}
+function trackerDetailState(text){
+  const state={fields:{},sections:{}};
+  TRACKER_DETAIL_FIELDS.forEach(def=>{
+    const block=trackerFieldBlock(text,def);
+    state.fields[def.key]=block?block.value:'';
+  });
+  TRACKER_DETAIL_SECTIONS.forEach(def=>{
+    const sec=trackerSection(text,def.section);
+    state.sections[def.key]=sec?sec.body.replace(/\r/g,'').trim():'';
+  });
+  return state;
+}
+function trackerFieldOutput(def,prefix,value,cr){
+  const parts=String(value==null?'':value).replace(/\r/g,'').split('\n');
+  const first=parts.shift()||'';
+  const lead=prefix.replace(/\s*$/,'')+(first?' ':'');
+  const lines=[lead+first+cr], continuation=def.quote?'> ':'  ';
+  parts.forEach(line=>lines.push(continuation+line+cr));
+  return lines;
+}
+function updateTrackerDetailField(text,def,value){
+  const lines=String(text||'').split('\n'), cr=/\r\n/.test(String(text||''))?'\r':'';
+  const block=trackerFieldBlock(text,def);
+  if(block){
+    lines.splice(block.start,block.end-block.start,...trackerFieldOutput(def,block.prefix,value,cr));
+    return lines.join('\n');
+  }
+  const scope=def.section?trackerSection(text,def.section):trackerRootSection(text);
+  if(!scope) throw new Error('refusing to write — tracker section missing for '+def.label);
+  let at=scope.end;
+  while(at>scope.start+1 && !lines[at-1].trim()) at--;
+  const label=def.quote?'> Current:':(def.writeLabel||def.label)+':';
+  lines.splice(at,0,...trackerFieldOutput(def,label,value,cr),cr);
+  return lines.join('\n');
+}
+function updateTrackerDetailSection(text,def,value){
+  const source=String(text||''), cr=/\r\n/.test(source)?'\r':'';
+  const body=String(value==null?'':value).replace(/\r/g,'').trim();
+  const bodyLines=body?body.split('\n').map(line=>line+cr):[];
+  const sec=trackerSection(source,def.section);
+  if(sec){
+    const lines=sec.lines.slice(), replacement=[cr,...bodyLines,cr];
+    lines.splice(sec.start+1,sec.end-sec.start-1,...replacement);
+    return lines.join('\n');
+  }
+  return source.replace(/\s*$/,'')+'\n\n---\n\n'+def.heading+'\n\n'+body+'\n';
+}
+function updateTrackerDetails(text,patch){
+  let next=assertTracker(String(text||''));
+  const fields=patch&&patch.fields||{}, sections=patch&&patch.sections||{};
+  TRACKER_DETAIL_FIELDS.forEach(def=>{
+    if(Object.prototype.hasOwnProperty.call(fields,def.key)) next=updateTrackerDetailField(next,def,fields[def.key]);
+  });
+  TRACKER_DETAIL_SECTIONS.forEach(def=>{
+    if(Object.prototype.hasOwnProperty.call(sections,def.key)) next=updateTrackerDetailSection(next,def,sections[def.key]);
+  });
+  return next;
+}
 function parseTracker(text){
   const t=String(text||'');
-  const one=re=>{ const m=re.exec(t); return m? m[1].trim() : ''; };
   const gauge=name=>{ const m=new RegExp('^[\\-\\s]*'+name+':\\s*(.+)$','mi').exec(t); return m? m[1].trim() : ''; };
+  const details=trackerDetailState(t), fields=details.fields;
   return {
-    status: one(/^Status:\s*(.+)$/m),
-    scene: one(/^Scene:\s*(.+)$/m),
-    summary: one(/^>\s*Current:\s*(.+)$/m),
-    day: one(/^In-world day:\s*(.+)$/m),
-    location: one(/^Location:\s*(.+)$/m),
+    status: fields.status,
+    scene: fields.scene,
+    summary: fields.summary,
+    day: fields.day,
+    location: fields.location,
     runtime: {
       personalMana: gauge('Personal Mana'),
       divineMana: gauge('Divine Mana'),
       divineHunger: gauge('Divine Hunger'),
       strain: gauge('Strain'),
-      core: one(/(?:Gem \(core display\)|Core[ /]+Spark display|Core display)[^:\n]*:\s*(.+)/i),
-      body: one(/^Body:\s*(.+)$/m),
+      core: fields.core,
+      body: fields.body,
     },
     survival: parseSurvival(t),
+    details,
   };
 }
 // a campaign is "archived/closed" if its tracker status says so, else current
@@ -4751,6 +5351,77 @@ function startCampaignModal(){
     h('div',null, h('label',null,'Name'), nameIn,
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
+/* ========================================================================== *
+   TRACKER DETAILS — explicit editors for the Campaign State Tracker fields
+   not owned by runtime-gauges.js or survival.js. No automatic consequences:
+   this panel only writes user-entered text back to the same tracker file.
+ * ========================================================================== */
+const campResumeBeforeTrackerDetails=campResume;
+
+function trackerEditorTextarea(def,value){
+  const input=h('textarea',{rows:String(def.rows||3),value:value||'',spellcheck:'true'});
+  return {input,node:h('div',{class:'tracker-field'},h('label',null,def.label),input)};
+}
+function trackerDetailsEditor(cfg,trackerPath,text,host,campaignName){
+  const initial=trackerDetailState(text), fieldInputs={}, sectionInputs={};
+  const where=h('div',{class:'tracker-edit-grid'});
+  TRACKER_DETAIL_FIELDS.filter(def=>def.group==='where').forEach(def=>{
+    const ctl=trackerEditorTextarea(def,initial.fields[def.key]); fieldInputs[def.key]=ctl.input; where.append(ctl.node);
+  });
+  const protagonist=h('div',{class:'tracker-edit-grid'});
+  TRACKER_DETAIL_FIELDS.filter(def=>def.group==='protagonist').forEach(def=>{
+    const ctl=trackerEditorTextarea(def,initial.fields[def.key]); fieldInputs[def.key]=ctl.input; protagonist.append(ctl.node);
+  });
+  const sections=h('div',{class:'tracker-section-editors'});
+  TRACKER_DETAIL_SECTIONS.forEach(def=>{
+    const ctl=trackerEditorTextarea(def,initial.sections[def.key]); sectionInputs[def.key]=ctl.input;
+    sections.append(h('details',{class:'tracker-section-editor'},
+      h('summary',null,def.label),
+      h('p',{class:'hint'},'Markdown in this section is preserved as campaign state.'),
+      ctl.input));
+  });
+
+  const status=h('div',{class:'hint tracker-save-status',role:'status'});
+  const save=h('button',{class:'navbtn primary',type:'button'},'Save tracker details');
+  save.onclick=async()=>{
+    const patch={fields:{},sections:{}};
+    TRACKER_DETAIL_FIELDS.forEach(def=>{
+      const value=fieldInputs[def.key].value.replace(/\r/g,'').trim();
+      if(value!==initial.fields[def.key]) patch.fields[def.key]=value;
+    });
+    TRACKER_DETAIL_SECTIONS.forEach(def=>{
+      const value=sectionInputs[def.key].value.replace(/\r/g,'').trim();
+      if(value!==initial.sections[def.key]) patch.sections[def.key]=value;
+    });
+    if(!Object.keys(patch.fields).length && !Object.keys(patch.sections).length){
+      status.textContent='Nothing changed.'; return;
+    }
+    save.disabled=true; status.textContent='Saving to the campaign tracker…';
+    try{
+      await ghUpdate(cfg,trackerPath,current=>updateTrackerDetails(current,patch),'Update tracker details via Game',{guard:assertTracker});
+      toast('Tracker details saved.'); host.replaceChildren(); await campResume(host,campaignName);
+    }catch(error){ status.textContent='Failed: '+error.message; save.disabled=false; }
+  };
+
+  return h('div',{class:'tracker-editor'},
+    h('div',{class:'gauge-title'},h('h3',null,'Tracker details'),h('span',{class:'hint'},'manual campaign state')),
+    h('p',{class:'hint'},'These are the non-gauge parts of the same Campaign State Tracker. Changes happen only when you tap Save; nothing here advances clocks or applies mechanics automatically.'),
+    h('h4',null,'Setup & where we are'),where,
+    h('h4',null,'Protagonist description'),protagonist,
+    h('h4',null,'Other tracker sections'),sections,
+    h('div',{class:'toolrow'},save),status);
+}
+
+campResume=async function(host,name){
+  await campResumeBeforeTrackerDetails(host,name);
+  if(!ghReady()) return;
+  try{
+    const cfg=ghCfg(), files=await campaignFiles(cfg,name);
+    if(!files.tracker) return;
+    const tracker=await ghGetText(cfg,files.tracker); if(!tracker) return;
+    host.append(trackerDetailsEditor(cfg,files.tracker,tracker.text,host,name));
+  }catch(error){ host.append(h('p',{class:'hint'},'Tracker details editor unavailable: '+error.message)); }
+};
 /* REGION TAB — read-only Region Update 1 status view. */
 const CAMPAIGN_REGION_DIR='regions';
 
@@ -4885,8 +5556,9 @@ viewCampaign=function(name,tab){
    Renders ONLY the exact serialized terrain state of a saved region. It never
    mutates, regenerates, or writes region data; switching layers, panning, and
    zooming change the view, not the file. Explicitly GM-only and unrevealed
-   (fog) information is hidden. Pin, marker, fog, and terrain EDITING are out of
-   scope and intentionally deferred to later focused updates.
+   (fog) information is hidden. Update 3 layers pin/marker editing around this
+   renderer; Update 4 adds reveal/fog editing without changing this read path.
+   Terrain editing remains deferred to a later focused update.
 
    Cosmic Cloudsea placement (top / middle / bottom) styles the frame; local
    vertical layers (surface, caves, …) are an independent elevation axis. The
@@ -4990,6 +5662,22 @@ function regionMapVisibleFeatures(region, layerId, grid, mask){
     !regionFeatureHidden(f, grid, mask));
 }
 
+// Visible pins/markers share the same layer, GM-only, and fog rules as features.
+// The returned kind stays separate from the serialized item so editors never
+// have to guess which collection owns an ID.
+function regionMapVisibleItems(region, layerId, grid, mask){
+  const out = [];
+  [['pin','pins'],['marker','markers']].forEach(([kind,key]) => {
+    const items = region && Array.isArray(region[key]) ? region[key] : [];
+    items.forEach(item => {
+      if (regionIsRecord(item) && item.layerId === layerId &&
+        regionIsRecord(item.position) && Number.isFinite(item.position.x) && Number.isFinite(item.position.y) &&
+        !regionFeatureHidden(item, grid, mask)) out.push({ kind, item });
+    });
+  });
+  return out;
+}
+
 // Drawable connection lines: only between two visible features on this layer
 // (both endpoint positions are known). Cross-layer connections are listed
 // textually instead — see regionMapConnectionList.
@@ -5002,8 +5690,14 @@ function regionMapConnectionLines(region, layerId, posById){
 }
 function regionMapConnectionList(region, layerId, visibleFeatureIds){
   const ids = new Set(visibleFeatureIds || []);
+  const allowed = new Set(regionMapLayers(region).map(layer => layer.id));
+  regionMapLayers(region).forEach(layer => {
+    const grid = regionTerrainGrid(region, layer.id), mask = regionRevealMask(region, layer.id);
+    regionMapVisibleFeatures(region, layer.id, grid, mask).forEach(feature => allowed.add(feature.id));
+  });
   const conns = (region && Array.isArray(region.connections)) ? region.connections : [];
   return conns.filter(c => regionIsRecord(c) && !regionVisibilityHidden(c) &&
+    allowed.has(c.from) && allowed.has(c.to) &&
     (c.from === layerId || c.to === layerId || ids.has(c.from) || ids.has(c.to)));
 }
 
@@ -5049,13 +5743,65 @@ function regionSvg(tag, attrs, ...kids){
   return el;
 }
 
+function regionMapPoint(svg, event){
+  if (svg && typeof svg.createSVGPoint === 'function' && typeof svg.getScreenCTM === 'function'){
+    const matrix = svg.getScreenCTM();
+    if (matrix && typeof matrix.inverse === 'function'){
+      const point = svg.createSVGPoint();
+      point.x = event.clientX; point.y = event.clientY;
+      const mapped = point.matrixTransform(matrix.inverse());
+      return { x:regionMapRound(mapped.x), y:regionMapRound(mapped.y) };
+    }
+  }
+  const box = svg && svg.getBoundingClientRect ? svg.getBoundingClientRect() : null;
+  const values = String(svg && svg.getAttribute('viewBox') || '').trim().split(/\s+/).map(Number);
+  if (!box || !box.width || !box.height || values.length !== 4 || values.some(v => !Number.isFinite(v))) return null;
+  return {
+    x:regionMapRound(values[0] + (event.clientX - box.left) * values[2] / box.width),
+    y:regionMapRound(values[1] + (event.clientY - box.top) * values[3] / box.height),
+  };
+}
+
+function regionMapPlacementPosition(region, layerId, point){
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
+  const grid = regionTerrainGrid(region, layerId);
+  if (grid) return {
+    x:Math.min(grid.width - 1, Math.max(0, Math.floor(point.x))),
+    y:Math.min(grid.height - 1, Math.max(0, Math.floor(point.y))),
+  };
+  return { x:regionMapRound(point.x - 0.5), y:regionMapRound(point.y - 0.5) };
+}
+
+function regionMapTextSummary(region){
+  const lines = [
+    (region && region.title ? region.title : 'Region') + ' map',
+    'Cosmic layer: ' + regionCosmicLabel(region),
+  ];
+  const layers = regionMapLayers(region);
+  if (!layers.length){ lines.push('', 'No visible local layers.'); return lines.join('\n') + '\n'; }
+  layers.forEach(layer => {
+    const grid = regionTerrainGrid(region, layer.id), mask = regionRevealMask(region, layer.id);
+    const features = regionMapVisibleFeatures(region, layer.id, grid, mask);
+    const items = regionMapVisibleItems(region, layer.id, grid, mask);
+    const conns = regionMapConnectionList(region, layer.id, features.map(feature => feature.id));
+    lines.push('', (layer.label || layer.id) + ':');
+    features.forEach(feature => lines.push('- Feature: ' + feature.label));
+    items.forEach(({ kind, item }) => lines.push('- ' + (kind === 'pin' ? 'Pin' : 'Marker') + ': ' + item.label));
+    conns.forEach(connection => lines.push('- ' + (connection.type ? connection.type + ': ' : '') + connection.from + ' → ' + connection.to));
+    if (!features.length && !items.length && !conns.length) lines.push('- Nothing visible on this layer');
+  });
+  return lines.join('\n') + '\n';
+}
+
 // Build the read-only SVG for one local layer at a given viewport. Pure of any
 // writes; honours fog and GM-only hiding via the helpers above.
-function regionMapSvg(region, layerId, viewport){
+function regionMapSvg(region, layerId, viewport, options){
+  const opts = options || {};
   const grid = regionTerrainGrid(region, layerId);
   const mask = regionRevealMask(region, layerId);
   const features = regionMapVisibleFeatures(region, layerId, grid, mask);
-  const bounds = regionMapBounds(grid, features);
+  const items = regionMapVisibleItems(region, layerId, grid, mask);
+  const bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
   const layer = (region && Array.isArray(region.localLayers) ? region.localLayers : []).find(l => regionIsRecord(l) && l.id === layerId);
   const label = (region && region.title ? region.title : 'Region') + ' — ' + ((layer && layer.label) || layerId) + ' map';
   const svg = regionSvg('svg', { class:'region-map-svg', role:'img', 'aria-label':label, preserveAspectRatio:'xMidYMid meet' });
@@ -5091,11 +5837,42 @@ function regionMapSvg(region, layerId, viewport){
     });
     svg.append(g);
   }
+  if (items.length){
+    const g = regionSvg('g', { class:'region-map-items' });
+    items.forEach(({ kind, item }) => {
+      const cx = item.position.x + 0.5, cy = item.position.y + 0.5;
+      const selected = opts.selected && opts.selected.kind === kind && opts.selected.id === item.id;
+      const itemGroup = regionSvg('g', {
+        class:'region-map-item region-' + kind + (selected ? ' selected' : ''),
+        'data-region-kind':kind, 'data-region-id':item.id,
+        role:typeof opts.onSelect === 'function' ? 'button' : null,
+        tabindex:typeof opts.onSelect === 'function' ? '0' : null,
+        'aria-label':(kind === 'pin' ? 'Pin: ' : 'Marker: ') + item.label,
+      });
+      if (kind === 'pin'){
+        itemGroup.append(
+          regionSvg('line', { x1:cx, y1:cy + 0.12, x2:cx, y2:cy + 0.48, class:'region-pin-stem' }),
+          regionSvg('circle', { cx, cy, r:0.27, class:'region-pin-dot' }));
+      }else{
+        itemGroup.append(regionSvg('rect', { x:cx - 0.28, y:cy - 0.28, width:0.56, height:0.56, rx:0.12, class:'region-marker-dot' }));
+      }
+      itemGroup.append(regionSvg('text', { x:cx, y:cy - 0.42, 'text-anchor':'middle', class:'region-map-item-label' }, item.label));
+      if (typeof opts.onSelect === 'function'){
+        itemGroup.addEventListener('click', e => { e.stopPropagation(); opts.onSelect(kind, item.id); });
+        itemGroup.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' '){ e.preventDefault(); opts.onSelect(kind, item.id); }
+        });
+      }
+      g.append(itemGroup);
+    });
+    svg.append(g);
+  }
   return svg;
 }
 
 // The interactive, read-only map panel for one validated region entry.
-function regionMapPanel(entry){
+function regionMapPanel(entry, options){
+  const opts = options || {};
   const region = entry && entry.region;
   const layers = regionMapLayers(region);
   const panel = h('div', { class:'region-map cosmic-' + (region && typeof region.cosmicLayer === 'string' ? region.cosmicLayer : 'middle') });
@@ -5104,12 +5881,17 @@ function regionMapPanel(entry){
     h('span', { class:'hint' }, 'Cosmic layer: ' + regionCosmicLabel(region) + ' · local elevation is a separate axis')));
   if (!layers.length){ panel.append(h('p', { class:'hint' }, 'No visible local layers to map.')); return panel; }
 
-  const state = { layerId:layers[0].id, viewport:{ scale:1, panX:0, panY:0 }, showText:false };
+  const initialLayer = layers.some(layer => layer.id === opts.initialLayerId) ? opts.initialLayerId : layers[0].id;
+  const state = { layerId:initialLayer, viewport:{ scale:1, panX:0, panY:0 }, showText:false };
 
   const switchRow = h('div', { class:'region-layer-switch', role:'group', 'aria-label':'Local layer' });
   const switchBtns = layers.map(layer => {
     const b = h('button', { class:'tab', type:'button', 'aria-pressed':layer.id === state.layerId ? 'true' : 'false',
-      onclick:() => { state.layerId = layer.id; state.viewport = { scale:1, panX:0, panY:0 }; draw(); } }, layer.label || layer.id);
+      onclick:() => {
+        state.layerId = layer.id; state.viewport = { scale:1, panX:0, panY:0 };
+        if (typeof opts.onLayerChange === 'function') opts.onLayerChange(layer.id, regionTerrainGrid(region, layer.id));
+        draw();
+      } }, layer.label || layer.id);
     return { id:layer.id, b };
   });
   switchBtns.forEach(x => switchRow.append(x.b));
@@ -5128,12 +5910,16 @@ function regionMapPanel(entry){
   const textBox = h('pre', { class:'region-map-text', style:{ display:'none' } });
 
   function attachPan(svg){
+    if (opts.placementMode) return;
     let active = false, sx = 0, sy = 0, box = null;
     svg.addEventListener('pointerdown', e => { active = true; sx = e.clientX; sy = e.clientY; box = svg.getBoundingClientRect && svg.getBoundingClientRect(); });
     svg.addEventListener('pointermove', e => {
       if (!active || !box || !box.width || !box.height) return;
       const grid = regionTerrainGrid(region, state.layerId);
-      const bounds = regionMapBounds(grid, regionMapVisibleFeatures(region, state.layerId, grid, regionRevealMask(region, state.layerId)));
+      const mask = regionRevealMask(region, state.layerId);
+      const features = regionMapVisibleFeatures(region, state.layerId, grid, mask);
+      const items = regionMapVisibleItems(region, state.layerId, grid, mask);
+      const bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
       if (!bounds) return;
       const s = regionClampScale(state.viewport.scale);
       const w = (bounds.maxX - bounds.minX) / s, hh = (bounds.maxY - bounds.minY) / s;
@@ -5151,23 +5937,38 @@ function regionMapPanel(entry){
     const grid = regionTerrainGrid(region, state.layerId);
     const mask = regionRevealMask(region, state.layerId);
     const features = regionMapVisibleFeatures(region, state.layerId, grid, mask);
-    const svg = regionMapSvg(region, state.layerId, state.viewport);
+    const items = regionMapVisibleItems(region, state.layerId, grid, mask);
+    const svg = regionMapSvg(region, state.layerId, state.viewport, {
+      selected:opts.selected,
+      onSelect:opts.placementMode === 'fog' ? null : opts.onSelect,
+    });
+    if (opts.placementMode){
+      svg.setAttribute('class', svg.getAttribute('class') + ' is-placing');
+      svg.addEventListener('click', e => {
+        const point = regionMapPoint(svg, e);
+        const position = regionMapPlacementPosition(region, state.layerId, point);
+        if (position && typeof opts.onPlace === 'function') opts.onPlace(state.layerId, position);
+      });
+    }
     stage.replaceChildren(svg); attachPan(svg);
     const conns = regionMapConnectionList(region, state.layerId, features.map(f => f.id));
     meta.replaceChildren(h('p', { class:'hint' },
       features.length + ' feature' + (features.length === 1 ? '' : 's') + ' · ' +
+      items.filter(x => x.kind === 'pin').length + ' pin' + (items.filter(x => x.kind === 'pin').length === 1 ? '' : 's') + ' · ' +
+      items.filter(x => x.kind === 'marker').length + ' marker' + (items.filter(x => x.kind === 'marker').length === 1 ? '' : 's') + ' · ' +
       conns.length + ' connection' + (conns.length === 1 ? '' : 's') + ' on this layer' +
       (grid ? '' : ' · no serialized terrain for this layer')));
     if (conns.length)
       meta.append(h('ul', { class:'region-conn-list' }, ...conns.map(c => h('li', null, (c.type ? c.type + ': ' : '') + c.from + ' → ' + c.to))));
     if (state.showText){
-      try { textBox.textContent = formatRegionSummary(region); } catch (e){ textBox.textContent = 'Summary unavailable: ' + e.message; }
+      try { textBox.textContent = regionMapTextSummary(region); } catch (e){ textBox.textContent = 'Summary unavailable: ' + e.message; }
       textBox.style.display = 'block';
     } else { textBox.style.display = 'none'; }
   }
 
   panel.append(switchRow, toolbar, stage, meta, textBox,
-    h('p', { class:'region-readonly-note hint' }, 'Read-only view of saved data. Editing pins, markers, fog, and terrain comes in a later update.'));
+    h('p', { class:'region-readonly-note hint' }, opts.footerText ||
+       'Read-only view of saved data. Pin/marker and reveal/fog tools can be layered around this map; terrain editing remains deferred.'));
   draw();
   return panel;
 }
@@ -5180,14 +5981,16 @@ campRegion = async function(host, name){
   try{
     const result = await loadCampaignRegions(cfg, name);
     const wrap = h('div', { class:'region-view' },
-      h('div', { class:'region-readonly' }, h('b', null, 'Region map · read only'),
-        h('span', null, 'Renders only saved terrain. Switch layers, pan, and zoom — nothing here changes your data.')));
+      h('div', { class:'region-readonly' }, h('b', null, 'Region map · saved data'),
+        h('span', null, 'Pins, markers, and reveal/fog can be edited. Terrain remains read-only.')));
     if (!result.regions.length){
       wrap.append(h('div', { class:'region-empty' }, h('h3', null, 'No saved regions'),
         h('p', { class:'hint' }, 'No saved regions exist for this campaign yet. Add a region JSON under campaign/' + name + '/regions/ to see it mapped here.')));
     } else result.regions.forEach(entry => {
       wrap.append(regionStatusCard(entry));
-      if (entry.region && (!entry.errors || !entry.errors.length)) wrap.append(regionMapPanel(entry));
+      if (entry.region && (!entry.errors || !entry.errors.length)){
+        wrap.append(typeof regionEditableMapPanel === 'function' ? regionEditableMapPanel(entry, cfg, name) : regionMapPanel(entry));
+      }
     });
     if (result.orphanMarkdown.length){
       wrap.append(h('div', { class:'region-warning' }, h('b', null, 'Markdown summaries without JSON'),
@@ -5198,6 +6001,385 @@ campRegion = async function(host, name){
     host.replaceChildren(h('p', { class:'hint' }, 'Region data unavailable: ' + String(error && error.message || error)));
   }
 };
+/* ========================================================================== *
+   REGION EDIT — Region Update 3 pins/markers + Update 4 reveal/fog harness.
+
+   Every write re-parses the latest GitHub copy, applies one focused operation,
+   validates the complete region, and serializes stable JSON. Hidden or fogged
+   items are never exposed by the editor and cannot be changed through it.
+
+   TODO (Region Update 5): add terrain editing behind its own guarded operation.
+ * ========================================================================== */
+const REGION_EDIT_KINDS = ['pin','marker'];
+
+function regionMapItemListKey(kind){
+  if (kind === 'pin') return 'pins';
+  if (kind === 'marker') return 'markers';
+  throw new Error('Unknown region map item kind: ' + kind);
+}
+
+function regionMapItemSlug(value){
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'item';
+}
+
+function regionMapAllIds(region){
+  const ids = new Set();
+  ['localLayers','features','connections','pins','markers','notes'].forEach(key => {
+    const values = region && Array.isArray(region[key]) ? region[key] : [];
+    values.forEach(value => { if (regionIsRecord(value) && typeof value.id === 'string') ids.add(value.id); });
+  });
+  return ids;
+}
+
+function regionMapNextItemId(region, kind, label){
+  const ids = regionMapAllIds(region);
+  const base = kind + '-' + regionMapItemSlug(label);
+  if (!ids.has(base)) return base;
+  let n = 2;
+  while (ids.has(base + '-' + n)) n++;
+  return base + '-' + n;
+}
+
+function regionMapEditableLayer(region, layerId){
+  const layers = region && Array.isArray(region.localLayers) ? region.localLayers : [];
+  return layers.find(layer => regionIsRecord(layer) && layer.id === layerId &&
+    layer.visible !== false && !regionVisibilityHidden(layer)) || null;
+}
+
+function regionMapPositionRevealed(region, layerId, position){
+  if (!regionIsRecord(position) || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
+  const grid = regionTerrainGrid(region, layerId);
+  const mask = regionRevealMask(region, layerId);
+  if (!grid || !Array.isArray(mask)) return true;
+  const x = Math.floor(position.x), y = Math.floor(position.y);
+  if (x < 0 || y < 0 || x >= grid.width || y >= grid.height) return true;
+  return regionCellRevealed(mask, y * grid.width + x);
+}
+
+function regionFindMapItem(region, kind, id){
+  const key = regionMapItemListKey(kind);
+  const items = region && Array.isArray(region[key]) ? region[key] : [];
+  return items.find(item => regionIsRecord(item) && item.id === id) || null;
+}
+
+function regionMapItemEditable(region, item){
+  return !!item && !!regionMapEditableLayer(region, item.layerId) &&
+    !regionVisibilityHidden(item) && regionMapPositionRevealed(region, item.layerId, item.position);
+}
+
+function regionApplyMapItemEdit(region, edit, options){
+  const opts = options || {};
+  const valid = assertRegion(region, opts.expectedCampaign ? { expectedCampaign:opts.expectedCampaign } : undefined);
+  if (!edit || !REGION_EDIT_KINDS.includes(edit.kind)) throw new Error('Choose a pin or marker');
+  const next = regionClone(valid), key = regionMapItemListKey(edit.kind), items = next[key];
+  const action = edit.action;
+
+  if (action === 'place'){
+    const label = regionTrim(edit.label);
+    if (!label) throw new Error('A label is required');
+    if (!regionMapEditableLayer(next, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+    const position = regionNormalizePosition(edit.position);
+    if (!regionMapPositionRevealed(next, edit.layerId, position)) throw new Error('Pins and markers cannot be placed under fog');
+    const item = {
+      id:regionMapNextItemId(next, edit.kind, label),
+      label,
+      layerId:edit.layerId,
+      position,
+    };
+    if (edit.kind === 'marker'){
+      item.characterId = regionNormalizeId(edit.characterId);
+      if (!item.characterId) throw new Error('A character ID is required for a marker');
+    }
+    items.push(item);
+  }else{
+    const index = items.findIndex(item => regionIsRecord(item) && item.id === edit.id);
+    if (index < 0) throw new Error('That ' + edit.kind + ' no longer exists');
+    const current = items[index];
+    if (!regionMapItemEditable(next, current)) throw new Error('That ' + edit.kind + ' is hidden or under fog');
+    if (action === 'move'){
+      if (!regionMapEditableLayer(next, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+      const position = regionNormalizePosition(edit.position);
+      if (!regionMapPositionRevealed(next, edit.layerId, position)) throw new Error('Pins and markers cannot be moved under fog');
+      items[index] = { ...current, layerId:edit.layerId, position };
+    }else if (action === 'label'){
+      const label = regionTrim(edit.label);
+      if (!label) throw new Error('A label is required');
+      items[index] = { ...current, label };
+    }else if (action === 'delete'){
+      items.splice(index, 1);
+    }else throw new Error('Unknown region map item action: ' + action);
+  }
+  return assertRegion(next, opts.expectedCampaign ? { expectedCampaign:opts.expectedCampaign } : undefined);
+}
+
+function regionTransformMapItemEdit(currentText, path, campaignName, expectedRegionId, edit){
+  const current = assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
+  const next = regionApplyMapItemEdit(current, edit, { expectedCampaign:campaignName });
+  assertRegionWriteTarget(path, campaignName, next, currentText);
+  return serializeRegion(next);
+}
+
+function regionMapEditCommitMessage(edit){
+  const action = edit.action === 'label' ? 'Label' : edit.action.charAt(0).toUpperCase() + edit.action.slice(1);
+  return action + ' region ' + edit.kind + ' via Game';
+}
+
+async function regionSaveMapItemEdit(cfg, entry, campaignName, edit){
+  const path = entry && entry.json && entry.json.path;
+  const expectedRegionId = entry && entry.region && entry.region.id;
+  if (!path || !expectedRegionId) throw new Error('Region write target is unavailable');
+  let savedText = '';
+  await ghUpdate(cfg, path, currentText => {
+    savedText = regionTransformMapItemEdit(currentText, path, campaignName, expectedRegionId, edit);
+    return savedText;
+  }, regionMapEditCommitMessage(edit), {
+    guard:currentText => assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId }),
+  });
+  entry.region = assertRegionJson(savedText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
+  entry.errors = [];
+  return entry.region;
+}
+
+function regionEditableMapPanel(entry, cfg, campaignName){
+  const root = h('div', { class:'region-edit-wrap' });
+  const firstLayer = regionMapLayers(entry.region)[0];
+  const state = {
+    mode:null, kind:'pin', label:'', characterId:'', selected:null, status:'', saving:false,
+    activeLayerId:firstLayer ? firstLayer.id : '',
+  };
+
+  const selectedItem = () => state.selected &&
+    regionFindMapItem(entry.region, state.selected.kind, state.selected.id);
+
+  async function save(edit, success){
+    state.saving = true; state.status = 'Saving to the region file…'; draw();
+    try{
+      await regionSaveMapItemEdit(cfg, entry, campaignName, edit);
+      state.mode = null; state.selected = null; state.status = success;
+      toast(success);
+    }catch(error){
+      state.status = 'Failed: ' + String(error && error.message || error);
+    }finally{
+      state.saving = false; draw();
+    }
+  }
+
+  async function saveReveal(edit, success){
+    state.saving = true; state.status = 'Saving reveal state to the region file…'; draw();
+    try{
+      await regionSaveRevealEdit(cfg, entry, campaignName, edit);
+      state.status = success; toast(success);
+    }catch(error){
+      state.status = 'Failed: ' + String(error && error.message || error);
+    }finally{
+      state.saving = false; draw();
+    }
+  }
+
+  function beginPlace(kind, label, characterId){
+    const clean = regionTrim(label);
+    if (!clean){ state.status = 'Enter a label before placing it.'; draw(); return; }
+    if (kind === 'marker' && !REGION_ID_RE.test(regionNormalizeId(characterId) || '')){
+      state.status = 'Marker character ID must use lowercase letters, numbers, and internal hyphens.'; draw(); return;
+    }
+    state.kind = kind; state.label = clean; state.characterId = regionNormalizeId(characterId);
+    state.selected = null; state.mode = 'place'; state.status = 'Click a revealed map position to place the ' + kind + '.'; draw();
+  }
+
+  function draw(){
+    const item = selectedItem();
+    if (state.selected && (!item || !regionMapItemEditable(entry.region, item))) state.selected = null;
+
+    const kind = h('select', { 'aria-label':'Map item type' },
+      h('option', { value:'pin' }, 'Pin'),
+      h('option', { value:'marker' }, 'Marker'));
+    kind.value = state.kind;
+    const label = h('input', { type:'text', maxlength:'120', placeholder:'Label', value:state.label, 'aria-label':'New pin or marker label' });
+    const characterId = h('input', { type:'text', maxlength:'80', placeholder:'Character ID (marker)', value:state.characterId,
+      'aria-label':'Marker character ID' });
+    const place = h('button', { class:'navbtn primary', type:'button' }, state.mode === 'place' ? 'Choose a map position…' : 'Place on map');
+    place.disabled = state.saving;
+    kind.onchange = () => { state.kind = kind.value; characterId.style.display = state.kind === 'marker' ? '' : 'none'; };
+    characterId.style.display = state.kind === 'marker' ? '' : 'none';
+    place.onclick = () => beginPlace(kind.value, label.value, characterId.value);
+
+    const create = h('div', { class:'region-edit-create' },
+      h('label', null, 'Add', kind), label, characterId, place);
+
+    const activeGrid = regionTerrainGrid(entry.region, state.activeLayerId);
+    const fogToggle = h('button', { class:'navbtn', type:'button', onclick:() => {
+      state.mode = state.mode === 'fog' ? null : 'fog';
+      state.selected = null;
+      state.status = state.mode === 'fog'
+        ? 'Tap a terrain cell to toggle it revealed or fogged.'
+        : 'Reveal/fog tool closed.';
+      draw();
+    } }, state.mode === 'fog' ? 'Done toggling' : 'Toggle cells');
+    const revealAll = h('button', { class:'navbtn', type:'button', onclick:() =>
+      saveReveal({ action:'reveal-all', layerId:state.activeLayerId }, 'Layer fully revealed.') }, 'Reveal all');
+    const fogAll = h('button', { class:'navbtn', type:'button', onclick:() =>
+      saveReveal({ action:'fog-all', layerId:state.activeLayerId }, 'Layer fully fogged.') }, 'Fog all');
+    [fogToggle, revealAll, fogAll].forEach(button => { button.disabled = state.saving || !activeGrid; });
+    const fogControls = h('div', { class:'region-fog-controls' },
+      h('div', { class:'region-editor-head' }, h('h3', null, 'Reveal / fog'),
+        h('span', { class:'hint' }, activeGrid
+          ? activeGrid.width + ' × ' + activeGrid.height + ' cell mask'
+          : 'unavailable · this layer has no terrain grid')),
+      h('div', { class:'toolrow' }, fogToggle, revealAll, fogAll));
+
+    const inspector = h('div', { class:'region-edit-inspector' });
+    if (!item){
+      inspector.append(h('span', { class:'hint' }, 'Select a visible pin or marker on the map to move, relabel, or delete it.'));
+    }else{
+      const editLabel = h('input', { type:'text', maxlength:'120', value:item.label, 'aria-label':'Selected item label' });
+      const saveLabel = h('button', { class:'navbtn', type:'button', onclick:() =>
+        save({ action:'label', kind:state.selected.kind, id:state.selected.id, label:editLabel.value }, 'Label saved.') }, 'Save label');
+      const move = h('button', { class:'navbtn', type:'button', onclick:() => {
+        state.mode = 'move'; state.status = 'Click a revealed map position to move ' + item.label + '.'; draw();
+      } }, state.mode === 'move' ? 'Choose a map position…' : 'Move');
+      const remove = h('button', { class:'navbtn region-delete', type:'button', onclick:() => {
+        if (confirm('Delete ' + item.label + '?')) save({ action:'delete', kind:state.selected.kind, id:state.selected.id }, item.label + ' deleted.');
+      } }, 'Delete');
+      [saveLabel, move, remove].forEach(button => { button.disabled = state.saving; });
+      inspector.append(h('b', null, state.selected.kind === 'pin' ? 'Selected pin' : 'Selected marker'),
+        editLabel, saveLabel, move, remove);
+    }
+
+    const map = regionMapPanel(entry, {
+      initialLayerId:state.activeLayerId,
+      selected:state.selected,
+      placementMode:state.mode,
+      onLayerChange:(layerId) => { state.activeLayerId = layerId; state.mode = null; state.selected = null; draw(); },
+      onSelect:(itemKind, id) => {
+        if (state.saving) return;
+        const next = regionFindMapItem(entry.region, itemKind, id);
+        if (!regionMapItemEditable(entry.region, next)) return;
+        state.selected = { kind:itemKind, id }; state.mode = null; state.status = ''; draw();
+      },
+      onPlace:(layerId, position) => {
+        if (state.saving) return;
+        if (state.mode === 'fog'){
+          const grid = regionTerrainGrid(entry.region, layerId);
+          if (!grid){ state.status = 'Reveal/fog is unavailable without a terrain grid.'; draw(); return; }
+          const index = position.y * grid.width + position.x;
+          const currentMask = regionRevealMask(entry.region, layerId);
+          const revealed = !regionCellRevealed(currentMask, index);
+          saveReveal({ action:'cell', layerId, index, revealed },
+            revealed ? 'Cell revealed.' : 'Cell fogged.');
+        }else if (state.mode === 'place'){
+          save({ action:'place', kind:state.kind, label:state.label, characterId:state.characterId, layerId, position },
+            (state.kind === 'pin' ? 'Pin' : 'Marker') + ' placed.');
+        }else if (state.mode === 'move' && state.selected){
+          const moving = selectedItem();
+          save({ action:'move', kind:state.selected.kind, id:state.selected.id, layerId, position },
+            (moving ? moving.label : 'Map item') + ' moved.');
+        }
+      },
+      footerText:'Pins and markers are editable on revealed positions. Reveal/fog changes only the selected layer mask. GM-only data stays hidden; terrain remains read-only.',
+    });
+
+    const status = h('div', { class:'region-edit-status hint', role:'status' }, state.status);
+    root.replaceChildren(h('section', { class:'region-editor' },
+      h('div', { class:'region-editor-head' }, h('h3', null, 'Pins & markers'),
+        h('span', { class:'hint' }, 'place · move · label · delete')),
+      create, inspector), h('section', { class:'region-editor' }, fogControls, status), map);
+  }
+
+  draw();
+  return root;
+}
+/* ========================================================================== *
+   REGION REVEAL EDIT — Region Update 4.
+
+   Small DOM-free helpers own the exact reveal-mask math. Every persisted edit
+   re-parses the latest region JSON, changes only revealed.layers[layerId],
+   validates the whole region, and serializes stable JSON.
+ * ========================================================================== */
+function regionRevealGridOrThrow(region, layerId){
+  const grid = regionTerrainGrid(region, layerId);
+  if (!grid) throw new Error('Reveal/fog requires a complete terrain grid on that layer');
+  return grid;
+}
+
+function regionRevealExactMask(region, layerId){
+  const grid = regionRevealGridOrThrow(region, layerId);
+  const mask = regionRevealMask(region, layerId);
+  return Array.from({ length:grid.width * grid.height }, (_, index) =>
+    regionCellRevealed(mask, index) ? 1 : 0);
+}
+
+function regionRevealEditCopy(region){
+  const next = regionClone(region);
+  if (!regionIsRecord(next.revealed)) next.revealed = {};
+  if (!regionIsRecord(next.revealed.layers)) next.revealed.layers = {};
+  return next;
+}
+
+function regionSetCellRevealed(region, layerId, index, revealed){
+  const grid = regionRevealGridOrThrow(region, layerId);
+  const count = grid.width * grid.height;
+  if (!Number.isInteger(index) || index < 0 || index >= count) throw new Error('Reveal cell index is outside the terrain grid');
+  const next = regionRevealEditCopy(region);
+  const mask = regionRevealExactMask(region, layerId);
+  mask[index] = revealed ? 1 : 0;
+  next.revealed.layers[layerId] = mask;
+  return next;
+}
+
+function regionRevealAll(region, layerId){
+  regionRevealGridOrThrow(region, layerId);
+  const next = regionRevealEditCopy(region);
+  delete next.revealed.layers[layerId];  // absence of a mask means fully revealed
+  return next;
+}
+
+function regionFogAll(region, layerId){
+  const grid = regionRevealGridOrThrow(region, layerId);
+  const next = regionRevealEditCopy(region);
+  next.revealed.layers[layerId] = Array(grid.width * grid.height).fill(0);
+  return next;
+}
+
+function regionApplyRevealEdit(region, edit, options){
+  const opts = options || {};
+  const valid = assertRegion(region, opts.expectedCampaign ? { expectedCampaign:opts.expectedCampaign } : undefined);
+  if (!edit || !regionMapEditableLayer(valid, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+  let next;
+  if (edit.action === 'cell') next = regionSetCellRevealed(valid, edit.layerId, edit.index, edit.revealed);
+  else if (edit.action === 'reveal-all') next = regionRevealAll(valid, edit.layerId);
+  else if (edit.action === 'fog-all') next = regionFogAll(valid, edit.layerId);
+  else throw new Error('Unknown reveal/fog action: ' + String(edit.action || ''));
+  return assertRegion(next, opts.expectedCampaign ? { expectedCampaign:opts.expectedCampaign } : undefined);
+}
+
+function regionTransformRevealEdit(currentText, path, campaignName, expectedRegionId, edit){
+  const current = assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
+  const next = regionApplyRevealEdit(current, edit, { expectedCampaign:campaignName });
+  assertRegionWriteTarget(path, campaignName, next, currentText);
+  return serializeRegion(next);
+}
+
+function regionRevealCommitMessage(edit){
+  if (edit.action === 'reveal-all') return 'Reveal all region cells via Game';
+  if (edit.action === 'fog-all') return 'Fog all region cells via Game';
+  return (edit.revealed ? 'Reveal' : 'Fog') + ' region cell via Game';
+}
+
+async function regionSaveRevealEdit(cfg, entry, campaignName, edit){
+  const path = entry && entry.json && entry.json.path;
+  const expectedRegionId = entry && entry.region && entry.region.id;
+  if (!path || !expectedRegionId) throw new Error('Region write target is unavailable');
+  let savedText = '';
+  await ghUpdate(cfg, path, currentText => {
+    savedText = regionTransformRevealEdit(currentText, path, campaignName, expectedRegionId, edit);
+    return savedText;
+  }, regionRevealCommitMessage(edit), {
+    guard:currentText => assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId }),
+  });
+  entry.region = assertRegionJson(savedText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
+  entry.errors = [];
+  return entry.region;
+}
 /* ========================================================================== *
    GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
    the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
@@ -5369,8 +6551,8 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   try{ DB = await loadState(); }catch(e){ DB = defaults(); }
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
   applyMode();
-  if(DB.profileChosen && DB.profile==='worldbuilder') VIEW={name:'studio'};   // the Worldbuilder lands in the Studio, not the maker home
-  else if(DB.profileChosen && DB.profile==='game') VIEW={name:'campaigns'};   // the Game lands in Campaigns
+  const initialView=initialOpenViewName(DB);
+  if(initialView) VIEW={name:initialView};   // null leaves the untouched first-run screen in charge
   render();
   firstRun();
   // self-heal: load from the repo on open when asked to converge devices, OR whenever the
