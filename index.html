@@ -458,7 +458,11 @@
 .region-map.cosmic-bottom{border-top:4px solid #6f6076}
 .region-layer-switch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .region-map-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.region-view-toggle{margin-left:auto}
+.region-view-toggle[aria-pressed="false"]{background:#efe5c8;border-color:#cdb25e;color:#5b4720;font-weight:700}
+.region-view-toggle[aria-pressed="true"]{background:#e6edf0;border-color:#adc1ca;color:#365968;font-weight:700}
 .region-map-stage{border:1px solid #e7dcc4;border-radius:10px;background:#fbf7ec;overflow:hidden;touch-action:none}
+.region-map-no-layers{padding:38px 18px;text-align:center}
 .region-map-svg{display:block;width:100%;height:min(60vh,460px);background:#f4eedd;cursor:grab}
 .region-map-svg:active{cursor:grabbing}
 .region-cell{stroke:#00000010;stroke-width:.02}
@@ -495,6 +499,32 @@
 .region-fog-controls .region-editor-head{margin-bottom:8px}
 .region-fog-controls .toolrow{margin-top:0}
 .region-map-svg.is-placing .region-cell,.region-map-svg.is-placing .region-fog{cursor:crosshair}
+
+/* ---------- Region Forge 3: campaign atlas + Forge workspace ---------- */
+.region-atlas-actions{justify-content:center}
+.region-atlas,.region-opened,.region-forge-stage{padding:16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+.region-atlas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.region-atlas-card{display:flex;flex-direction:column;gap:7px;align-items:stretch;text-align:left;padding:10px;border:1.5px solid #e7dcc4;border-radius:12px;background:#fffaf0;color:var(--ink);cursor:pointer;font:inherit}
+.region-atlas-card:hover,.region-atlas-card.selected{border-color:#cdb25e;box-shadow:0 8px 18px -18px rgba(var(--shadow)/.65)}
+.region-atlas-card.invalid{opacity:.75;cursor:not-allowed}
+.region-atlas-title{font-weight:700;font-size:16px}
+.region-atlas-thumb{height:120px;border:1px solid #e7dcc4;border-radius:10px;background:#fbf7ec;overflow:hidden;display:grid;place-items:center;color:var(--hint);font-size:13px}
+.region-atlas-svg{height:120px;min-height:120px;cursor:pointer}
+.region-forge{display:grid;gap:12px}
+.region-forge-stage{background:#fffaf0}
+.region-forge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.region-forge-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--ink)}
+.region-forge-field span{color:var(--gold);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.region-forge-field input,.region-forge-field select,.region-forge-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink);font:inherit;padding:8px 10px}
+.region-forge-field textarea{resize:vertical;min-height:82px}
+.region-forge-field small{font-weight:400;letter-spacing:0;text-transform:none}
+.region-forge-detected{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:#fffdf7}
+.region-chip{display:inline-flex;align-items:center;border:1px solid #e2d0a8;border-radius:999px;background:#f3ead1;padding:3px 8px;font-size:12px;color:#5b4720}
+.region-forge-warning{margin:10px 0 0;text-align:left}
+.region-forge-seed-actions{align-content:end;align-items:end;margin:0}
+.region-forge-summary{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:#fffdf7}
+.region-forge-summary p{margin:6px 0 0}
+.region-forge-accept{align-items:center;justify-content:flex-end}
 @media(max-width:620px){
   .region-map{padding:12px}.region-map-svg{height:54vh}
   .region-editor{padding:12px}.region-edit-create,.region-edit-inspector{align-items:stretch;flex-direction:column}
@@ -502,6 +532,10 @@
   .region-edit-inspector input,.region-edit-inspector button{width:100%;box-sizing:border-box}
   .region-fog-controls .toolrow{align-items:stretch;flex-direction:column}
   .region-fog-controls .toolrow .navbtn{width:100%}
+  .region-view-toggle{margin-left:0;width:100%}
+  .region-atlas-grid,.region-forge-grid{grid-template-columns:1fr}
+  .region-forge-accept,.region-forge-seed-actions{align-items:stretch;flex-direction:column}
+  .region-forge-accept .navbtn,.region-forge-seed-actions .navbtn{width:100%}
 }
 /* ---------- Engine settings: device-only profiles, no model calls yet ---------- */
 .engine-settings{display:grid;gap:14px}
@@ -4732,8 +4766,10 @@ function sessionZeroHandoff(name){
    This module intentionally does NOT render maps or mutate campaign files.
    Cosmic Cloudsea placement and local traversable geography are independent.
  * ========================================================================== */
-const REGION_SCHEMA_VERSION = 1;
+const REGION_SCHEMA_VERSION = 2;
+const REGION_PREVIOUS_SCHEMA_VERSION = 1;
 const REGION_COSMIC_LAYERS = ['top','middle','bottom'];
+const REGION_REGION_ROLES = ['starter','outer'];
 const REGION_LOCAL_LAYER_TYPES = [
   'high-airspace',
   'floating-islands',
@@ -4747,7 +4783,7 @@ const REGION_LOCAL_LAYER_TYPES = [
 const REGION_ID_RE = /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
 const REGION_HIDDEN_VISIBILITIES = ['gm','gm-only','hidden','private'];
 const REGION_TOP_LEVEL_ORDER = [
-  'schemaVersion','id','title','campaign','cosmicLayer','localLayers','features',
+  'schemaVersion','id','title','campaign','cosmicLayer','cosmicBlend','ambientMana','localLayers','features',
   'connections','terrain','revealed','pins','markers','elementalInfluence','notes','metadata',
 ];
 
@@ -4764,6 +4800,32 @@ function regionFiniteNumber(value){
 function regionOptionalArray(value){ return value==null ? [] : value; }
 function regionOptionalRecord(value){ return value==null ? {} : value; }
 function regionNormalizeId(value){ return typeof value==='string' ? value.trim() : value; }
+function regionNormalizeBoolean(value){
+  if(typeof value==='boolean') return value;
+  if(typeof value==='string'){
+    const v=value.trim().toLowerCase();
+    if(v==='true') return true;
+    if(v==='false') return false;
+  }
+  return value;
+}
+function regionBroadElementKeys(){
+  return (typeof ELEMENTS!=='undefined' && Array.isArray(ELEMENTS))
+    ? ELEMENTS.map(element=>element&&element.key).filter(Boolean)
+    : [];
+}
+function regionNeutralCosmicBlend(){
+  return {
+    active:false,
+    neighborLayer:null,
+    strength:0,
+    band:'none',
+    ambientManaInterpolation:null,
+    environmentalTendencies:[],
+  };
+}
+function regionNeutralAmbientMana(){ return {band:'neutral',intensity:0}; }
+function regionNeutralElementalInfluence(){ return {region:{},localLayers:{}}; }
 function regionNormalizePosition(position){
   if(!regionIsRecord(position)) return position;
   const out={...position};
@@ -4783,9 +4845,83 @@ function regionNormalizeList(value, mapper){
   if(!Array.isArray(value)) return value;
   return value.map(item=>mapper(regionClone(item)));
 }
+function regionNormalizeCosmicBlend(value){
+  const src=regionIsRecord(value)?value:{};
+  const out={...regionNeutralCosmicBlend(),...src};
+  if('active' in out) out.active=regionNormalizeBoolean(out.active);
+  if(typeof out.neighborLayer==='string') out.neighborLayer=out.neighborLayer.trim().toLowerCase();
+  if('strength' in out) out.strength=regionFiniteNumber(out.strength);
+  if(typeof out.band==='string') out.band=regionTrim(out.band);
+  if('ambientManaInterpolation' in out && regionIsRecord(out.ambientManaInterpolation)){
+    out.ambientManaInterpolation=regionClone(out.ambientManaInterpolation);
+  }
+  if('environmentalTendencies' in out && Array.isArray(out.environmentalTendencies)){
+    out.environmentalTendencies=out.environmentalTendencies.map(item=>typeof item==='string'?item.trim():item);
+  }
+  return out;
+}
+function regionNormalizeAmbientMana(value){
+  const src=regionIsRecord(value)?value:{};
+  const out={...regionNeutralAmbientMana(),...src};
+  if(typeof out.band==='string') out.band=regionTrim(out.band);
+  if('intensity' in out) out.intensity=regionFiniteNumber(out.intensity);
+  return out;
+}
+function regionNormalizeElementWeights(value){
+  if(!regionIsRecord(value)) return {};
+  const out={...value};
+  Object.keys(out).forEach(key=>{ out[key]=regionFiniteNumber(out[key]); });
+  return out;
+}
+function regionNormalizeElementalInfluence(value){
+  const src=regionIsRecord(value)?value:{};
+  const out={...regionNeutralElementalInfluence(),...src};
+  out.region=regionNormalizeElementWeights(out.region);
+  const layers=regionIsRecord(out.localLayers)?{...out.localLayers}:{};
+  Object.keys(layers).forEach(layerId=>{ layers[layerId]=regionNormalizeElementWeights(layers[layerId]); });
+  out.localLayers=layers;
+  return out;
+}
+function regionNormalizeMetadata(value){
+  const out=regionIsRecord(value)?{...value}:{};
+  if('generated' in out) out.generated=regionNormalizeBoolean(out.generated);
+  ['seed','generator','generatorVersion','sourceProfileHash'].forEach(key=>{ if(key in out) out[key]=regionTrim(out[key]); });
+  if(typeof out.regionRole==='string') out.regionRole=out.regionRole.trim().toLowerCase();
+  if(typeof out.creationMarker==='string') out.creationMarker=regionTrim(out.creationMarker);
+  if(regionIsRecord(out.visibleInputs)) out.visibleInputs=regionClone(out.visibleInputs);
+  if(regionIsRecord(out.sourceProfileSnapshot)) out.sourceProfileSnapshot=regionClone(out.sourceProfileSnapshot);
+  return out;
+}
+function regionEnsureV2Defaults(region){
+  if(!regionIsRecord(region)) return region;
+  const out={...region};
+  if(!regionIsRecord(out.cosmicBlend)) out.cosmicBlend=regionNeutralCosmicBlend();
+  if(!regionIsRecord(out.ambientMana)) out.ambientMana=regionNeutralAmbientMana();
+  if(!regionIsRecord(out.elementalInfluence)) out.elementalInfluence=regionNeutralElementalInfluence();
+  else{
+    out.elementalInfluence={...out.elementalInfluence};
+    if(!regionIsRecord(out.elementalInfluence.region)) out.elementalInfluence.region={};
+    if(!regionIsRecord(out.elementalInfluence.localLayers)) out.elementalInfluence.localLayers={};
+  }
+  if(!regionIsRecord(out.metadata)) out.metadata={};
+  return out;
+}
+// Schema migration. Single-step today (v1 -> v2): there is exactly one prior version, so we
+// stamp the current version and let regionEnsureV2Defaults fill neutral values for the systems
+// v1 lacked (cosmicBlend, ambientMana, structured elementalInfluence, metadata). When a future
+// v3 lands, migrate in STEPS — bump v1->v2 here, then v2->v3 below — so each upgrade stays
+// independent rather than branching on the source version.
+function migrateRegion(region){
+  const src=regionClone(region);
+  if(!regionIsRecord(src)) return src;
+  let version='schemaVersion' in src ? regionFiniteNumber(src.schemaVersion) : src.schemaVersion;
+  if(version===REGION_PREVIOUS_SCHEMA_VERSION){ src.schemaVersion=REGION_SCHEMA_VERSION; version=REGION_SCHEMA_VERSION; }
+  if(version===REGION_SCHEMA_VERSION) return regionEnsureV2Defaults(src);
+  return src;
+}
 
 function normalizeRegion(region){
-  const src=regionClone(region);
+  const src=migrateRegion(region);
   if(!regionIsRecord(src)) return src;
   const out={...src};
   if('schemaVersion' in out) out.schemaVersion=regionFiniteNumber(out.schemaVersion);
@@ -4793,6 +4929,8 @@ function normalizeRegion(region){
   if('title' in out) out.title=regionTrim(out.title);
   if('campaign' in out) out.campaign=regionTrim(out.campaign);
   if(typeof out.cosmicLayer==='string') out.cosmicLayer=out.cosmicLayer.trim().toLowerCase();
+  out.cosmicBlend=regionNormalizeCosmicBlend(out.cosmicBlend);
+  out.ambientMana=regionNormalizeAmbientMana(out.ambientMana);
 
   out.localLayers=regionNormalizeList(out.localLayers, layer=>{
     if(!regionIsRecord(layer)) return layer;
@@ -4872,8 +5010,8 @@ function normalizeRegion(region){
 
   out.terrain=regionOptionalRecord(out.terrain);
   out.revealed=regionOptionalRecord(out.revealed);
-  out.elementalInfluence=regionOptionalRecord(out.elementalInfluence);
-  out.metadata=regionOptionalRecord(out.metadata);
+  out.elementalInfluence=regionNormalizeElementalInfluence(out.elementalInfluence);
+  out.metadata=regionNormalizeMetadata(out.metadata);
   return out;
 }
 
@@ -4914,6 +5052,12 @@ function regionValidateRecord(errors,path,value){
   if(!regionIsRecord(value)){ regionPushError(errors,path,'must be an object'); return false; }
   return true;
 }
+function regionValidateOptionalString(errors,path,value){
+  if(value!==undefined && value!==null && typeof value!=='string') regionPushError(errors,path,'must be a string');
+}
+function regionValidateNonnegativeNumber(errors,path,value){
+  if(!Number.isFinite(value) || value<0) regionPushError(errors,path,'must be a non-negative finite number');
+}
 function regionVisibilityHidden(item){
   if(!regionIsRecord(item)) return false;
   if(item.hidden===true || item.revealed===false) return true;
@@ -4936,7 +5080,76 @@ function regionHasCompleteTerrain(region){
 }
 function regionHasGenerationProvenance(region){
   const metadata=region && region.metadata;
-  return regionIsRecord(metadata) && (metadata.seed!==undefined || metadata.generator!==undefined || metadata.generatorVersion!==undefined);
+  return regionIsRecord(metadata) && (
+    metadata.generated===true ||
+    metadata.seed!==undefined ||
+    metadata.generator!==undefined ||
+    metadata.generatorVersion!==undefined ||
+    metadata.regionRole!==undefined ||
+    metadata.visibleInputs!==undefined ||
+    metadata.sourceProfileHash!==undefined ||
+    metadata.sourceProfileSnapshot!==undefined ||
+    metadata.creationMarker!==undefined
+  );
+}
+function regionCosmicBlendAdjacent(primary,neighbor){
+  return (primary==='top'&&neighbor==='middle') ||
+    (primary==='middle'&&(neighbor==='top'||neighbor==='bottom')) ||
+    (primary==='bottom'&&neighbor==='middle');
+}
+function regionValidateCosmicBlend(errors,path,blend,primaryLayer){
+  if(blend.active!==undefined && typeof blend.active!=='boolean') regionPushError(errors,path+'.active','must be true or false');
+  const neighbor=blend.neighborLayer;
+  if(neighbor!=null && neighbor!==''){
+    if(!REGION_COSMIC_LAYERS.includes(neighbor)) regionPushError(errors,path+'.neighborLayer','must be one of: '+REGION_COSMIC_LAYERS.join(', '));
+    else if(REGION_COSMIC_LAYERS.includes(primaryLayer) && !regionCosmicBlendAdjacent(primaryLayer,neighbor)){
+      regionPushError(errors,path+'.neighborLayer','must blend only adjacent cosmic layers (top↔middle or middle↔bottom)');
+    }
+  }else if(blend.active===true) regionPushError(errors,path+'.neighborLayer','is required when a cosmic blend is active');
+  if(blend.strength!==undefined && (!Number.isFinite(blend.strength) || blend.strength<0 || blend.strength>1)){
+    regionPushError(errors,path+'.strength','must be a finite number from 0 to 1');
+  }
+  if(blend.band!==undefined && blend.band!==null && !(typeof blend.band==='string' || Number.isFinite(blend.band) || regionIsRecord(blend.band))){
+    regionPushError(errors,path+'.band','must be a string, number, or object');
+  }
+  if(blend.ambientManaInterpolation!==undefined && blend.ambientManaInterpolation!==null && !regionIsRecord(blend.ambientManaInterpolation)){
+    regionPushError(errors,path+'.ambientManaInterpolation','must be an object');
+  }
+  if(blend.environmentalTendencies!==undefined && !(Array.isArray(blend.environmentalTendencies) || regionIsRecord(blend.environmentalTendencies))){
+    regionPushError(errors,path+'.environmentalTendencies','must be an array or object');
+  }
+}
+function regionValidateAmbientMana(errors,path,value){
+  regionValidateOptionalString(errors,path+'.band',value.band);
+  regionValidateNonnegativeNumber(errors,path+'.intensity',value.intensity);
+}
+function regionValidateElementWeights(errors,path,weights){
+  if(!regionValidateRecord(errors,path,weights)) return;
+  Object.entries(weights).forEach(([key,weight])=>{
+    if(!REGION_ID_RE.test(key)) regionPushError(errors,path+'.'+key,'element key must use lowercase letters, numbers, and internal hyphens');
+    if(!Number.isFinite(weight) || weight<0) regionPushError(errors,path+'.'+key,'weight must be a non-negative finite number');
+  });
+}
+function regionValidateElementalInfluence(errors,path,value,layerIds){
+  if(!regionValidateRecord(errors,path,value)) return;
+  regionValidateElementWeights(errors,path+'.region',value.region);
+  if(!regionValidateRecord(errors,path+'.localLayers',value.localLayers)) return;
+  Object.entries(value.localLayers).forEach(([layerId,weights])=>{
+    if(!layerIds.has(layerId)) regionPushError(errors,path+'.localLayers.'+layerId,'references an unknown local layer');
+    regionValidateElementWeights(errors,path+'.localLayers.'+layerId,weights);
+  });
+}
+function regionValidateGenerationMetadata(errors,path,metadata){
+  if(metadata.generated!==undefined && typeof metadata.generated!=='boolean') regionPushError(errors,path+'.generated','must be true or false');
+  ['seed','generator','generatorVersion','sourceProfileHash'].forEach(key=>regionValidateOptionalString(errors,path+'.'+key,metadata[key]));
+  if(metadata.regionRole!==undefined && !REGION_REGION_ROLES.includes(metadata.regionRole)){
+    regionPushError(errors,path+'.regionRole','must be one of: '+REGION_REGION_ROLES.join(', '));
+  }
+  if(metadata.visibleInputs!==undefined && !regionIsRecord(metadata.visibleInputs)) regionPushError(errors,path+'.visibleInputs','must be an object');
+  if(metadata.sourceProfileSnapshot!==undefined && !regionIsRecord(metadata.sourceProfileSnapshot)) regionPushError(errors,path+'.sourceProfileSnapshot','must be an object');
+  if(metadata.creationMarker!==undefined && !(typeof metadata.creationMarker==='string' || regionIsRecord(metadata.creationMarker))){
+    regionPushError(errors,path+'.creationMarker','must be a string or object');
+  }
 }
 
 function validateRegion(region,options){
@@ -4952,6 +5165,8 @@ function validateRegion(region,options){
   if(opts.expectedCampaign && region.campaign!==opts.expectedCampaign) regionPushError(errors,'campaign','must match selected campaign '+opts.expectedCampaign);
   if(opts.expectedId && region.id!==opts.expectedId) regionPushError(errors,'id','must match expected region '+opts.expectedId);
   if(!REGION_COSMIC_LAYERS.includes(region.cosmicLayer)) regionPushError(errors,'cosmicLayer','must be one of: '+REGION_COSMIC_LAYERS.join(', '));
+  if(regionValidateRecord(errors,'cosmicBlend',region.cosmicBlend)) regionValidateCosmicBlend(errors,'cosmicBlend',region.cosmicBlend,region.cosmicLayer);
+  if(regionValidateRecord(errors,'ambientMana',region.ambientMana)) regionValidateAmbientMana(errors,'ambientMana',region.ambientMana);
 
   const allIds=new Map(), layerIds=new Set(), featureIds=new Set();
   const registerId=(path,id)=>{
@@ -5038,8 +5253,8 @@ function validateRegion(region,options){
 
   regionValidateRecord(errors,'terrain',region.terrain);
   regionValidateRecord(errors,'revealed',region.revealed);
-  regionValidateRecord(errors,'elementalInfluence',region.elementalInfluence);
-  regionValidateRecord(errors,'metadata',region.metadata);
+  regionValidateElementalInfluence(errors,'elementalInfluence',region.elementalInfluence,layerIds);
+  if(regionValidateRecord(errors,'metadata',region.metadata)) regionValidateGenerationMetadata(errors,'metadata',region.metadata);
 
   if(regionIsRecord(region.terrain) && region.terrain.layers!==undefined){
     if(!regionIsRecord(region.terrain.layers)) regionPushError(errors,'terrain.layers','must be an object keyed by local layer ID');
@@ -5153,6 +5368,487 @@ function assertRegionWriteTarget(path,campaignName,region,currentText){
     if(current.id!==valid.id) throw new Error('Refusing region write: current region ID changed');
   }
   return valid;
+}
+/* ========================================================================== *
+   REGION FORGE 2 — deterministic broad-strokes generator core.
+
+   Pure logic only. No UI, no network, no clocks, no platform randomness. The seed is an
+   input/provenance handle, never the save: every generated region includes full
+   schema-v2 serialized terrain that the existing renderer can draw.
+
+   Namespace: this core and region-forge.js (the Forge UI) are the two halves of one
+   feature and share the regionForge* / REGION_FORGE_* prefix in the concatenated
+   single-file build — keep every top-level symbol unique across BOTH files.
+ * ========================================================================== */
+const REGION_FORGE_GENERATOR_ID = 'region-forge';
+const REGION_FORGE_GENERATOR_VERSION = '2.0.0';
+const REGION_FORGE_CREATION_MARKER = 'region-forge-2';
+const REGION_FORGE_DEFAULT_WIDTH = 12;
+const REGION_FORGE_DEFAULT_HEIGHT = 8;
+const REGION_FORGE_HIDDEN_KEY_RE = /^(?:gm|gmOnly|gm_only|hidden|secret|private|author|authorSide|author_side|patron|patronGifts|patron_gifts|metadata)$/i;
+const REGION_FORGE_ELEMENT_FALLBACKS = ['earth','water','air','fire','wood','light','shadow','metal','lightning','ice','crystal','life'];
+const REGION_FORGE_EXPRESSION_ELEMENTS = {
+  storm:{lightning:1,air:0.8}, loam:{earth:1,life:0.35}, stone:{earth:1},
+  root:{wood:1,earth:0.35}, breath:{air:1,life:0.25}, steam:{water:0.7,fire:0.45},
+  mist:{water:0.65,air:0.45}, frost:{ice:1,water:0.25}, ember:{fire:1},
+  memory:{crystal:0.55,shadow:0.25,light:0.25},
+};
+const REGION_FORGE_COSMIC_BASE = {
+  top:{
+    elements:{air:0.9,light:0.75,lightning:0.35},
+    forms:{aerial:1,island:0.9,ridge:0.45,mist:0.45,storm:0.35,basin:0.15,cave:0.05,ravine:0.12,rooted:0.15},
+    ambient:0.55,
+  },
+  middle:{
+    elements:{earth:0.55,water:0.35,wood:0.35,life:0.3,air:0.15},
+    forms:{island:0.25,ridge:0.35,basin:0.45,rooted:0.45,cave:0.2,ravine:0.22,mist:0.2,storm:0.12,aerial:0.15},
+    ambient:0.35,
+  },
+  bottom:{
+    elements:{earth:0.7,shadow:0.55,crystal:0.35,metal:0.25,fire:0.18},
+    forms:{cave:0.95,ravine:0.75,ridge:0.45,basin:0.25,rooted:0.18,mist:0.35,storm:0.12,aerial:0.02,island:0.05},
+    ambient:0.68,
+  },
+};
+
+// Tunable signal weights. Public signals may influence terrain and visible
+// feature choice. Hidden signals influence only anonymous weights/forms.
+const REGION_FORGE_SIGNAL_WEIGHTS = [
+  { re:/\b(?:vael|wing|aerial|sky|flight|bird|feather|glide|airspace)\b/i,
+    elements:{air:0.75,light:0.25}, forms:{aerial:0.7,island:0.45,ridge:0.25}, ambient:0.05 },
+  { re:/\b(?:gill|river|rain|water|sea|tide|lake|swim|stream|crossing)\b/i,
+    elements:{water:0.75,life:0.18}, forms:{basin:0.55,mist:0.25}, ambient:0.02 },
+  { re:/\b(?:root|wood|forest|grove|tree|green|growth|plant|living)\b/i,
+    elements:{wood:0.7,life:0.35,earth:0.15}, forms:{rooted:0.6,basin:0.2}, ambient:0.03 },
+  { re:/\b(?:stone|earth|soil|mountain|ridge|strength|endurance|sturdy|body)\b/i,
+    elements:{earth:0.65,metal:0.15}, forms:{ridge:0.55,ravine:0.2}, ambient:0.01 },
+  { re:/\b(?:fire|ember|heat|forge|burn|spark|volcanic|flame)\b/i,
+    elements:{fire:0.75,metal:0.2}, forms:{ridge:0.15,ravine:0.25}, ambient:0.12, danger:0.12 },
+  { re:/\b(?:storm|lightning|quick|speed|agility|charge|electric)\b/i,
+    elements:{lightning:0.7,air:0.35}, forms:{storm:0.75,aerial:0.25}, ambient:0.12, danger:0.1 },
+  { re:/\b(?:ice|frost|cold|stillness|winter)\b/i,
+    elements:{ice:0.75,water:0.2}, forms:{ridge:0.2,mist:0.3}, ambient:0.05, danger:0.06 },
+  { re:/\b(?:crystal|lattice|memory|resonance|focus|intelligence|study|scholar)\b/i,
+    elements:{crystal:0.65,light:0.2}, forms:{ridge:0.2,cave:0.25}, ambient:0.08 },
+  { re:/\b(?:shadow|stealth|hidden|night|secret|fear|danger|threat|monster|ambush)\b/i,
+    elements:{shadow:0.65}, forms:{cave:0.3,ravine:0.35,mist:0.25}, ambient:0.08, danger:0.25 },
+  { re:/\b(?:profession|craft|smith|soldier|guard|hunter|scout|fieldcraft|survival)\b/i,
+    elements:{earth:0.25,metal:0.25,wood:0.18}, forms:{ridge:0.18,rooted:0.18}, ambient:0.01 },
+  { re:/\b(?:kind|compassion|heal|vital|life|charisma|bond|friend|community)\b/i,
+    elements:{life:0.65,light:0.2,wood:0.2}, forms:{basin:0.2,rooted:0.25}, ambient:0.04 },
+  { re:/\b(?:premise|arrival|portal|threshold|gate|crossing|hook|start|begin)\b/i,
+    elements:{air:0.12,crystal:0.12}, forms:{island:0.2,ridge:0.15,mist:0.15}, ambient:0.04 },
+];
+const REGION_FORGE_HIDDEN_SIGNAL_WEIGHTS = [
+  { re:/\b(?:eldrabreer|patron|gift|divine|godling|author|gm-only|secret)\b/i,
+    elements:{shadow:0.45,crystal:0.35,life:0.2,light:0.15}, forms:{mist:0.45,ravine:0.25,cave:0.25}, ambient:0.12, danger:0.1 },
+  { re:/\b(?:doom|curse|enemy|betrayal|horror|danger|threat|pressure)\b/i,
+    elements:{shadow:0.5,fire:0.2}, forms:{ravine:0.45,cave:0.25,storm:0.15}, ambient:0.1, danger:0.35 },
+];
+
+function regionForgeClamp(value,min,max){
+  const n=Number.isFinite(value)?value:min;
+  return Math.min(max,Math.max(min,n));
+}
+function regionForgeRound(value,places){
+  const p=Math.pow(10,Number.isInteger(places)?places:4);
+  return Math.round((Number.isFinite(value)?value:0)*p)/p;
+}
+function regionForgeSlug(value,fallback){
+  const slug=String(value||'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  return slug||fallback||'region';
+}
+function regionForgeElementKeys(){
+  const fromRoster=regionBroadElementKeys();
+  return fromRoster.length?fromRoster:REGION_FORGE_ELEMENT_FALLBACKS.slice();
+}
+function regionForgeStableSnapshot(value){
+  if(Array.isArray(value)) return value.map(regionForgeStableSnapshot).filter(v=>v!==undefined);
+  if(!regionIsRecord(value)){
+    if(value===undefined || typeof value==='function') return undefined;
+    return typeof value==='string' ? value.trim().replace(/\s+/g,' ') : value;
+  }
+  const out={};
+  Object.keys(value).sort().forEach(key=>{
+    const next=regionForgeStableSnapshot(value[key]);
+    if(next!==undefined) out[key]=next;
+  });
+  return out;
+}
+function regionForgeStableString(value){ return JSON.stringify(regionForgeStableSnapshot(value)); }
+function regionForgeHash(value){
+  const text=typeof value==='string'?value:regionForgeStableString(value);
+  let hash=2166136261;
+  for(let i=0;i<text.length;i++){
+    hash^=text.charCodeAt(i);
+    hash=Math.imul(hash,16777619)>>>0;
+  }
+  return ('00000000'+hash.toString(16)).slice(-8);
+}
+function regionForgeHashLong(value){
+  const text=typeof value==='string'?value:regionForgeStableString(value);
+  return regionForgeHash('a|'+text)+regionForgeHash('b|'+text)+regionForgeHash('c|'+text);
+}
+function regionForgeScrubHidden(value){
+  if(Array.isArray(value)) return value.map(regionForgeScrubHidden).filter(v=>v!==undefined);
+  if(!regionIsRecord(value)) return regionForgeStableSnapshot(value);
+  const out={};
+  Object.keys(value).sort().forEach(key=>{
+    if(REGION_FORGE_HIDDEN_KEY_RE.test(key)) return;
+    const next=regionForgeScrubHidden(value[key]);
+    if(next!==undefined) out[key]=next;
+  });
+  return out;
+}
+function regionForgeCollectText(value,out){
+  const lines=out||[];
+  if(Array.isArray(value)) value.forEach(item=>regionForgeCollectText(item,lines));
+  else if(regionIsRecord(value)) Object.keys(value).sort().forEach(key=>regionForgeCollectText(value[key],lines));
+  else if(value!==undefined && value!==null && typeof value!=='function') lines.push(String(value));
+  return lines;
+}
+function regionForgeCollectHiddenText(value,out,inHidden){
+  const lines=out||[];
+  if(Array.isArray(value)) value.forEach(item=>regionForgeCollectHiddenText(item,lines,inHidden));
+  else if(regionIsRecord(value)) Object.keys(value).sort().forEach(key=>{
+    regionForgeCollectHiddenText(value[key],lines,inHidden||REGION_FORGE_HIDDEN_KEY_RE.test(key));
+  });
+  else if(inHidden && value!==undefined && value!==null && typeof value!=='function') lines.push(String(value));
+  return lines;
+}
+function regionForgeSourceForRole(input,role){
+  const src=regionIsRecord(input)?input:{};
+  const campaign=regionIsRecord(src.campaign)?src.campaign:{name:src.campaignName||src.campaign||'',premise:src.premise||src.campaignPremise||''};
+  const base={
+    role,
+    campaign,
+    setup:src.setup,
+    hooks:src.hooks||src.startingHooks,
+    dangers:src.dangers,
+    neighbors:src.neighbors||src.neighborContinuity,
+    continuity:src.continuity,
+    cosmicLayer:src.cosmicLayer,
+    cosmicBlend:src.cosmicBlend||src.blend,
+  };
+  if(role==='starter'){
+    base.character=src.character||src.protagonist||src.hero;
+    base.authorSide=src.authorSide||src.author||src.gm||src.gmOnly||src.hidden||src.private;
+  }
+  return regionForgeStableSnapshot(base);
+}
+function regionForgeInputProfile(input){
+  const src=regionIsRecord(input)?input:{};
+  const role=src.role==='outer'?'outer':'starter';
+  const source=regionForgeSourceForRole(src,role);
+  const visibleSource=regionForgeScrubHidden(source);
+  const fullHash=regionForgeHashLong({generator:REGION_FORGE_GENERATOR_ID,version:REGION_FORGE_GENERATOR_VERSION,source});
+  const visibleHash=regionForgeHashLong({generator:REGION_FORGE_GENERATOR_ID,version:REGION_FORGE_GENERATOR_VERSION,source:visibleSource});
+  const seed=role==='starter'
+    ? regionForgeStarterSeed(source)
+    : regionForgeNormalizeOuterSeed(src.seed||src.outerSeed||regionForgeOuterSeed(visibleSource));
+  const campaignName=typeof src.campaign==='string'&&src.campaign.trim()
+    ? src.campaign.trim()
+    : (regionIsRecord(src.campaign)&&src.campaign.name?String(src.campaign.name).trim():(src.campaignName||'Campaign'));
+  const cosmicLayer=REGION_COSMIC_LAYERS.includes(String(src.cosmicLayer||'').toLowerCase()) ? String(src.cosmicLayer).toLowerCase() : 'middle';
+  const width=regionForgeClamp(Number(src.width||src.size&&src.size.width||REGION_FORGE_DEFAULT_WIDTH),8,18);
+  const height=regionForgeClamp(Number(src.height||src.size&&src.size.height||REGION_FORGE_DEFAULT_HEIGHT),6,14);
+  return {
+    role, source, visibleSource, sourceProfileHash:fullHash, visibleSourceHash:visibleHash, seed,
+    campaign:campaignName,
+    id:regionForgeSlug(src.id||src.regionId||(role==='starter'?'starter-region':'outer-region')),
+    title:regionTrim(src.title)||(role==='starter'?'Starter Region':'Outer Region'),
+    cosmicLayer, width:Math.round(width), height:Math.round(height),
+    requestedBlend:src.cosmicBlend||src.blend||{},
+  };
+}
+function regionForgeStarterSeed(snapshot){
+  const stable=regionForgeStableSnapshot(snapshot);
+  return 'starter-'+regionForgeHashLong({version:REGION_FORGE_GENERATOR_VERSION,snapshot:stable}).slice(0,16);
+}
+function regionForgeNormalizeOuterSeed(seed){
+  const clean=String(seed||'').trim();
+  return clean||'outer-'+regionForgeHashLong({version:REGION_FORGE_GENERATOR_VERSION,seed:'default'}).slice(0,12);
+}
+function regionForgeOuterSeed(input){ return 'outer-'+regionForgeHashLong({version:REGION_FORGE_GENERATOR_VERSION,input}).slice(0,12); }
+function regionForgeRandomizeSeed(input){
+  return 'outer-'+regionForgeHashLong({version:REGION_FORGE_GENERATOR_VERSION,randomize:regionForgeStableSnapshot(input)}).slice(0,12);
+}
+function regionForgeRerollSeed(seed,step){
+  return 'outer-'+regionForgeHashLong({version:REGION_FORGE_GENERATOR_VERSION,seed:String(seed||''),step:Number.isInteger(step)?step:1}).slice(0,12);
+}
+function regionForgePrng(seed){
+  let state=parseInt(regionForgeHash(String(seed||'')),16)>>>0;
+  return function(){
+    state=(Math.imul(state,1664525)+1013904223)>>>0;
+    return state/4294967296;
+  };
+}
+function regionForgeAddWeights(target,weights,scale){
+  const s=Number.isFinite(scale)?scale:1;
+  Object.entries(weights||{}).forEach(([key,value])=>{
+    target[key]=(target[key]||0)+(Number(value)||0)*s;
+  });
+}
+function regionForgeApplySignal(scores,signal,scale){
+  regionForgeAddWeights(scores.elements,signal.elements,scale);
+  regionForgeAddWeights(scores.forms,signal.forms,scale);
+  if(Number.isFinite(signal.ambient)) scores.ambient+=signal.ambient*scale;
+  if(Number.isFinite(signal.danger)) scores.danger+=signal.danger*scale;
+}
+function regionForgeApplySignalTable(scores,text,table,scale){
+  table.forEach(signal=>{ if(signal.re.test(text)) regionForgeApplySignal(scores,signal,scale); });
+}
+function regionForgeApplyExplicitElements(scores,text,scale){
+  regionForgeElementKeys().forEach(key=>{
+    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+    if(re.test(text)) scores.elements[key]=(scores.elements[key]||0)+0.7*scale;
+  });
+  Object.entries(REGION_FORGE_EXPRESSION_ELEMENTS).forEach(([key,weights])=>{
+    const re=new RegExp('\\b'+key+'\\b','i');
+    if(re.test(text)) regionForgeAddWeights(scores.elements,weights,0.55*scale);
+  });
+}
+function regionForgeScoreProfile(profile){
+  const base=REGION_FORGE_COSMIC_BASE[profile.cosmicLayer]||REGION_FORGE_COSMIC_BASE.middle;
+  const scores={elements:{},forms:{},ambient:base.ambient,danger:0};
+  regionForgeAddWeights(scores.elements,base.elements,1);
+  regionForgeAddWeights(scores.forms,base.forms,1);
+  const publicText=regionForgeCollectText(profile.visibleSource).join(' ').toLowerCase();
+  const hiddenText=profile.role==='starter'?regionForgeCollectHiddenText(profile.source).join(' ').toLowerCase():'';
+  const publicScale=profile.role==='starter'?1:0.35;
+  regionForgeApplySignalTable(scores,publicText,REGION_FORGE_SIGNAL_WEIGHTS,publicScale);
+  regionForgeApplyExplicitElements(scores,publicText,publicScale);
+  if(hiddenText){
+    regionForgeApplySignalTable(scores,hiddenText,REGION_FORGE_HIDDEN_SIGNAL_WEIGHTS,1);
+    regionForgeApplyExplicitElements(scores,hiddenText,0.45);
+  }
+  scores.ambient=regionForgeClamp(scores.ambient,0,1.5);
+  scores.danger=regionForgeClamp(scores.danger,0,1.5);
+  return scores;
+}
+function regionForgeNormalizeWeights(weights,maxValue){
+  const keys=regionForgeElementKeys();
+  const out={};
+  let max=0;
+  keys.forEach(key=>{ max=Math.max(max,Number(weights&&weights[key])||0); });
+  keys.forEach(key=>{
+    const value=Number(weights&&weights[key])||0;
+    if(value>0) out[key]=regionForgeRound(value/(max||1)*(maxValue||1),3);
+  });
+  return out;
+}
+function regionForgeTopElement(weights,fallback){
+  let best=fallback||'earth', bestValue=-1;
+  Object.entries(weights||{}).forEach(([key,value])=>{
+    if(value>bestValue){ best=key; bestValue=value; }
+  });
+  return best;
+}
+function regionForgeAmbientMana(profile,scores){
+  const intensity=regionForgeClamp(scores.ambient+scores.danger*0.12,0,1);
+  const band=intensity>=0.82?'severe':intensity>=0.62?'charged':intensity>=0.42?'bright':intensity>=0.22?'steady':'quiet';
+  return {band,intensity:regionForgeRound(intensity,3)};
+}
+function regionForgeCosmicBlend(profile,scores){
+  const req=regionIsRecord(profile.requestedBlend)?profile.requestedBlend:{};
+  const neighbor=typeof req.neighborLayer==='string'?req.neighborLayer.trim().toLowerCase():'';
+  if(neighbor && REGION_COSMIC_LAYERS.includes(neighbor) && regionCosmicBlendAdjacent(profile.cosmicLayer,neighbor)){
+    const strength=regionForgeClamp(regionFiniteNumber(req.strength),0,1);
+    return {
+      active:true,
+      neighborLayer:neighbor,
+      strength:regionForgeRound(Number.isFinite(strength)?strength:0.25,3),
+      band:regionTrim(req.band)||'transition',
+      ambientManaInterpolation:{from:profile.cosmicLayer,to:neighbor},
+      environmentalTendencies:regionForgeBlendTendencies(profile.cosmicLayer,neighbor,scores),
+    };
+  }
+  return regionNeutralCosmicBlend();
+}
+function regionForgeBlendTendencies(primary,neighbor,scores){
+  const top=regionForgeTopElement(scores.elements,'air');
+  const pair=[primary,neighbor].sort().join('-');
+  const base=pair==='middle-top'?['updrafts','mist shelves']:pair==='bottom-middle'?['pressure seams','rooted descents']:['soft transition'];
+  return base.concat(top+' influence');
+}
+function regionForgeLocalLayers(profile,scores){
+  const layers=[];
+  if(profile.cosmicLayer==='top'){
+    layers.push(
+      {id:'sky-reaches',type:'high-airspace',label:'Sky Reaches',verticalOrder:2,visible:true},
+      {id:'island-shelves',type:'floating-islands',label:'Island Shelves',verticalOrder:1,visible:true},
+      {id:'underside-caves',type:'caves',label:'Underside Caves',verticalOrder:-1,visible:true});
+  }else if(profile.cosmicLayer==='bottom'){
+    layers.push(
+      {id:'ravine-floor',type:'cliffs-ravines',label:'Ravine Floor',verticalOrder:0,visible:true},
+      {id:'deep-caverns',type:'deep-caverns',label:'Deep Caverns',verticalOrder:-1,visible:true},
+      {id:'pressure-pocket',type:'dimensional-interiors',label:'Pressure Pocket',verticalOrder:-2,visible:true});
+  }else{
+    layers.push(
+      {id:'upper-shelf',type:'peaks-canopy',label:'Upper Shelf',verticalOrder:1,visible:true},
+      {id:'surface-main',type:'surface',label:'Main Surface',verticalOrder:0,visible:true},
+      {id:'root-caves',type:'caves',label:'Root Caves',verticalOrder:-1,visible:true});
+  }
+  if((scores.forms.storm||0)>0.9 && !layers.some(layer=>layer.id==='storm-corridor')){
+    layers[0]={...layers[0],label:layers[0].label+' Corridor'};
+  }
+  return layers;
+}
+function regionForgeLayerElementWeights(layer,regionWeights,profile){
+  const weights={...regionWeights};
+  if(/airspace|floating|peaks/.test(layer.type)) regionForgeAddWeights(weights,{air:0.35,light:0.2,lightning:0.12},1);
+  if(/surface|canopy|islands/.test(layer.type)) regionForgeAddWeights(weights,{earth:0.2,wood:0.18,water:0.12,life:0.1},1);
+  if(/cave|cavern|ravine|interiors/.test(layer.type)) regionForgeAddWeights(weights,{earth:0.28,shadow:0.22,crystal:0.15,metal:0.1},1);
+  if(profile.cosmicLayer==='bottom') regionForgeAddWeights(weights,{shadow:0.15,crystal:0.08},1);
+  return regionForgeNormalizeWeights(weights,1);
+}
+function regionForgeElementalInfluence(profile,layers,scores){
+  const region=regionForgeNormalizeWeights(scores.elements,1);
+  const localLayers={};
+  layers.forEach(layer=>{ localLayers[layer.id]=regionForgeLayerElementWeights(layer,scores.elements,profile); });
+  return {region,localLayers};
+}
+function regionForgeTerrainCell(layer,x,y,w,h,scores,params){
+  const nx=w<=1?0.5:x/(w-1), ny=h<=1?0.5:y/(h-1);
+  const forms=scores.forms||{};
+  const ridge=Math.abs(ny-(params.ridgeBase+params.ridgeSlope*(nx-0.5)));
+  const diagonal=Math.abs((ny-nx)-params.diagOffset);
+  const basin=((nx-params.basinX)*(nx-params.basinX))/(0.12+0.12*(forms.basin||0))+
+    ((ny-params.basinY)*(ny-params.basinY))/(0.08+0.10*(forms.basin||0));
+  const island=((nx-params.islandX)*(nx-params.islandX))/(0.20+0.12*(forms.island||0))+
+    ((ny-params.islandY)*(ny-params.islandY))/(0.14+0.10*(forms.island||0));
+  const ravine=Math.abs(nx-params.ravineX);
+  const caveLike=/cave|cavern|interiors/.test(layer.type);
+  const aerial=/airspace|floating|peaks/.test(layer.type);
+  if(caveLike){
+    if(ravine<0.06+0.04*(forms.ravine||0)) return 'tunnel';
+    if(basin<0.9 && (scores.elements.water||0)>0.35) return 'water';
+    if(diagonal<0.08+0.03*(forms.storm||0)) return (scores.elements.crystal||0)>0.4?'crystal':'stone';
+    if(ridge<0.08) return 'cliff';
+    return (scores.elements.shadow||0)>0.55?'cave':'cave-floor';
+  }
+  if(aerial && island>1.25) return profileSafeVoid(layer.type);
+  if(ravine<0.045+0.035*(forms.ravine||0)) return 'cliff';
+  if(ridge<0.075+0.025*(forms.ridge||0)) return 'stone';
+  if(diagonal<0.055+0.035*(forms.storm||0)) return (scores.elements.lightning||0)>0.45?'road':'stone';
+  if(basin<0.85 && (scores.elements.water||0)>0.25) return (scores.elements.wood||0)>0.45?'marsh':'water';
+  if((scores.elements.wood||0)>0.5 && ny>0.42 && ny<0.82) return 'forest';
+  if((scores.elements.fire||0)>0.65 && nx>0.65 && ny>0.45) return 'ash';
+  if(aerial) return (scores.elements.light||0)>0.55?'meadow':'grass';
+  return profileSafeBase(profileSafeLayerCosmic(layer),scores);
+}
+function profileSafeLayerCosmic(layer){
+  if(/cave|cavern|ravine|interiors/.test(layer.type)) return 'bottom';
+  if(/airspace|floating|peaks/.test(layer.type)) return 'top';
+  return 'middle';
+}
+function profileSafeVoid(type){ return /airspace/.test(type)?'void':'water'; }
+function profileSafeBase(cosmic,scores){
+  if(cosmic==='top') return (scores.elements.air||0)>0.55?'meadow':'grass';
+  if(cosmic==='bottom') return 'cave-floor';
+  return (scores.elements.wood||0)>0.45?'meadow':'grass';
+}
+function regionForgeBuildTerrain(profile,layers,scores){
+  const terrain={layers:{}};
+  layers.forEach((layer,index)=>{
+    const rng=regionForgePrng(profile.seed+'|'+REGION_FORGE_GENERATOR_VERSION+'|terrain|'+layer.id);
+    const w=Math.max(6,profile.width-(index===2?2:0));
+    const h=Math.max(5,profile.height-(index===2?2:0));
+    const params={
+      ridgeBase:0.28+rng()*0.38, ridgeSlope:(rng()-0.5)*0.5,
+      diagOffset:(rng()-0.5)*0.35, basinX:0.25+rng()*0.5, basinY:0.25+rng()*0.5,
+      islandX:0.35+rng()*0.3, islandY:0.35+rng()*0.3, ravineX:0.18+rng()*0.64,
+    };
+    const cells=[];
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++) cells.push(regionForgeTerrainCell(layer,x,y,w,h,scores,params));
+    terrain.layers[layer.id]={format:'cell-grid',width:w,height:h,cells};
+  });
+  return terrain;
+}
+function regionForgeGridPoint(terrain,layerId,fx,fy){
+  const grid=terrain.layers[layerId];
+  return {
+    x:Math.min(grid.width-1,Math.max(0,Math.round((grid.width-1)*fx))),
+    y:Math.min(grid.height-1,Math.max(0,Math.round((grid.height-1)*fy))),
+  };
+}
+function regionForgeFeatureKind(scores){
+  if((scores.elements.water||0)>0.45) return {type:'water-source',label:'Clear Basin'};
+  if((scores.elements.lightning||0)>0.5) return {type:'storm-site',label:'Storm Marker'};
+  if((scores.elements.fire||0)>0.55) return {type:'warm-vent',label:'Warm Vent'};
+  if((scores.elements.wood||0)>0.5) return {type:'root-grove',label:'Rooted Grove'};
+  return {type:'site',label:'Sheltered Site'};
+}
+function regionForgeFeatures(profile,layers,terrain,scores){
+  const main=layers[Math.min(1,layers.length-1)], high=layers[0], low=layers[layers.length-1];
+  const special=regionForgeFeatureKind(scores);
+  const danger=(scores.danger||0)>0.2;
+  const features=[
+    {id:'site-arrival',type:'arrival',label:'Crossing Scar',layerId:main.id,position:regionForgeGridPoint(terrain,main.id,0.18,0.22),tags:['arrival','traversal']},
+    {id:'site-shelter',type:'shelter',label:'Sheltered Camp',layerId:main.id,position:regionForgeGridPoint(terrain,main.id,0.42,0.55),tags:['rest']},
+    {id:'site-resource',type:special.type,label:special.label,layerId:main.id,position:regionForgeGridPoint(terrain,main.id,0.72,0.42),tags:['resource',regionForgeTopElement(scores.elements,'earth')]},
+    {id:'site-overlook',type:'overlook',label:'Lookout Edge',layerId:high.id,position:regionForgeGridPoint(terrain,high.id,0.65,0.2),tags:['scout']},
+    {id:'site-passage',type:'passage',label:'Layer Passage',layerId:low.id,position:regionForgeGridPoint(terrain,low.id,0.48,0.72),tags:['connection']},
+  ];
+  if(danger) features.push({id:'site-hazard',type:'hazard',label:'Unstable Edge',layerId:main.id,
+    position:regionForgeGridPoint(terrain,main.id,0.82,0.78),tags:['danger']});
+  return features;
+}
+function regionForgeConnections(features){
+  const byId=new Map(features.map(feature=>[feature.id,feature]));
+  const pairs=[['site-arrival','site-shelter'],['site-shelter','site-resource'],['site-shelter','site-overlook'],['site-resource','site-passage']];
+  if(byId.has('site-hazard')) pairs.push(['site-resource','site-hazard']);
+  return pairs.filter(([from,to])=>byId.has(from)&&byId.has(to)).map(([from,to],index)=>({
+    id:'route-'+(index+1),
+    from,to,
+    type:byId.get(from).layerId===byId.get(to).layerId?'trail':'traverse',
+    bidirectional:true,
+    status:'open',
+  }));
+}
+function regionForgeGenerateRegion(input){
+  const profile=regionForgeInputProfile(input);
+  const scores=regionForgeScoreProfile(profile);
+  const layers=regionForgeLocalLayers(profile,scores);
+  const terrain=regionForgeBuildTerrain(profile,layers,scores);
+  const features=regionForgeFeatures(profile,layers,terrain,scores);
+  const connections=regionForgeConnections(features);
+  const region={
+    schemaVersion:REGION_SCHEMA_VERSION,
+    id:profile.id,
+    title:profile.title,
+    campaign:profile.campaign,
+    cosmicLayer:profile.cosmicLayer,
+    cosmicBlend:regionForgeCosmicBlend(profile,scores),
+    ambientMana:regionForgeAmbientMana(profile,scores),
+    localLayers:layers,
+    features,
+    connections,
+    terrain,
+    revealed:{layers:{}},
+    pins:[],
+    markers:[],
+    elementalInfluence:regionForgeElementalInfluence(profile,layers,scores),
+    notes:[],
+    metadata:{
+      generated:true,
+      generator:REGION_FORGE_GENERATOR_ID,
+      generatorVersion:REGION_FORGE_GENERATOR_VERSION,
+      seed:profile.seed,
+      regionRole:profile.role,
+      visibleInputs:{
+        generatorVersion:REGION_FORGE_GENERATOR_VERSION,
+        role:profile.role,
+        cosmicLayer:profile.cosmicLayer,
+        size:{width:profile.width,height:profile.height},
+        source:profile.visibleSource,
+        sourceHash:profile.visibleSourceHash,
+      },
+      sourceProfileHash:profile.sourceProfileHash,
+      creationMarker:REGION_FORGE_CREATION_MARKER,
+    },
+  };
+  return assertRegion(region,{expectedCampaign:profile.campaign});
 }
 /* ========================================================================== *
    THE GAME SPACE — manage campaigns and hand sessions off to the GM. The
@@ -5555,9 +6251,9 @@ viewCampaign=function(name,tab){
 
    Renders ONLY the exact serialized terrain state of a saved region. It never
    mutates, regenerates, or writes region data; switching layers, panning, and
-   zooming change the view, not the file. Explicitly GM-only and unrevealed
-   (fog) information is hidden. Update 3 layers pin/marker editing around this
-   renderer; Update 4 adds reveal/fog editing without changing this read path.
+   zooming change the view, not the file. Update 5 adds an explicit GM/player
+   viewing policy: player view applies fog and GM-only hiding, while GM view
+   shows the complete saved map for reading and editing. Neither view writes.
    Terrain editing remains deferred to a later focused update.
 
    Cosmic Cloudsea placement (top / middle / bottom) styles the frame; local
@@ -5593,13 +6289,30 @@ function regionCosmicLabel(region){
   return c ? c.charAt(0).toUpperCase() + c.slice(1) : 'Unknown';
 }
 
-// Local layers a player may switch between: visible, GM-hidden excluded, sorted
-// so higher elevation lands first; ties keep the original (stable) order.
-function regionMapLayers(region){
+// Pure Update 5 visibility policy. Unspecified callers stay player-safe for
+// backwards compatibility; the interactive panel explicitly starts in GM view.
+function regionMapViewMode(view){ return view === 'gm' ? 'gm' : 'player'; }
+function regionMapObjectVisible(item, view){
+  if (!regionIsRecord(item)) return false;
+  return regionMapViewMode(view) === 'gm' ||
+    (item.visible !== false && !regionVisibilityHidden(item));
+}
+function regionMapLayerVisible(region, layerId, view){
+  const layers = region && Array.isArray(region.localLayers) ? region.localLayers : [];
+  const layer = layers.find(item => regionIsRecord(item) && item.id === layerId);
+  return !!layer && regionMapObjectVisible(layer, view);
+}
+function regionMapMaskForView(region, layerId, view){
+  return regionMapViewMode(view) === 'gm' ? null : regionRevealMask(region, layerId);
+}
+
+// Local layers available in the chosen view, sorted so higher elevation lands
+// first; ties keep the original (stable) order.
+function regionMapLayers(region, view){
   const layers = (region && Array.isArray(region.localLayers)) ? region.localLayers : [];
   return layers
     .map((layer, index) => ({ layer, index }))
-    .filter(({ layer }) => regionIsRecord(layer) && layer.visible !== false && !regionVisibilityHidden(layer))
+    .filter(({ layer }) => regionMapObjectVisible(layer, view))
     .sort((a, b) => {
       const av = Number.isFinite(a.layer.verticalOrder) ? a.layer.verticalOrder : 0;
       const bv = Number.isFinite(b.layer.verticalOrder) ? b.layer.verticalOrder : 0;
@@ -5644,8 +6357,9 @@ function regionCellRevealed(mask, index){
   return !(v === 0 || v === false || v == null);
 }
 
-function regionFeatureHidden(feature, grid, mask){
-  if (!regionIsRecord(feature) || regionVisibilityHidden(feature)) return true;
+function regionFeatureHidden(feature, grid, mask, view){
+  if (!regionMapObjectVisible(feature, view)) return true;
+  if (regionMapViewMode(view) === 'gm') return false;
   if (!grid || !Array.isArray(mask)) return false;
   const p = feature.position;
   if (!regionIsRecord(p) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return false;
@@ -5654,25 +6368,27 @@ function regionFeatureHidden(feature, grid, mask){
   return !regionCellRevealed(mask, y * grid.width + x);
 }
 
-function regionMapVisibleFeatures(region, layerId, grid, mask){
+function regionMapVisibleFeatures(region, layerId, grid, mask, view){
+  if (!regionMapLayerVisible(region, layerId, view)) return [];
   const features = (region && Array.isArray(region.features)) ? region.features : [];
   return features.filter(f =>
     regionIsRecord(f) && f.layerId === layerId &&
     regionIsRecord(f.position) && Number.isFinite(f.position.x) && Number.isFinite(f.position.y) &&
-    !regionFeatureHidden(f, grid, mask));
+    !regionFeatureHidden(f, grid, mask, view));
 }
 
 // Visible pins/markers share the same layer, GM-only, and fog rules as features.
 // The returned kind stays separate from the serialized item so editors never
 // have to guess which collection owns an ID.
-function regionMapVisibleItems(region, layerId, grid, mask){
+function regionMapVisibleItems(region, layerId, grid, mask, view){
+  if (!regionMapLayerVisible(region, layerId, view)) return [];
   const out = [];
   [['pin','pins'],['marker','markers']].forEach(([kind,key]) => {
     const items = region && Array.isArray(region[key]) ? region[key] : [];
     items.forEach(item => {
       if (regionIsRecord(item) && item.layerId === layerId &&
         regionIsRecord(item.position) && Number.isFinite(item.position.x) && Number.isFinite(item.position.y) &&
-        !regionFeatureHidden(item, grid, mask)) out.push({ kind, item });
+        !regionFeatureHidden(item, grid, mask, view)) out.push({ kind, item });
     });
   });
   return out;
@@ -5681,22 +6397,23 @@ function regionMapVisibleItems(region, layerId, grid, mask){
 // Drawable connection lines: only between two visible features on this layer
 // (both endpoint positions are known). Cross-layer connections are listed
 // textually instead — see regionMapConnectionList.
-function regionMapConnectionLines(region, layerId, posById){
+function regionMapConnectionLines(region, layerId, posById, view){
+  if (!regionMapLayerVisible(region, layerId, view)) return [];
   const conns = (region && Array.isArray(region.connections)) ? region.connections : [];
   const get = id => posById && (posById instanceof Map ? posById.get(id) : posById[id]);
   return conns
-    .filter(c => regionIsRecord(c) && !regionVisibilityHidden(c) && get(c.from) && get(c.to))
+    .filter(c => regionMapObjectVisible(c, view) && get(c.from) && get(c.to))
     .map(c => ({ id:c.id, type:c.type, from:get(c.from), to:get(c.to) }));
 }
-function regionMapConnectionList(region, layerId, visibleFeatureIds){
+function regionMapConnectionList(region, layerId, visibleFeatureIds, view){
   const ids = new Set(visibleFeatureIds || []);
-  const allowed = new Set(regionMapLayers(region).map(layer => layer.id));
-  regionMapLayers(region).forEach(layer => {
-    const grid = regionTerrainGrid(region, layer.id), mask = regionRevealMask(region, layer.id);
-    regionMapVisibleFeatures(region, layer.id, grid, mask).forEach(feature => allowed.add(feature.id));
+  const allowed = new Set(regionMapLayers(region, view).map(layer => layer.id));
+  regionMapLayers(region, view).forEach(layer => {
+    const grid = regionTerrainGrid(region, layer.id), mask = regionMapMaskForView(region, layer.id, view);
+    regionMapVisibleFeatures(region, layer.id, grid, mask, view).forEach(feature => allowed.add(feature.id));
   });
   const conns = (region && Array.isArray(region.connections)) ? region.connections : [];
-  return conns.filter(c => regionIsRecord(c) && !regionVisibilityHidden(c) &&
+  return conns.filter(c => regionMapObjectVisible(c, view) &&
     allowed.has(c.from) && allowed.has(c.to) &&
     (c.from === layerId || c.to === layerId || ids.has(c.from) || ids.has(c.to)));
 }
@@ -5772,18 +6489,18 @@ function regionMapPlacementPosition(region, layerId, point){
   return { x:regionMapRound(point.x - 0.5), y:regionMapRound(point.y - 0.5) };
 }
 
-function regionMapTextSummary(region){
+function regionMapTextSummary(region, view){
   const lines = [
     (region && region.title ? region.title : 'Region') + ' map',
     'Cosmic layer: ' + regionCosmicLabel(region),
   ];
-  const layers = regionMapLayers(region);
+  const layers = regionMapLayers(region, view);
   if (!layers.length){ lines.push('', 'No visible local layers.'); return lines.join('\n') + '\n'; }
   layers.forEach(layer => {
-    const grid = regionTerrainGrid(region, layer.id), mask = regionRevealMask(region, layer.id);
-    const features = regionMapVisibleFeatures(region, layer.id, grid, mask);
-    const items = regionMapVisibleItems(region, layer.id, grid, mask);
-    const conns = regionMapConnectionList(region, layer.id, features.map(feature => feature.id));
+    const grid = regionTerrainGrid(region, layer.id), mask = regionMapMaskForView(region, layer.id, view);
+    const features = regionMapVisibleFeatures(region, layer.id, grid, mask, view);
+    const items = regionMapVisibleItems(region, layer.id, grid, mask, view);
+    const conns = regionMapConnectionList(region, layer.id, features.map(feature => feature.id), view);
     lines.push('', (layer.label || layer.id) + ':');
     features.forEach(feature => lines.push('- Feature: ' + feature.label));
     items.forEach(({ kind, item }) => lines.push('- ' + (kind === 'pin' ? 'Pin' : 'Marker') + ': ' + item.label));
@@ -5794,16 +6511,19 @@ function regionMapTextSummary(region){
 }
 
 // Build the read-only SVG for one local layer at a given viewport. Pure of any
-// writes; honours fog and GM-only hiding via the helpers above.
+// writes; honours the chosen GM/player policy via the helpers above.
 function regionMapSvg(region, layerId, viewport, options){
   const opts = options || {};
-  const grid = regionTerrainGrid(region, layerId);
-  const mask = regionRevealMask(region, layerId);
-  const features = regionMapVisibleFeatures(region, layerId, grid, mask);
-  const items = regionMapVisibleItems(region, layerId, grid, mask);
+  const view = regionMapViewMode(opts.view);
+  const layerVisible = regionMapLayerVisible(region, layerId, view);
+  const grid = layerVisible ? regionTerrainGrid(region, layerId) : null;
+  const mask = regionMapMaskForView(region, layerId, view);
+  const features = regionMapVisibleFeatures(region, layerId, grid, mask, view);
+  const items = regionMapVisibleItems(region, layerId, grid, mask, view);
   const bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
   const layer = (region && Array.isArray(region.localLayers) ? region.localLayers : []).find(l => regionIsRecord(l) && l.id === layerId);
-  const label = (region && region.title ? region.title : 'Region') + ' — ' + ((layer && layer.label) || layerId) + ' map';
+  const label = (region && region.title ? region.title : 'Region') +
+    (layerVisible ? ' — ' + ((layer && layer.label) || layerId) : '') + ' map';
   const svg = regionSvg('svg', { class:'region-map-svg', role:'img', 'aria-label':label, preserveAspectRatio:'xMidYMid meet' });
   if (!bounds){
     svg.setAttribute('viewBox', '0 0 10 6');
@@ -5822,7 +6542,7 @@ function regionMapSvg(region, layerId, viewport, options){
     svg.append(g);
   }
   const posById = {}; features.forEach(f => { posById[f.id] = f.position; });
-  const lines = regionMapConnectionLines(region, layerId, posById);
+  const lines = regionMapConnectionLines(region, layerId, posById, view);
   if (lines.length){
     const g = regionSvg('g', { class:'region-conns' });
     lines.forEach(l => g.append(regionSvg('line', { x1:l.from.x + 0.5, y1:l.from.y + 0.5, x2:l.to.x + 0.5, y2:l.to.y + 0.5, class:'region-conn-line' })));
@@ -5874,36 +6594,46 @@ function regionMapSvg(region, layerId, viewport, options){
 function regionMapPanel(entry, options){
   const opts = options || {};
   const region = entry && entry.region;
-  const layers = regionMapLayers(region);
+  const gmLayers = regionMapLayers(region, 'gm');
   const panel = h('div', { class:'region-map cosmic-' + (region && typeof region.cosmicLayer === 'string' ? region.cosmicLayer : 'middle') });
   panel.append(h('div', { class:'region-map-head' },
     h('h3', null, 'Region map'),
     h('span', { class:'hint' }, 'Cosmic layer: ' + regionCosmicLabel(region) + ' · local elevation is a separate axis')));
-  if (!layers.length){ panel.append(h('p', { class:'hint' }, 'No visible local layers to map.')); return panel; }
+  if (!gmLayers.length){ panel.append(h('p', { class:'hint' }, 'No local layers to map.')); return panel; }
 
-  const initialLayer = layers.some(layer => layer.id === opts.initialLayerId) ? opts.initialLayerId : layers[0].id;
-  const state = { layerId:initialLayer, viewport:{ scale:1, panX:0, panY:0 }, showText:false };
+  const initialLayer = gmLayers.some(layer => layer.id === opts.initialLayerId) ? opts.initialLayerId : gmLayers[0].id;
+  const state = {
+    layerId:initialLayer,
+    view:opts.initialView === 'player' ? 'player' : 'gm',
+    viewport:{ scale:1, panX:0, panY:0 },
+    showText:false,
+  };
 
   const switchRow = h('div', { class:'region-layer-switch', role:'group', 'aria-label':'Local layer' });
-  const switchBtns = layers.map(layer => {
-    const b = h('button', { class:'tab', type:'button', 'aria-pressed':layer.id === state.layerId ? 'true' : 'false',
-      onclick:() => {
-        state.layerId = layer.id; state.viewport = { scale:1, panX:0, panY:0 };
-        if (typeof opts.onLayerChange === 'function') opts.onLayerChange(layer.id, regionTerrainGrid(region, layer.id));
-        draw();
-      } }, layer.label || layer.id);
-    return { id:layer.id, b };
-  });
-  switchBtns.forEach(x => switchRow.append(x.b));
 
   const zoom = f => { state.viewport.scale = regionClampScale(state.viewport.scale * f); draw(); };
   const fit = () => { state.viewport = { scale:1, panX:0, panY:0 }; draw(); };
+  const viewToggle = h('button', {
+    class:'navbtn region-view-toggle',
+    type:'button',
+    onclick:() => {
+      state.view = state.view === 'gm' ? 'player' : 'gm';
+      const layers = regionMapLayers(region, state.view);
+      if (!layers.some(layer => layer.id === state.layerId)) state.layerId = layers[0] ? layers[0].id : '';
+      if (typeof opts.onViewChange === 'function') opts.onViewChange(state.view, state.layerId);
+      else draw();
+    },
+  });
   const toolbar = h('div', { class:'region-map-toolbar' },
     h('button', { class:'navbtn', type:'button', title:'Zoom out', 'aria-label':'Zoom out', onclick:() => zoom(1 / 1.5) }, '−'),
     h('button', { class:'navbtn', type:'button', title:'Zoom in', 'aria-label':'Zoom in', onclick:() => zoom(1.5) }, '+'),
     h('button', { class:'navbtn', type:'button', onclick:fit }, 'Fit'),
-    h('button', { class:'navbtn', type:'button', onclick:() => { state.layerId = layers[0].id; fit(); } }, 'Reset'),
-    h('button', { class:'navbtn', type:'button', 'aria-pressed':'false', onclick(){ state.showText = !state.showText; this.setAttribute('aria-pressed', state.showText ? 'true' : 'false'); draw(); } }, 'Text summary'));
+    h('button', { class:'navbtn', type:'button', onclick:() => {
+      const layers = regionMapLayers(region, state.view);
+      state.layerId = layers[0] ? layers[0].id : ''; fit();
+    } }, 'Reset'),
+    h('button', { class:'navbtn', type:'button', 'aria-pressed':'false', onclick(){ state.showText = !state.showText; this.setAttribute('aria-pressed', state.showText ? 'true' : 'false'); draw(); } }, 'Text summary'),
+    viewToggle);
 
   const stage = h('div', { class:'region-map-stage' });
   const meta = h('div', { class:'region-map-meta' });
@@ -5916,9 +6646,9 @@ function regionMapPanel(entry, options){
     svg.addEventListener('pointermove', e => {
       if (!active || !box || !box.width || !box.height) return;
       const grid = regionTerrainGrid(region, state.layerId);
-      const mask = regionRevealMask(region, state.layerId);
-      const features = regionMapVisibleFeatures(region, state.layerId, grid, mask);
-      const items = regionMapVisibleItems(region, state.layerId, grid, mask);
+      const mask = regionMapMaskForView(region, state.layerId, state.view);
+      const features = regionMapVisibleFeatures(region, state.layerId, grid, mask, state.view);
+      const items = regionMapVisibleItems(region, state.layerId, grid, mask, state.view);
       const bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
       if (!bounds) return;
       const s = regionClampScale(state.viewport.scale);
@@ -5933,12 +6663,34 @@ function regionMapPanel(entry, options){
   }
 
   function draw(){
-    switchBtns.forEach(x => x.b.setAttribute('aria-pressed', x.id === state.layerId ? 'true' : 'false'));
+    const layers = regionMapLayers(region, state.view);
+    if (!layers.some(layer => layer.id === state.layerId)) state.layerId = layers[0] ? layers[0].id : '';
+    switchRow.replaceChildren(...layers.map(layer =>
+      h('button', {
+        class:'tab',
+        type:'button',
+        'aria-pressed':layer.id === state.layerId ? 'true' : 'false',
+        onclick:() => {
+          state.layerId = layer.id; state.viewport = { scale:1, panX:0, panY:0 };
+          if (typeof opts.onLayerChange === 'function') opts.onLayerChange(layer.id, regionTerrainGrid(region, layer.id));
+          draw();
+        },
+      }, layer.label || layer.id)));
+    viewToggle.textContent = 'GM view ⇄ Player view · ' + (state.view === 'gm' ? 'GM' : 'Player');
+    viewToggle.setAttribute('aria-pressed', state.view === 'player' ? 'true' : 'false');
+    viewToggle.setAttribute('title', 'Switch to ' + (state.view === 'gm' ? 'Player' : 'GM') + ' view');
+    if (!state.layerId){
+      stage.replaceChildren(h('p', { class:'region-map-no-layers hint' }, 'No player-visible local layers.'));
+      meta.replaceChildren();
+      textBox.style.display = 'none';
+      return;
+    }
     const grid = regionTerrainGrid(region, state.layerId);
-    const mask = regionRevealMask(region, state.layerId);
-    const features = regionMapVisibleFeatures(region, state.layerId, grid, mask);
-    const items = regionMapVisibleItems(region, state.layerId, grid, mask);
+    const mask = regionMapMaskForView(region, state.layerId, state.view);
+    const features = regionMapVisibleFeatures(region, state.layerId, grid, mask, state.view);
+    const items = regionMapVisibleItems(region, state.layerId, grid, mask, state.view);
     const svg = regionMapSvg(region, state.layerId, state.viewport, {
+      view:state.view,
       selected:opts.selected,
       onSelect:opts.placementMode === 'fog' ? null : opts.onSelect,
     });
@@ -5947,11 +6699,11 @@ function regionMapPanel(entry, options){
       svg.addEventListener('click', e => {
         const point = regionMapPoint(svg, e);
         const position = regionMapPlacementPosition(region, state.layerId, point);
-        if (position && typeof opts.onPlace === 'function') opts.onPlace(state.layerId, position);
+        if (position && typeof opts.onPlace === 'function') opts.onPlace(state.layerId, position, state.view);
       });
     }
     stage.replaceChildren(svg); attachPan(svg);
-    const conns = regionMapConnectionList(region, state.layerId, features.map(f => f.id));
+    const conns = regionMapConnectionList(region, state.layerId, features.map(f => f.id), state.view);
     meta.replaceChildren(h('p', { class:'hint' },
       features.length + ' feature' + (features.length === 1 ? '' : 's') + ' · ' +
       items.filter(x => x.kind === 'pin').length + ' pin' + (items.filter(x => x.kind === 'pin').length === 1 ? '' : 's') + ' · ' +
@@ -5961,7 +6713,7 @@ function regionMapPanel(entry, options){
     if (conns.length)
       meta.append(h('ul', { class:'region-conn-list' }, ...conns.map(c => h('li', null, (c.type ? c.type + ': ' : '') + c.from + ' → ' + c.to))));
     if (state.showText){
-      try { textBox.textContent = regionMapTextSummary(region); } catch (e){ textBox.textContent = 'Summary unavailable: ' + e.message; }
+      try { textBox.textContent = regionMapTextSummary(region, state.view); } catch (e){ textBox.textContent = 'Summary unavailable: ' + e.message; }
       textBox.style.display = 'block';
     } else { textBox.style.display = 'none'; }
   }
@@ -6005,10 +6757,10 @@ campRegion = async function(host, name){
    REGION EDIT — Region Update 3 pins/markers + Update 4 reveal/fog harness.
 
    Every write re-parses the latest GitHub copy, applies one focused operation,
-   validates the complete region, and serializes stable JSON. Hidden or fogged
-   items are never exposed by the editor and cannot be changed through it.
+   validates the complete region, and serializes stable JSON. Player view keeps
+   hidden/fogged items protected; Update 5 GM view may expose and edit them.
 
-   TODO (Region Update 5): add terrain editing behind its own guarded operation.
+   TODO (Region Update 6): add terrain editing behind its own guarded operation.
  * ========================================================================== */
 const REGION_EDIT_KINDS = ['pin','marker'];
 
@@ -6040,14 +6792,15 @@ function regionMapNextItemId(region, kind, label){
   return base + '-' + n;
 }
 
-function regionMapEditableLayer(region, layerId){
+function regionMapEditableLayer(region, layerId, view){
   const layers = region && Array.isArray(region.localLayers) ? region.localLayers : [];
   return layers.find(layer => regionIsRecord(layer) && layer.id === layerId &&
-    layer.visible !== false && !regionVisibilityHidden(layer)) || null;
+    regionMapObjectVisible(layer, view)) || null;
 }
 
-function regionMapPositionRevealed(region, layerId, position){
+function regionMapPositionRevealed(region, layerId, position, view){
   if (!regionIsRecord(position) || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return false;
+  if (regionMapViewMode(view) === 'gm') return true;
   const grid = regionTerrainGrid(region, layerId);
   const mask = regionRevealMask(region, layerId);
   if (!grid || !Array.isArray(mask)) return true;
@@ -6062,9 +6815,9 @@ function regionFindMapItem(region, kind, id){
   return items.find(item => regionIsRecord(item) && item.id === id) || null;
 }
 
-function regionMapItemEditable(region, item){
-  return !!item && !!regionMapEditableLayer(region, item.layerId) &&
-    !regionVisibilityHidden(item) && regionMapPositionRevealed(region, item.layerId, item.position);
+function regionMapItemEditable(region, item, view){
+  return !!item && !!regionMapEditableLayer(region, item.layerId, view) &&
+    regionMapObjectVisible(item, view) && regionMapPositionRevealed(region, item.layerId, item.position, view);
 }
 
 function regionApplyMapItemEdit(region, edit, options){
@@ -6077,9 +6830,9 @@ function regionApplyMapItemEdit(region, edit, options){
   if (action === 'place'){
     const label = regionTrim(edit.label);
     if (!label) throw new Error('A label is required');
-    if (!regionMapEditableLayer(next, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+    if (!regionMapEditableLayer(next, edit.layerId, opts.view)) throw new Error('That local layer is hidden or unavailable');
     const position = regionNormalizePosition(edit.position);
-    if (!regionMapPositionRevealed(next, edit.layerId, position)) throw new Error('Pins and markers cannot be placed under fog');
+    if (!regionMapPositionRevealed(next, edit.layerId, position, opts.view)) throw new Error('Pins and markers cannot be placed under fog');
     const item = {
       id:regionMapNextItemId(next, edit.kind, label),
       label,
@@ -6095,11 +6848,11 @@ function regionApplyMapItemEdit(region, edit, options){
     const index = items.findIndex(item => regionIsRecord(item) && item.id === edit.id);
     if (index < 0) throw new Error('That ' + edit.kind + ' no longer exists');
     const current = items[index];
-    if (!regionMapItemEditable(next, current)) throw new Error('That ' + edit.kind + ' is hidden or under fog');
+    if (!regionMapItemEditable(next, current, opts.view)) throw new Error('That ' + edit.kind + ' is hidden or under fog');
     if (action === 'move'){
-      if (!regionMapEditableLayer(next, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+      if (!regionMapEditableLayer(next, edit.layerId, opts.view)) throw new Error('That local layer is hidden or unavailable');
       const position = regionNormalizePosition(edit.position);
-      if (!regionMapPositionRevealed(next, edit.layerId, position)) throw new Error('Pins and markers cannot be moved under fog');
+      if (!regionMapPositionRevealed(next, edit.layerId, position, opts.view)) throw new Error('Pins and markers cannot be moved under fog');
       items[index] = { ...current, layerId:edit.layerId, position };
     }else if (action === 'label'){
       const label = regionTrim(edit.label);
@@ -6114,7 +6867,7 @@ function regionApplyMapItemEdit(region, edit, options){
 
 function regionTransformMapItemEdit(currentText, path, campaignName, expectedRegionId, edit){
   const current = assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
-  const next = regionApplyMapItemEdit(current, edit, { expectedCampaign:campaignName });
+  const next = regionApplyMapItemEdit(current, edit, { expectedCampaign:campaignName, view:edit && edit.view });
   assertRegionWriteTarget(path, campaignName, next, currentText);
   return serializeRegion(next);
 }
@@ -6142,16 +6895,17 @@ async function regionSaveMapItemEdit(cfg, entry, campaignName, edit){
 
 function regionEditableMapPanel(entry, cfg, campaignName){
   const root = h('div', { class:'region-edit-wrap' });
-  const firstLayer = regionMapLayers(entry.region)[0];
+  const firstLayer = regionMapLayers(entry.region, 'gm')[0];
   const state = {
     mode:null, kind:'pin', label:'', characterId:'', selected:null, status:'', saving:false,
-    activeLayerId:firstLayer ? firstLayer.id : '',
+    activeLayerId:firstLayer ? firstLayer.id : '', mapView:'gm',
   };
 
   const selectedItem = () => state.selected &&
     regionFindMapItem(entry.region, state.selected.kind, state.selected.id);
 
   async function save(edit, success){
+    edit = { ...edit, view:state.mapView };
     state.saving = true; state.status = 'Saving to the region file…'; draw();
     try{
       await regionSaveMapItemEdit(cfg, entry, campaignName, edit);
@@ -6165,6 +6919,7 @@ function regionEditableMapPanel(entry, cfg, campaignName){
   }
 
   async function saveReveal(edit, success){
+    edit = { ...edit, view:state.mapView };
     state.saving = true; state.status = 'Saving reveal state to the region file…'; draw();
     try{
       await regionSaveRevealEdit(cfg, entry, campaignName, edit);
@@ -6188,7 +6943,7 @@ function regionEditableMapPanel(entry, cfg, campaignName){
 
   function draw(){
     const item = selectedItem();
-    if (state.selected && (!item || !regionMapItemEditable(entry.region, item))) state.selected = null;
+    if (state.selected && (!item || !regionMapItemEditable(entry.region, item, state.mapView))) state.selected = null;
 
     const kind = h('select', { 'aria-label':'Map item type' },
       h('option', { value:'pin' }, 'Pin'),
@@ -6247,13 +7002,19 @@ function regionEditableMapPanel(entry, cfg, campaignName){
 
     const map = regionMapPanel(entry, {
       initialLayerId:state.activeLayerId,
+      initialView:state.mapView,
       selected:state.selected,
       placementMode:state.mode,
+      onViewChange:(view, layerId) => {
+        state.mapView = view; state.activeLayerId = layerId;
+        if (state.selected && !regionMapItemEditable(entry.region, selectedItem(), view)) state.selected = null;
+        state.mode = null; state.status = ''; draw();
+      },
       onLayerChange:(layerId) => { state.activeLayerId = layerId; state.mode = null; state.selected = null; draw(); },
       onSelect:(itemKind, id) => {
         if (state.saving) return;
         const next = regionFindMapItem(entry.region, itemKind, id);
-        if (!regionMapItemEditable(entry.region, next)) return;
+        if (!regionMapItemEditable(entry.region, next, state.mapView)) return;
         state.selected = { kind:itemKind, id }; state.mode = null; state.status = ''; draw();
       },
       onPlace:(layerId, position) => {
@@ -6275,7 +7036,7 @@ function regionEditableMapPanel(entry, cfg, campaignName){
             (moving ? moving.label : 'Map item') + ' moved.');
         }
       },
-      footerText:'Pins and markers are editable on revealed positions. Reveal/fog changes only the selected layer mask. GM-only data stays hidden; terrain remains read-only.',
+      footerText:'GM view shows the complete saved map for editing. Player view previews strict fog and GM-only hiding. The view toggle never writes data; terrain remains read-only.',
     });
 
     const status = h('div', { class:'region-edit-status hint', role:'status' }, state.status);
@@ -6343,7 +7104,7 @@ function regionFogAll(region, layerId){
 function regionApplyRevealEdit(region, edit, options){
   const opts = options || {};
   const valid = assertRegion(region, opts.expectedCampaign ? { expectedCampaign:opts.expectedCampaign } : undefined);
-  if (!edit || !regionMapEditableLayer(valid, edit.layerId)) throw new Error('That local layer is hidden or unavailable');
+  if (!edit || !regionMapEditableLayer(valid, edit.layerId, opts.view)) throw new Error('That local layer is hidden or unavailable');
   let next;
   if (edit.action === 'cell') next = regionSetCellRevealed(valid, edit.layerId, edit.index, edit.revealed);
   else if (edit.action === 'reveal-all') next = regionRevealAll(valid, edit.layerId);
@@ -6354,7 +7115,7 @@ function regionApplyRevealEdit(region, edit, options){
 
 function regionTransformRevealEdit(currentText, path, campaignName, expectedRegionId, edit){
   const current = assertRegionJson(currentText, { expectedCampaign:campaignName, expectedId:expectedRegionId });
-  const next = regionApplyRevealEdit(current, edit, { expectedCampaign:campaignName });
+  const next = regionApplyRevealEdit(current, edit, { expectedCampaign:campaignName, view:edit && edit.view });
   assertRegionWriteTarget(path, campaignName, next, currentText);
   return serializeRegion(next);
 }
@@ -6380,6 +7141,424 @@ async function regionSaveRevealEdit(cfg, entry, campaignName, edit){
   entry.errors = [];
   return entry.region;
 }
+/* ========================================================================== *
+   REGION FORGE 3 — campaign atlas + Forge workspace.
+
+   This is deliberately campaign-side. Worldbuilder owns canon cards; Game owns
+   saved campaign regions. The Forge runs the deterministic generator core,
+   previews the complete GM truth through the existing GM/player map toggle, and
+   accepts by writing a complete serialized Region JSON into the campaign's
+   regions folder via ghUpdate.
+
+   Namespace: this UI and region-generate.js (the generator core) share the regionForge* /
+   REGION_FORGE_* prefix in the concatenated single-file build — keep every top-level
+   symbol unique across BOTH files.
+ * ========================================================================== */
+const REGION_FORGE_HIDDEN_LINE_RE = /\b(?:gm[-\s]?only|hidden|secret|private|author|patron|eldrabreer|spoiler)\b/i;
+const REGION_FORGE_DIGEST_LINE_LIMIT = 24;
+const REGION_FORGE_DIGEST_CHAR_LIMIT = 160;
+const REGION_FORGE_START_REVEAL_RADIUS = 2;
+
+function regionForgeCleanLine(line){
+  return String(line||'').replace(/^[-*#>\s]+/,'').trim().replace(/\s+/g,' ');
+}
+function regionForgeDigestLines(text, hidden){
+  const lines=String(text||'').split(/\r?\n/).map(regionForgeCleanLine).filter(Boolean);
+  const picked=[];
+  lines.forEach(line=>{
+    const isHidden=REGION_FORGE_HIDDEN_LINE_RE.test(line);
+    if(!!hidden!==!!isHidden) return;
+    if(picked.length>=REGION_FORGE_DIGEST_LINE_LIMIT) return;
+    picked.push(line.length>REGION_FORGE_DIGEST_CHAR_LIMIT?line.slice(0,REGION_FORGE_DIGEST_CHAR_LIMIT-1)+'…':line);
+  });
+  return picked.join('\n');
+}
+function regionForgeVisibleDigest(text){ return regionForgeDigestLines(text,false); }
+function regionForgeHiddenDigest(text){ return regionForgeDigestLines(text,true); }
+function regionForgeAnyText(records){
+  return Object.values(records||{}).map(value=>String(value||'')).filter(Boolean).join('\n');
+}
+function regionForgeCampaignFacts(bundle){
+  const b=bundle||{}, texts=b.texts||{};
+  return {
+    hasTracker:!!texts.tracker, hasThreads:!!texts.threads, hasLedger:!!texts.ledger, hasCharacter:!!texts.character,
+    hiddenInputs:!!b.hiddenDigest,
+  };
+}
+function regionForgeFactChips(bundle){
+  const facts=regionForgeCampaignFacts(bundle), chips=[];
+  if(facts.hasCharacter) chips.push('character sheet');
+  if(facts.hasTracker) chips.push('state tracker');
+  if(facts.hasThreads) chips.push('threads');
+  if(facts.hasLedger) chips.push('ledger');
+  if(!chips.length) chips.push('neutral defaults');
+  return chips;
+}
+async function regionForgeCampaignSource(cfg,campaignName){
+  const files=await campaignFiles(cfg,campaignName);
+  const read=async path=>path?(await ghGetText(cfg,path).catch(()=>null)):null;
+  const [tracker,threads,ledger,character]=await Promise.all([
+    read(files.tracker), read(files.threads), read(files.ledger), read(files.character),
+  ]);
+  const texts={
+    tracker:tracker&&tracker.text||'',
+    threads:threads&&threads.text||'',
+    ledger:ledger&&ledger.text||'',
+    character:character&&character.text||'',
+  };
+  let trackerData={};
+  try{ if(texts.tracker) trackerData=parseTracker(texts.tracker); }catch(_){}
+  const visible={
+    tracker:trackerData&&Object.keys(trackerData).length?{
+      status:trackerData.status||'',
+      scene:trackerData.scene||'',
+      summary:trackerData.summary||'',
+      inWorldDay:trackerData.day||'',
+      location:trackerData.location||'',
+    }:regionForgeVisibleDigest(texts.tracker),
+    threads:regionForgeVisibleDigest(texts.threads),
+    ledger:regionForgeVisibleDigest(texts.ledger),
+    character:regionForgeVisibleDigest(texts.character),
+  };
+  const hiddenDigest=regionForgeHiddenDigest(regionForgeAnyText(texts));
+  return {
+    files, texts, visible, hiddenDigest,
+    campaign:{ name:campaignName, premise:regionForgeVisibleDigest(regionForgeAnyText({tracker:texts.tracker,threads:texts.threads})) },
+    character:visible.character?{ sheet:visible.character }:undefined,
+    setup:{ tracker:visible.tracker, threads:visible.threads, ledger:visible.ledger },
+    gm:hiddenDigest?{ detectedCampaignSignals:hiddenDigest }:undefined,
+  };
+}
+
+function regionForgeSummaryPath(campaignName,regionId){ return 'campaign/'+campaignName+'/regions/'+regionId+'.md'; }
+function regionForgeDefaultState(campaignName,role){
+  const starter=role==='starter';
+  const base=regionForgeSlug(campaignName||'campaign','campaign');
+  return {
+    role:starter?'starter':'outer',
+    id:starter?'starter-region':'outer-'+base,
+    title:starter?'Starter Region':'Outer Region',
+    width:REGION_FORGE_DEFAULT_WIDTH,
+    height:REGION_FORGE_DEFAULT_HEIGHT,
+    cosmicLayer:'middle',
+    neighborLayer:'',
+    blendStrength:0.25,
+    terrainCharacter:'',
+    elementEmphasis:'',
+    ambientMana:'recommended',
+    danger:'recommended',
+    direction:'',
+    seed:'',
+    rerollStep:1,
+  };
+}
+function regionForgeOuterUiSeed(campaignName,bundle){
+  return regionForgeOuterSeed({campaign:campaignName,sourceHash:bundle&&bundle.hiddenDigest?'hidden-inputs':'visible-inputs'});
+}
+function regionForgeBuildInput(state,bundle,campaignName){
+  const source=bundle||{};
+  const setup={...(source.setup||{})};
+  if(state.terrainCharacter) setup.terrainCharacter=state.terrainCharacter;
+  if(state.elementEmphasis) setup.elementEmphasis=state.elementEmphasis;
+  if(state.ambientMana&&state.ambientMana!=='recommended') setup.ambientMana=state.ambientMana;
+  if(state.danger&&state.danger!=='recommended') setup.danger=state.danger;
+  if(state.direction) setup.direction=state.direction;
+  const input={
+    role:state.role==='outer'?'outer':'starter',
+    id:regionForgeSlug(state.id,state.role==='starter'?'starter-region':'outer-region'),
+    title:regionTrim(state.title)||(state.role==='starter'?'Starter Region':'Outer Region'),
+    campaign:{name:campaignName,premise:source.campaign&&source.campaign.premise||''},
+    setup,
+    cosmicLayer:state.cosmicLayer,
+    width:Number(state.width),
+    height:Number(state.height),
+    cosmicBlend:state.neighborLayer?{neighborLayer:state.neighborLayer,strength:Number(state.blendStrength),band:'transition'}:{},
+  };
+  if(state.role==='starter'){
+    if(source.character) input.character=source.character;
+    if(source.gm) input.gm=source.gm;
+  }else{
+    input.seed=state.seed||regionForgeOuterUiSeed(campaignName,bundle);
+    input.continuity=source.campaign&&source.campaign.premise||'campaign continuity';
+  }
+  return input;
+}
+function regionForgeAmbientOverride(band){
+  const table={quiet:0.12,steady:0.32,bright:0.5,charged:0.72,severe:0.92};
+  return Object.prototype.hasOwnProperty.call(table,band)?{band,intensity:table[band]}:null;
+}
+function regionForgeApplyUiOverrides(region,state){
+  const next=regionClone(region);
+  const ambient=regionForgeAmbientOverride(state&&state.ambientMana);
+  if(ambient) next.ambientMana=ambient;
+  next.metadata={...(next.metadata||{})};
+  next.metadata.visibleInputs={...(next.metadata.visibleInputs||{})};
+  next.metadata.visibleInputs.forgeUi={
+    terrainCharacter:state.terrainCharacter||'',
+    elementEmphasis:state.elementEmphasis||'',
+    ambientMana:state.ambientMana||'recommended',
+    danger:state.danger||'recommended',
+    direction:state.direction||'',
+  };
+  return assertRegion(next,{expectedCampaign:next.campaign});
+}
+function regionForgeGenerateCandidate(state,bundle,campaignName){
+  const generated=regionForgeGenerateRegion(regionForgeBuildInput(state,bundle,campaignName));
+  const withOverrides=regionForgeApplyUiOverrides(generated,state);
+  return regionForgeInitialReveal(withOverrides,{campaignName});
+}
+
+function regionForgeSilhouetteCell(x,y,width,height){
+  if(width<=3||height<=3) return x===0||y===0;
+  return x===0||y===0||x===width-1||y===height-1||((x*7+y*11)%17===0);
+}
+function regionForgeFeatureCell(grid,feature){
+  const p=feature&&feature.position;
+  if(!grid||!regionIsRecord(p)||!Number.isFinite(p.x)||!Number.isFinite(p.y)) return null;
+  const x=Math.floor(p.x), y=Math.floor(p.y);
+  if(x<0||y<0||x>=grid.width||y>=grid.height) return null;
+  return y*grid.width+x;
+}
+function regionForgeRevealAround(mask,grid,position,radius){
+  const p=position||{}, cx=Math.floor(Number(p.x)), cy=Math.floor(Number(p.y));
+  if(!Number.isFinite(cx)||!Number.isFinite(cy)) return;
+  for(let y=cy-radius;y<=cy+radius;y++) for(let x=cx-radius;x<=cx+radius;x++){
+    if(x<0||y<0||x>=grid.width||y>=grid.height) continue;
+    if(Math.abs(x-cx)+Math.abs(y-cy)<=radius) mask[y*grid.width+x]=1;
+  }
+}
+function regionForgeInitialReveal(region,options){
+  const opts=options||{}, valid=assertRegion(region,opts.campaignName?{expectedCampaign:opts.campaignName}:undefined);
+  const next=regionClone(valid);
+  next.revealed={...(next.revealed||{}),layers:{}};
+  const features=Array.isArray(next.features)?next.features:[];
+  const arrival=features.find(feature=>feature&&feature.id==='site-arrival') ||
+    features.find(feature=>Array.isArray(feature&&feature.tags)&&feature.tags.includes('arrival'));
+  next.localLayers.forEach(layer=>{
+    const grid=regionTerrainGrid(next,layer.id);
+    if(!grid) return;
+    const mask=Array(grid.width*grid.height).fill(0);
+    grid.cells.forEach(cell=>{ if(regionForgeSilhouetteCell(cell.x,cell.y,grid.width,grid.height)) mask[cell.index]=1; });
+    if(arrival&&arrival.layerId===layer.id) regionForgeRevealAround(mask,grid,arrival.position,REGION_FORGE_START_REVEAL_RADIUS);
+    else if(!arrival&&layer.id===next.localLayers[0].id) regionForgeRevealAround(mask,grid,{x:Math.floor(grid.width*0.2),y:Math.floor(grid.height*0.25)},REGION_FORGE_START_REVEAL_RADIUS);
+    features.filter(feature=>feature&&feature.layerId===layer.id&&feature.id!=='site-arrival').forEach(feature=>{
+      const index=regionForgeFeatureCell(grid,feature);
+      if(index!=null) mask[index]=0;
+    });
+    next.revealed.layers[layer.id]=mask;
+  });
+  return assertRegion(next,opts.campaignName?{expectedCampaign:opts.campaignName}:undefined);
+}
+
+function regionAtlasDiscoveryLabel(region){
+  let total=0, revealed=0, layers=0;
+  (region&&Array.isArray(region.localLayers)?region.localLayers:[]).forEach(layer=>{
+    const grid=regionTerrainGrid(region,layer.id);
+    if(!grid) return;
+    layers++;
+    const mask=regionRevealMask(region,layer.id), count=grid.width*grid.height;
+    total+=count;
+    revealed+=Array.isArray(mask)?Array.from({length:count},(_,i)=>regionCellRevealed(mask,i)?1:0).reduce((a,b)=>a+b,0):count;
+  });
+  if(!layers) return 'No terrain grid yet';
+  if(revealed===0) return 'Fully fogged';
+  if(revealed===total) return 'Fully revealed';
+  return revealed+' / '+total+' cells discovered';
+}
+function regionAtlasThumbnail(region){
+  const layer=regionMapLayers(region,'player')[0];
+  if(!layer) return h('div',{class:'region-atlas-thumb empty'},'No player-visible layer');
+  const svg=regionMapSvg(region,layer.id,{scale:1,panX:0,panY:0},{view:'player'});
+  svg.setAttribute('class',(svg.getAttribute('class')||'region-map-svg')+' region-atlas-svg');
+  return h('div',{class:'region-atlas-thumb'},svg);
+}
+function regionAtlasCard(entry,campaignName,selected){
+  const valid=entry&&entry.region&&(!entry.errors||!entry.errors.length);
+  const region=entry&&entry.region;
+  const title=valid?(region.title||region.id):(entry&&entry.json&&entry.json.name||'Unreadable region');
+  const card=h('button',{
+    class:'region-atlas-card'+(selected?' selected':'')+(valid?'':' invalid'),
+    type:'button',
+    onclick:()=>{ if(valid) go('campaign',{camp:campaignName,tab:'region',region:region.id}); },
+    disabled:valid?null:'true',
+  });
+  card.append(valid?regionAtlasThumbnail(region):h('div',{class:'region-atlas-thumb empty'},'Needs attention'),
+    h('span',{class:'region-atlas-title'},title),
+    h('span',{class:'hint'},valid?('Cosmic '+region.cosmicLayer+' · '+(region.localLayers||[]).length+' local layer'+((region.localLayers||[]).length===1?'':'s')):'Open validation card below'),
+    h('span',{class:'hint'},valid?regionAtlasDiscoveryLabel(region):(entry.errors||[]).length+' issue(s)'));
+  return card;
+}
+
+async function regionSaveGeneratedRegion(cfg,campaignName,region,options){
+  const opts=options||{}, valid=assertRegion(region,{expectedCampaign:campaignName});
+  const path=regionExpectedPath(campaignName,valid.id), text=serializeRegion(valid);
+  const refuseExisting=current=>{ if(current&&String(current).trim()) throw new Error('Region already exists: '+path); };
+  await ghUpdate(cfg,path,current=>{
+    refuseExisting(current);
+    assertRegionWriteTarget(path,campaignName,valid,'');
+    return text;
+  },'Create generated region '+valid.title+' via Game',{create:true,guard:refuseExisting});
+  if(opts.summary!==false){
+    const mdPath=regionForgeSummaryPath(campaignName,valid.id);
+    await ghUpdate(cfg,mdPath,()=>formatRegionSummary(valid,{expectedCampaign:campaignName}),
+      'Update region summary '+valid.title+' via Game',{create:true});
+  }
+  return {path,region:valid};
+}
+
+function regionForgeStage(title,kicker,...kids){
+  return h('section',{class:'region-forge-stage'},h('div',{class:'region-editor-head'},h('h3',null,title),h('span',{class:'hint'},kicker)),...kids);
+}
+function regionForgeField(label,node,hint){
+  return h('label',{class:'region-forge-field'},h('span',null,label),node,hint?h('small',{class:'hint'},hint):null);
+}
+function regionForgeSelect(value,options,onchange){
+  const sel=h('select',{onchange:()=>onchange(sel.value)},...options.map(opt=>
+    h('option',{value:opt[0]},opt[1])));
+  sel.value=value; return sel;
+}
+function regionForgeInput(value,onchange,attrs){
+  const input=h('input',{...(attrs||{}),value:value,onchange:()=>onchange(input.value)});
+  return input;
+}
+function regionForgeTextarea(value,onchange,attrs){
+  const input=h('textarea',{...(attrs||{}),onchange:()=>onchange(input.value)},value||'');
+  input.value=value||''; return input;
+}
+
+function regionForgeWorkspace(host,cfg,campaignName,initialRole){
+  const state=regionForgeDefaultState(campaignName,initialRole==='starter'?'starter':'outer');
+  let bundle=null, status='Loading campaign inputs…', saving=false;
+  host.replaceChildren(h('p',{class:'hint',style:{textAlign:'center'}},status));
+  regionForgeCampaignSource(cfg,campaignName).then(source=>{
+    bundle=source; state.seed=regionForgeOuterUiSeed(campaignName,bundle); status=''; draw();
+  }).catch(error=>{
+    status='Could not read campaign inputs: '+String(error&&error.message||error);
+    bundle={campaign:{name:campaignName,premise:''},setup:{},hiddenDigest:''};
+    state.seed=regionForgeOuterUiSeed(campaignName,bundle); draw();
+  });
+
+  function setRole(role){
+    const next=regionForgeDefaultState(campaignName,role);
+    Object.keys(next).forEach(key=>{ state[key]=next[key]; });
+    if(state.role==='outer') state.seed=regionForgeOuterUiSeed(campaignName,bundle);
+    draw();
+  }
+  function update(key,value){ state[key]=value; draw(); }
+  function candidate(){
+    return regionForgeGenerateCandidate(state,bundle,campaignName);
+  }
+  async function accept(){
+    const preview=candidate(), errors=validateRegion(preview,{expectedCampaign:campaignName});
+    if(errors.length){ status='Fix validation first: '+errors.map(e=>e.text).join('; '); draw(); return; }
+    saving=true; status='Saving the complete region to the campaign atlas…'; draw();
+    try{
+      await regionSaveGeneratedRegion(cfg,campaignName,preview,{summary:true});
+      toast('Region saved to the campaign atlas.');
+      go('campaign',{camp:campaignName,tab:'region',region:preview.id});
+    }catch(error){
+      saving=false; status='Save failed: '+String(error&&error.message||error); draw();
+    }
+  }
+  function draw(){
+    let preview=null, errors=[];
+    try{ if(bundle) preview=candidate(); if(preview) errors=validateRegion(preview,{expectedCampaign:campaignName}); }
+    catch(error){ errors=[{text:String(error&&error.message||error)}]; }
+    const facts=bundle?regionForgeFactChips(bundle):['loading'];
+    const sourceStage=regionForgeStage('Source','campaign-bound inputs',
+      h('div',{class:'region-forge-grid'},
+        regionForgeField('Source type',regionForgeSelect(state.role,[['starter','Starter — character/campaign-bound'],['outer','Outer — continuity + visible seed']],setRole),'Both use the same Forge; starter derives a stable seed.'),
+        h('div',{class:'region-forge-detected'},h('b',null,'Detected: '),...facts.map(chip=>h('span',{class:'region-chip'},chip)))),
+      bundle&&bundle.hiddenDigest?h('p',{class:'region-warning region-forge-warning'},'Hidden / GM-side campaign signals were detected and may weight the GM-truth map. They are not shown in player-facing labels or preview text.'):null);
+    const shapeStage=regionForgeStage('Shape','editable recommendations',
+      h('div',{class:'region-forge-grid'},
+        regionForgeField('Region ID',regionForgeInput(state.id,v=>update('id',regionForgeSlug(v,state.id)),{maxlength:'80'}),'Saved as campaign/'+campaignName+'/regions/<id>.json'),
+        regionForgeField('Title',regionForgeInput(state.title,v=>update('title',v),{maxlength:'120'})),
+        regionForgeField('Width',regionForgeInput(state.width,v=>update('width',Number(v)),{type:'number',min:'8',max:'18'})),
+        regionForgeField('Height',regionForgeInput(state.height,v=>update('height',Number(v)),{type:'number',min:'6',max:'14'})),
+        regionForgeField('Primary cosmic layer',regionForgeSelect(state.cosmicLayer,[['top','Top'],['middle','Middle'],['bottom','Bottom']],v=>update('cosmicLayer',v)),'The primary layer stays top/middle/bottom.'),
+        regionForgeField('Blend neighbor',regionForgeSelect(state.neighborLayer,[['','No transition'],['top','Top'],['middle','Middle'],['bottom','Bottom']],v=>update('neighborLayer',v)),'Only adjacent blends validate.'),
+        regionForgeField('Blend strength',regionForgeInput(state.blendStrength,v=>update('blendStrength',Number(v)),{type:'number',min:'0',max:'1',step:'0.05'})),
+        regionForgeField('Terrain character',regionForgeInput(state.terrainCharacter,v=>update('terrainCharacter',v),{placeholder:'ridges, basins, storm corridor…'}),'A visible cue; campaign truth still wins.')));
+    const forcesStage=regionForgeStage('Forces','elements · mana · danger',
+      h('div',{class:'region-forge-grid'},
+        regionForgeField('Element emphasis',regionForgeInput(state.elementEmphasis,v=>update('elementEmphasis',v),{placeholder:'air, water, root, crystal…'})),
+        regionForgeField('Ambient mana',regionForgeSelect(state.ambientMana,[['recommended','Recommended'],['quiet','Quiet'],['steady','Steady'],['bright','Bright'],['charged','Charged'],['severe','Severe']],v=>update('ambientMana',v)),'Stored separately from element weights.'),
+        regionForgeField('Danger',regionForgeSelect(state.danger,[['recommended','Recommended'],['low','Low'],['moderate','Moderate'],['high','High']],v=>update('danger',v)),'Guides broad-strokes hazards, not automatic consequences.')));
+    const directionStage=regionForgeStage('Direction','optional prose',
+      regionForgeField('Short direction',regionForgeTextarea(state.direction,v=>update('direction',v),{rows:'3',placeholder:'Optional: lean toward misty ravines, old crossings, safe camp first…'}),'Used as a soft input only; validation and campaign facts remain authoritative.'));
+    const seedText=preview&&preview.metadata&&preview.metadata.seed||state.seed;
+    const seedStage=regionForgeStage('Seed','visible provenance',
+      h('div',{class:'region-forge-grid'},
+        regionForgeField('Seed',regionForgeInput(seedText,v=>update('seed',v),{disabled:state.role==='starter'?'true':null}),'Starter seed is stable from the normalized campaign snapshot; outer seed is copy/edit/reroll.'),
+        h('div',{class:'toolrow region-forge-seed-actions'},
+          h('button',{class:'navbtn',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRerollSeed(state.seed,++state.rerollStep); draw(); }},'Reroll'),
+          h('button',{class:'navbtn',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRandomizeSeed({campaign:campaignName,entropy:(typeof crypto!=='undefined'&&crypto.getRandomValues)?Array.from(crypto.getRandomValues(new Uint32Array(2))).join('-'):String(new Date().getTime())}); draw(); }},'Randomize'),
+          h('button',{class:'navbtn',type:'button',onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(seedText||''); toast('Seed copied.'); }},'Copy seed'))),
+      preview?h('p',{class:'hint'},'Provenance: '+preview.metadata.generator+' '+preview.metadata.generatorVersion+' · '+preview.metadata.regionRole+' · source hash stored, raw hidden text not shown.'):null);
+    const previewStage=regionForgeStage('Preview','GM truth ⇄ player fog',
+      errors.length?h('div',{class:'region-invalid'},h('b',null,'Validation'),h('ul',null,...errors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},'Valid generated region save'),
+      preview?regionMapPanel({region:preview,errors:[]},{initialView:'gm',footerText:'Preview only. GM view shows the complete generated truth; Player view applies the initial discovery mask and hides GM-only/fogged detail.'}):null,
+      preview?h('div',{class:'region-forge-summary'},
+        h('b',null,'Generated summary'),
+        h('p',null,preview.title+' · '+regionCosmicLabel(preview)+' · '+preview.localLayers.length+' local layers · '+regionAtlasDiscoveryLabel(preview)),
+        h('p',{class:'hint'},'Player reveal starts layered: arrival area and silhouettes are visible; exact routes, interiors, hazards, resources, and secrets remain fogged.')):null);
+    const acceptRow=h('div',{class:'toolrow region-forge-accept'},
+      h('button',{class:'navbtn',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Back to atlas'),
+      h('button',{class:'navbtn primary',type:'button',disabled:(saving||!preview||errors.length)?'true':null,onclick:accept},saving?'Saving…':'Accept into campaign atlas'),
+      h('span',{class:'hint',role:'status'},status));
+    host.replaceChildren(h('div',{class:'region-forge'},sourceStage,shapeStage,forcesStage,directionStage,seedStage,previewStage,acceptRow));
+  }
+}
+
+function regionForgeView(campaignName,source){
+  const f=framed('Region Forge','campaign atlas → generated region','Game owns campaign regions; Worldbuilder stays canon-side');
+  const body=f.querySelector('.framed-body');
+  if(!campaignName){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Choose a campaign first.')); return f; }
+  if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
+  body.append(h('div',{class:'toolrow',style:{marginBottom:'10px'}},h('button',{class:'navbtn',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Region atlas')));
+  const host=h('div'); body.append(host); regionForgeWorkspace(host,ghCfg(),campaignName,source); return f;
+}
+
+registerView('regionForge',v=>regionForgeView(v.camp,v.source||v.role));
+
+campRegion=async function(host,name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint',style:{textAlign:'center'}},'Loading campaign atlas…'));
+  try{
+    const result=await loadCampaignRegions(cfg,name);
+    const selectedId=VIEW&&VIEW.region;
+    const validEntries=result.regions.filter(entry=>entry.region&&(!entry.errors||!entry.errors.length));
+    const selected=validEntries.find(entry=>entry.region.id===selectedId)||validEntries[0]||null;
+    const wrap=h('div',{class:'region-view'},
+      h('div',{class:'region-readonly'},h('b',null,'Campaign atlas · Region Forge'),
+        h('span',null,'Browse saved regions, open one for edits, or forge a complete generated candidate.')),
+      h('div',{class:'toolrow region-atlas-actions'},
+        h('button',{class:'navbtn primary',onclick:()=>go('regionForge',{camp:name,source:'outer'})},'Create Region'),
+        h('button',{class:'navbtn',onclick:()=>go('regionForge',{camp:name,source:'starter'})},'Generate Starter Region')));
+    if(!result.regions.length){
+      wrap.append(h('div',{class:'region-empty'},h('h3',null,'No saved regions yet'),
+        h('p',{class:'hint'},'Use Create Region for a neutral outer candidate, or Generate Starter Region for a campaign/character-bound first map.')));
+    }else{
+      wrap.append(h('section',{class:'region-atlas'},
+        h('div',{class:'region-editor-head'},h('h3',null,'Saved regions'),h('span',{class:'hint'},result.regions.length+' region file'+(result.regions.length===1?'':'s'))),
+        h('div',{class:'region-atlas-grid'},...result.regions.map(entry=>regionAtlasCard(entry,name,!!(selected&&entry.region&&entry.region.id===selected.region.id))))));
+      result.regions.filter(entry=>entry.errors&&entry.errors.length).forEach(entry=>wrap.append(regionStatusCard(entry)));
+      if(selected){
+        wrap.append(h('section',{class:'region-opened'},h('div',{class:'region-editor-head'},h('h3',null,'Open region'),h('span',{class:'hint'},selected.json.name))));
+        wrap.append(regionStatusCard(selected));
+        wrap.append(typeof regionEditableMapPanel==='function'?regionEditableMapPanel(selected,cfg,name):regionMapPanel(selected));
+      }
+    }
+    if(result.orphanMarkdown.length){
+      wrap.append(h('div',{class:'region-warning'},h('b',null,'Markdown summaries without JSON'),
+        h('ul',null,...result.orphanMarkdown.map(entry=>h('li',null,entry.markdown.name)))));
+    }
+    host.replaceChildren(wrap);
+  }catch(error){
+    host.replaceChildren(h('p',{class:'hint'},'Region data unavailable: '+String(error&&error.message||error)));
+  }
+};
 /* ========================================================================== *
    GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
    the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
