@@ -628,6 +628,17 @@
   .demo-section > h3{ margin:0 0 2px; font-size:21px; }
   .region-demo-modal{ width:min(880px,94vw); }
   .region-demo-modal .region-map-svg{ height:min(56vh,440px); }
+
+  /* ---------- in-app GM play (▶ Play tab) ---------- */
+  .play-log{ display:flex; flex-direction:column; gap:10px; margin:12px 0; }
+  .play-msg{ padding:9px 12px; border-radius:12px; border:1px solid var(--gold-soft); }
+  .play-msg.you{ background:#fff8; align-self:flex-end; max-width:88%; }
+  .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; }
+  .play-msg .who{ font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--hint); margin-bottom:3px; }
+  .play-text{ white-space:pre-wrap; margin:0; font:inherit; line-height:1.5; }
+  .play-proposal{ margin-top:8px; border:1px dashed var(--gold); border-radius:8px; padding:8px 10px; background:#fff7e6; }
+  .play-input{ width:100%; box-sizing:border-box; border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); color:var(--ink-soft); font:inherit; padding:9px 11px; }
+  @media (max-width:480px){ .play-msg.you,.play-msg.gm{ max-width:100%; } }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
 .region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
@@ -2132,6 +2143,24 @@ auto it = std::find(v.begin(), v.end(), target);
 ];
 
 function pppDefaultIndex(){ return 1; }   // start at Ch 1 "Hello, World!", not the front-matter
+/* ========================================================================== *
+   ASSISTANT PERSONAS
+
+   Per-"hat" system prompts (and an optional preferred model) for the in-app AI
+   assistant. Picking a persona only prepends its system prompt to the canon
+   grounding before the request — it never changes retrieval, and never touches
+   canon-write safety. Add or reword entries freely; `id` must stay stable.
+ * ========================================================================== */
+const ASSISTANT_PERSONAS=[
+  {id:'worldbuilder', label:'Worldbuilder', model:'',
+   system:"You are a worldbuilding assistant for the Godling Universe canon. Answer using the provided canon context. Be precise, cite canon IDs when relevant, and never invent canon — if something is not established, say so plainly. Everything you produce is a suggestion only; nothing is official until the keeper promotes it."},
+  {id:'gm', label:'Game Master', model:'',
+   system:"You are the Game Master for a Godling Universe campaign. Use the provided canon context. Narrate vividly but concisely. Honor the setting's felt-not-numbers magic and its survival stakes. End each turn with a clear situation and the player's options. Never decide the player's actions for them."},
+  {id:'tutor', label:'C++ Tutor', model:'qwen2.5-coder:latest',
+   system:"You are a C++ tutor following Stroustrup's \"Programming: Principles and Practice\". Do NOT write the solution for me. Point out the flaw in my logic, ask one guiding question, and explain the underlying concept. Prefer a small hint over a full answer."},
+  {id:'maker', label:'Maker', model:'',
+   system:"You are a gentle, encouraging creative companion for the Maker's space. Help brainstorm Vael folk, groves, creatures, seeds, and crochet colorways. Keep it warm, low-pressure, and imaginative. Offer a few gentle options; never make it feel like homework."},
+];
 /* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
 const IDB_NAME='vfj', IDB_STORE='kv', IDB_KEY='state';
@@ -6435,6 +6464,19 @@ function assistantIsLocalEngine(engine){
   return engine&&engine.type==='OpenAI-compatible local endpoint';
 }
 
+// Persona = a system-prompt "hat" (and optional preferred model) for the assistant.
+function assistantPersonaList(){
+  return (typeof ASSISTANT_PERSONAS!=='undefined'&&Array.isArray(ASSISTANT_PERSONAS))?ASSISTANT_PERSONAS:[];
+}
+function assistantPersonaById(id){
+  const list=assistantPersonaList();
+  return list.find(p=>p.id===id)||list[0]||{id:'worldbuilder',label:'Worldbuilder',system:'',model:''};
+}
+function assistantDefaultPersonaId(){
+  const list=assistantPersonaList();
+  return list[0]?list[0].id:'worldbuilder';
+}
+
 function assistantEngineProfiles(){
   const settings=engineSettings();
   return (Array.isArray(settings.profiles)?settings.profiles.slice():[]).filter(profile=>!engineIsPrivateBackendType(profile.type));
@@ -6587,7 +6629,7 @@ async function assistantSendAnswerToLedger(campaignName, state){
 
 function studioAssistant(host){
   const profiles=assistantEngineProfiles();
-  const state={question:'',answer:'',grounding:{ids:[],entries:[],system:''},model:''};
+  const state={question:'',answer:'',grounding:{ids:[],entries:[],system:''},model:'',personaId:assistantDefaultPersonaId()};
   if(!profiles.length){
     const settingsBtn=h('button',{class:'primary'},'Open Engine settings');
     settingsBtn.onclick=()=>openEngineSettings();
@@ -6608,6 +6650,15 @@ function studioAssistant(host){
     h('option',{value:''},'Choose a task preset...'),
     ...ENGINE_TASK_PRESETS.map((preset,i)=>h('option',{value:String(i)},preset.label+' - '+preset.model))
   );
+  const personaSel=h('select',{class:'assistant-persona'},...assistantPersonaList().map(p=>h('option',{value:p.id},p.label)));
+  personaSel.value=state.personaId;
+  personaSel.onchange=()=>{
+    state.personaId=personaSel.value;
+    const persona=assistantPersonaById(state.personaId);
+    if(persona.model&&Array.from(modelSel.children||[]).some(o=>o.value===persona.model)){
+      modelSel.value=persona.model; state.model=persona.model; persistCurrentEngine({model:persona.model});
+    }
+  };
   const tempUse=h('input',{type:'checkbox'});
   const temperatureIn=h('input',{type:'range',min:'0',max:'1.5',step:'0.05',value:'0.70'});
   const temperatureValue=h('span',{class:'assistant-temp-value'});
@@ -6757,7 +6808,7 @@ function studioAssistant(host){
         answerHost.scrollTop=answerHost.scrollHeight;
       };
       const chat=Object.assign({
-        system:grounding.system,
+        system:[assistantPersonaById(state.personaId).system,grounding.system].filter(Boolean).join('\n\n'),
         messages:[{role:'user',content:q}],
         model:assistantModelFor(state,engine),
         maxTokens:ASSISTANT_MAX_TOKENS
@@ -6823,6 +6874,7 @@ function studioAssistant(host){
     ),
     h('div',{class:'assistant-controls'},
       h('div',{class:'assistant-engine-pick'},
+        h('label',{},'Persona',personaSel),
         h('label',{},'Engine',engineSel),
         h('label',{},'Model',modelSel),
         h('label',{},'Preset',presetSel)
@@ -10827,6 +10879,241 @@ campResume=async function(host,name){
     host.append(survivalEditor(cfg,files.tracker,parseTracker(r.text),host,name));
   }catch(e){ host.append(h('p',{class:'hint'},'Survival editor unavailable: '+e.message)); }
 };
+/* ========================================================================== *
+   CAMPAIGN PLAY — the in-app Game Master.
+
+   A turn-by-turn chat that drops the GM persona into a campaign with its LIVE
+   state (scene/location/runtime gauges + live threads) and canon grounding
+   injected each turn. Three guarded extras, all opt-in per action:
+     - GM-proposed state updates: the GM may emit a ```state``` block; the player
+       taps "Apply" to write it through the EXISTING guarded tracker writers
+       (updateTrackerDetails / updateRuntimeState). The GM never writes directly.
+     - Capture a beat to the campaign ledger (addLedgerEntry, CAMPAIGN-ONLY).
+     - Auto-saved transcript to a play-log file so a session survives reload.
+
+   Reuses the assistant's engine/stream/grounding/persona helpers and the
+   campaign parse/write helpers. Self-registers as a campaign tab.
+ * ========================================================================== */
+const CAMP_PLAY_LOG_PREFIX='CAMPAIGN PLAY LOG';
+const CAMP_PLAY_MAX_TOKENS=1024;
+const CAMP_PLAY_STATE_PROTOCOL=[
+  'STATE UPDATES: when the story changes a tracked value, append ONE fenced block',
+  'at the very end of your reply, nothing after it:',
+  '```state',
+  'scene: <short text>',
+  'location: <short text>',
+  'day: <short text>',
+  'personalMana: <0-100 integer>',
+  'divineMana: <0-100 integer>',
+  'divineHunger: <0-100 integer>',
+  'strain: <0-100 integer>',
+  '```',
+  'Include ONLY the lines that changed. Keep all narration before the block, and',
+  'never mention the block in your prose. If nothing changed, omit it entirely.',
+].join('\n');
+
+function campPlayLogPath(name){ return `${CAMP_DIR}/${name}/${CAMP_PLAY_LOG_PREFIX} ${name}.md`; }
+
+// Compact live-state summary fed to the GM each turn.
+function campPlayStateBlock(name, parsed, threads){
+  const t=parsed||{}, rt=t.runtime||{}, live=(threads&&threads.LIVE)||[];
+  return [
+    'Campaign: '+name,
+    t.scene&&('Scene: '+t.scene),
+    t.summary&&('Now: '+t.summary),
+    t.day&&('In-world day: '+t.day),
+    t.location&&('Location: '+t.location),
+    'Runtime — Personal Mana: '+(rt.personalMana||'?')+' · Divine Mana: '+(rt.divineMana||'?')+' · Divine Hunger: '+(rt.divineHunger||'?')+' · Strain: '+(rt.strain||'?'),
+    live.length&&('Live threads: '+live.join(' | ')),
+  ].filter(Boolean).join('\n');
+}
+
+// Remove the trailing ```state``` block from a reply, leaving the narration.
+function campPlayStripState(text){
+  return String(text||'').replace(/```state[\s\S]*?```/i,'').replace(/\s+$/,'').trim();
+}
+
+// Parse a GM ```state``` block into guarded-writer shapes, or null if none/empty.
+function campPlayParseProposal(text){
+  const m=/```state\s*([\s\S]*?)```/i.exec(String(text||''));
+  if(!m) return null;
+  const fields={}, gauges={};
+  m[1].split('\n').forEach(line=>{
+    const kv=/^\s*([A-Za-z ]+?)\s*:\s*(.+?)\s*$/.exec(line); if(!kv) return;
+    const key=kv[1].trim().toLowerCase(), val=kv[2].trim();
+    if(key==='scene') fields.scene=val;
+    else if(key==='location') fields.location=val;
+    else if(key==='day'||key==='in-world day') fields.day=val;
+    else if(key==='summary'||key==='now') fields.summary=val;
+    else if(/^personal ?mana$/.test(key)) gauges.personalMana=val;
+    else if(/^divine ?mana$/.test(key)) gauges.divineMana=val;
+    else if(/^divine ?hunger$/.test(key)) gauges.divineHunger=val;
+    else if(key==='strain') gauges.strain=val;
+  });
+  if(!Object.keys(fields).length && !Object.keys(gauges).length) return null;
+  return {fields,gauges};
+}
+
+// Human-readable one-liner of what a proposal would change.
+function campPlayProposalSummary(proposal){
+  const bits=[];
+  Object.keys(proposal.fields||{}).forEach(k=>bits.push(k+' → '+proposal.fields[k]));
+  Object.keys(proposal.gauges||{}).forEach(k=>bits.push(k+' → '+proposal.gauges[k]));
+  return bits.join(' · ');
+}
+
+// Transcript <-> markdown log (so a session survives reload / a new device).
+function campPlayLogText(name, messages){
+  const head='# '+CAMP_PLAY_LOG_PREFIX+' '+name+'\n\n> In-app GM session log. CAMPAIGN-ONLY; not canon.\n\n';
+  return head+(messages||[]).map(m=>(m.role==='assistant'?'**GM**':'**You**')+': '+String(m.content||'').trim()).join('\n\n')+'\n';
+}
+function campPlayParseLog(text){
+  const msgs=[], re=/\*\*(GM|You)\*\*:\s*([\s\S]*?)(?=\n\n\*\*(?:GM|You)\*\*:|\s*$)/g; let m;
+  while((m=re.exec(String(text||'')))){
+    const content=m[2].trim();
+    if(content) msgs.push({role:m[1]==='GM'?'assistant':'user', content});
+  }
+  return msgs;
+}
+
+// Apply a GM proposal through the existing guarded tracker writers only.
+async function campPlayApplyProposal(cfg, files, proposal, currentRuntime){
+  if(proposal.fields && Object.keys(proposal.fields).length){
+    await ghUpdate(cfg, files.tracker, text=>updateTrackerDetails(text,{fields:proposal.fields}), 'GM state update via Play', {guard:assertTracker});
+  }
+  const gkeys=Object.keys(proposal.gauges||{});
+  if(gkeys.length){
+    const next={};
+    gkeys.forEach(k=>{
+      const cur=(currentRuntime&&currentRuntime[k])||{current:0,max:RUNTIME_FALLBACK_MAX};
+      const n=parseInt(proposal.gauges[k],10);
+      next[k]={current:Number.isFinite(n)?n:cur.current, max:cur.max||RUNTIME_FALLBACK_MAX};
+    });
+    await ghUpdate(cfg, files.tracker, text=>updateRuntimeState(text,next), 'GM gauge update via Play', {guard:assertRuntimeTracker});
+  }
+}
+
+async function campPlayCaptureBeat(cfg, files, body){
+  await ghUpdate(cfg, files.ledger, t=>addLedgerEntry(t, {
+    id:ledgerNextId(parseLedger(t)), date:new Date().toISOString().slice(0,10),
+    phase:'play', label:'MOMENT', body:String(body||'').trim(), status:'CAMPAIGN-ONLY',
+  }), 'Play beat to ledger', {guard:assertLedger});
+}
+
+async function campPlay(host, name){
+  const cfg=ghCfg();
+  const profiles=(typeof assistantEngineProfiles==='function')?assistantEngineProfiles():[];
+  if(!profiles.length){
+    const btn=h('button',{class:'navbtn primary', onclick:()=>openEngineSettings()},'Open Engine settings');
+    host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Add an AI engine profile first, then come back to play. The Game Master uses your chosen engine.'), h('div',{class:'toolrow', style:{justifyContent:'center'}},btn));
+    return;
+  }
+  host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
+
+  let files, parsed={}, runtime={}, threads={}, messages=[];
+  try{
+    files=await campaignFiles(cfg,name);
+    if(!files.tracker){ host.replaceChildren(h('p',{class:'hint'},'No state tracker for '+name+' yet — start play once the campaign is scaffolded.')); return; }
+    const tr=await ghGetText(cfg, files.tracker); const th=files.threads?await ghGetText(cfg, files.threads):null;
+    if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); }
+    if(th) threads=parseThreads(th.text);
+    messages=await campPlayLoadLog(cfg, name);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+
+  const defaultEngine=assistantDefaultEngine(profiles);
+  const engineSel=h('select',{class:'play-engine'},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' · '+p.type)));
+  if(defaultEngine) engineSel.value=defaultEngine.id;
+  const transcript=h('div',{class:'play-log'});
+  const input=h('textarea',{class:'play-input', rows:'3', placeholder:'What do you do? (the GM sees your live state + canon)'});
+  const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
+  const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
+  const status=h('div',{class:'sync-status'});
+  let busy=false, streamNode=null, saveTimer=null;
+
+  async function reloadState(){
+    try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
+  }
+  function scheduleSave(){
+    if(saveTimer) clearTimeout(saveTimer);
+    saveTimer=setTimeout(()=>{ campPlaySaveLog(cfg, name, messages).catch(()=>{}); }, 2500);
+  }
+  function bubble(m){
+    const who=m.role==='assistant'?'GM':'You';
+    const textNode=h('pre',{class:'play-text'}, String(m.content||''));
+    const node=h('div',{class:'play-msg '+(m.role==='assistant'?'gm':'you')}, h('div',{class:'who'}, who), textNode);
+    if(m.role==='assistant'){
+      const acts=h('div',{class:'toolrow', style:{marginTop:'6px'}});
+      const ledgerBtn=h('button',{class:'navbtn', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'▸ ledger');
+      ledgerBtn.onclick=async()=>{ ledgerBtn.disabled=true; try{ await campPlayCaptureBeat(cfg, files, m.content); toast('Marked that beat in the ledger.'); }catch(e){ toast('Could not save: '+e.message); ledgerBtn.disabled=false; } };
+      acts.append(ledgerBtn);
+      node.append(acts);
+      if(m.proposal){
+        const apply=h('button',{class:'navbtn primary', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'Apply to tracker');
+        const pstat=h('span',{class:'hint'});
+        apply.onclick=async()=>{ apply.disabled=true; pstat.textContent='Applying…'; try{ await campPlayApplyProposal(cfg, files, m.proposal, runtime); await reloadState(); pstat.textContent='Applied.'; toast('Tracker updated.'); }catch(e){ pstat.textContent='Failed: '+e.message; apply.disabled=false; } };
+        node.append(h('div',{class:'play-proposal'}, h('div',{class:'hint'},'GM proposes: '+campPlayProposalSummary(m.proposal)), h('div',{class:'toolrow', style:{marginTop:'6px'}}, apply, pstat)));
+      }
+    }
+    return {node, textNode};
+  }
+  function drawTranscript(){
+    transcript.replaceChildren();
+    if(!messages.length){ transcript.append(h('p',{class:'hint', style:{textAlign:'center'}},'No turns yet. Set the scene to begin, or type what you do.')); return; }
+    messages.forEach((m,i)=>{ const b=bubble(m); transcript.append(b.node); if(i===messages.length-1 && m.role==='assistant') streamNode=b.textNode; });
+  }
+
+  async function runTurn(userText){
+    if(busy) return;
+    const engine=assistantEngineById(profiles, engineSel.value)||defaultEngine;
+    if(!engine){ status.textContent='Choose an engine first.'; return; }
+    busy=true; sendBtn.disabled=true; sceneBtn.disabled=true;
+    messages.push({role:'user', content:userText});
+    const gm={role:'assistant', content:'', proposal:null};
+    messages.push(gm); drawTranscript();
+    status.textContent='The GM is thinking…';
+    let groundingSystem='';
+    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; }catch(e){}
+    const system=[
+      assistantPersonaById('gm').system,
+      'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(name, parsed, threads),
+      CAMP_PLAY_STATE_PROTOCOL,
+      groundingSystem,
+    ].filter(Boolean).join('\n\n');
+    const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
+    const chat=Object.assign({ system, messages:history, model:assistantModelFor({}, engine), maxTokens:CAMP_PLAY_MAX_TOKENS }, assistantChatOptions(engine));
+    let raw='';
+    try{
+      await assistantStreamAi(engine, chat, piece=>{ raw+=piece; gm.content=campPlayStripState(raw); if(streamNode) streamNode.textContent=gm.content; });
+    }catch(e){ raw=''; gm.content='(The GM could not answer: '+(e&&e.message?e.message:String(e))+')'; }
+    if(raw){ gm.content=campPlayStripState(raw)||'(no narration)'; gm.proposal=campPlayParseProposal(raw); }
+    busy=false; sendBtn.disabled=false; sceneBtn.disabled=false;
+    status.textContent='Your move.';
+    drawTranscript();
+    scheduleSave();
+  }
+
+  sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; runTurn(v); };
+  sceneBtn.onclick=()=>runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.');
+
+  drawTranscript();
+  host.replaceChildren(
+    h('div',{class:'toolrow', style:{alignItems:'center', marginBottom:'4px'}}, h('label',{class:'hint'},'Engine'), engineSel),
+    h('p',{class:'hint', style:{margin:'0 0 8px'}},'The GM sees this campaign’s live state and relevant canon. State changes are suggested only — you tap Apply. Nothing here writes canon.'),
+    transcript,
+    input,
+    h('div',{class:'toolrow', style:{marginTop:'6px'}}, sendBtn, sceneBtn, status)
+  );
+}
+
+async function campPlaySaveLog(cfg, name, messages){
+  if(!messages || !messages.length) return;
+  await ghUpdate(cfg, campPlayLogPath(name), ()=>campPlayLogText(name, messages), 'Play session log', {create:true});
+}
+async function campPlayLoadLog(cfg, name){
+  try{ const r=await ghGetText(cfg, campPlayLogPath(name)); return r?campPlayParseLog(r.text):[]; }catch(e){ return []; }
+}
+
+registerCampaignTab(['play','▶ Play','Play in-app with the Game Master — your live state and canon come along.'], campPlay, {after:'resume'});
 /* ---------- boot ----------------------------------------------------------- */
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
 // flush the in-memory state to IndexedDB when the app is backgrounded/closed
