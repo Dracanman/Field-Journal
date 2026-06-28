@@ -255,14 +255,14 @@
   .prose .layer{ border-left:3px solid var(--gold-soft); padding-left:14px; margin:8px 0; }
   .prose table{ border-collapse:collapse; margin:8px 0; }
   .prose td{ padding:3px 14px 3px 0; }
-  .prose code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; font-size:.92em; }
+  .prose code{ background:var(--paper-slot); padding:1px 6px; border-radius:4px; font-size:.92em; }
 
   /* ---------- modal ---------- */
   .modal-bg{ position:fixed; inset:0; background:#2e2a2466; display:flex; align-items:center; justify-content:center; padding:18px; z-index:60; }
   .modal{ background:var(--paper); border:1.5px solid var(--gold); border-radius:10px; max-width:620px; width:100%; max-height:88vh; overflow:auto; padding:24px 26px; box-shadow:0 30px 60px -20px #2e2a2480; }
   .modal h2{ font-size:24px; margin-bottom:6px; }
-  .modal textarea{ width:100%; min-height:240px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; border:1px solid var(--gold-soft); border-radius:8px; padding:12px; background:#fffdf7; color:var(--ink-soft); }
-  .toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:var(--ink); color:#faf4e6; padding:11px 20px; border-radius:999px; font-size:15px; z-index:80; box-shadow:0 12px 30px -12px #2e2a24aa; }
+  .modal textarea{ width:100%; min-height:240px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; border:1px solid var(--gold-soft); border-radius:8px; padding:12px; background:var(--paper-card); color:var(--ink-soft); }
+  .toast{ position:fixed; left:50%; bottom:26px; transform:translateX(-50%); background:var(--ink); color:var(--paper); padding:11px 20px; border-radius:999px; font-size:15px; z-index:80; box-shadow:0 12px 30px -12px #2e2a24aa; }
   .toast-undo{ background:none; border:none; color:#e7c989; font:inherit; font-size:15px; margin-left:14px; padding:0; text-decoration:underline; cursor:pointer; }
 
   /* ---------- mode gating (Cozy / Full kit) ---------- */
@@ -287,21 +287,21 @@
   .studio-tabs .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
   .canon-list{ display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:12px; }
   .canon-list .pick small{ text-transform:none; letter-spacing:0; }
-  .canon-doc{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; box-sizing:border-box; overflow-wrap:anywhere; overflow-x:hidden; }
+  .canon-doc{ background:var(--paper-card); border:1px solid var(--gold-soft); border-radius:10px; padding:20px 22px; max-width:820px; margin:0 auto; box-sizing:border-box; overflow-wrap:anywhere; overflow-x:hidden; }
   .canon-doc h2, .canon-doc h4{ overflow-wrap:anywhere; }
   .canon-doc h2{ font-size:24px; margin:14px 0 6px; }
   .canon-doc h3{ font-size:13px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:16px 0 4px; overflow-wrap:anywhere; }
   .canon-doc p, .canon-doc li{ margin:0 0 10px; overflow-wrap:anywhere; }
   /* diagram/structured blocks: a self-contained scrollable box — keeps ASCII aligned and never spills the page (iOS pre-wrap is unreliable for wide lines) */
-  .canon-doc pre{ background:#f0e7d0; border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .canon-doc pre{ background:var(--paper-slot); border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .canon-doc pre.raw{ white-space:pre-wrap; overflow-wrap:anywhere; word-break:break-word; }   /* View raw = prose source: wrap it */
-  .canon-doc code{ background:#f0e7d0; padding:1px 6px; border-radius:4px; overflow-wrap:anywhere; }
+  .canon-doc code{ background:var(--paper-slot); padding:1px 6px; border-radius:4px; overflow-wrap:anywhere; }
   .search-row{ display:flex; gap:10px; margin-bottom:16px; max-width:820px; margin-inline:auto; }
-  .search-row input{ flex:1; min-width:0; border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
-  .search-hit{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; box-sizing:border-box; overflow-wrap:anywhere; }
+  .search-row input{ flex:1; min-width:0; border:1.5px solid var(--gold-soft); border-radius:999px; background:var(--paper-card); padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
+  .search-hit{ background:var(--paper-card); border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; box-sizing:border-box; overflow-wrap:anywhere; }
   .search-hit b{ color:var(--green); } .search-hit .ln{ color:var(--ink-soft); font-size:14px; overflow-wrap:anywhere; word-break:break-word; }
   .board{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
-  .board .col{ background:#faf4e6; border:1px solid var(--gold-soft); border-radius:10px; padding:10px; }
+  .board .col{ background:var(--paper); border:1px solid var(--gold-soft); border-radius:10px; padding:10px; }
   .board .col h4{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; text-align:center; }
   .board .pcard{ background:#fff8; border:1px solid #e6dcc4; border-radius:7px; padding:8px 10px; margin-bottom:7px; font-size:14px; }
   .board .pcard b{ color:var(--ink); display:block; }
@@ -328,17 +328,17 @@
   .canon-graph{display:grid;gap:12px}
   .canon-graph-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1.5px solid var(--gold-soft);border-radius:10px;background:#fff8}
   .canon-graph-summary span{color:var(--hint);font-style:italic}
-  .canon-graph-stage{border:1.5px solid var(--gold-soft);border-radius:12px;background:#fffdf7;overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
-  .canon-graph-svg{display:block;min-width:760px;width:100%;height:auto;background:linear-gradient(180deg,#fffdf7,#f6edd8)}
+  .canon-graph-stage{border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+  .canon-graph-svg{display:block;min-width:760px;width:100%;height:auto;background:linear-gradient(180deg,var(--paper-card),#f6edd8)}
   .canon-graph-edge{stroke-linecap:round;vector-effect:non-scaling-stroke}
   .canon-graph-edge.domain{stroke:#cdbf99;stroke-width:1.2;stroke-dasharray:5 7;opacity:.7}
   .canon-graph-edge.citation{stroke:#5f8c53;stroke-width:2;opacity:.82}
   .canon-graph-domain{fill:var(--gold);font:700 14px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
   .canon-graph-domain-count{fill:var(--hint);font:12px system-ui,sans-serif}
   .canon-graph-node{cursor:pointer;outline:none}
-  .canon-graph-node circle{stroke:#fff8ef;stroke-width:3;filter:drop-shadow(0 2px 2px #2e2a2420)}
+  .canon-graph-node circle{stroke:var(--paper-card);stroke-width:3;filter:drop-shadow(0 2px 2px #2e2a2420)}
   .canon-graph-node:hover circle,.canon-graph-node:focus-visible circle{stroke:#d39d22;stroke-width:4}
-  .canon-graph-node-id{fill:#fffdf7;font:700 11px system-ui,sans-serif;pointer-events:none}
+  .canon-graph-node-id{fill:var(--paper-card);font:700 11px system-ui,sans-serif;pointer-events:none}
   .canon-graph-node-title{fill:var(--ink);font:600 13px system-ui,sans-serif;pointer-events:none}
   .canon-graph-node-meta{fill:var(--hint);font:11px system-ui,sans-serif;pointer-events:none}
   .canon-graph-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;color:var(--hint);font-size:13px}
@@ -354,30 +354,51 @@
   .assistant-head .usage-meter{margin-left:auto}
   .assistant-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:12px;align-items:end}
   .assistant-controls label{display:grid;gap:5px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-  .assistant-controls select,.assistant-question,.assistant-outbound input{border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft)}
+  .assistant-engine-pick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;min-width:0}
+  .assistant-engine-pick select{min-width:0}
+  @media(max-width:680px){.assistant-engine-pick{grid-template-columns:1fr}}
+  .assistant-controls select,.assistant-advanced select,.assistant-advanced input,.assistant-question,.assistant-outbound input{border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft)}
   .assistant-engine-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .assistant-spend{color:var(--hint);font-size:13px}
+  .assistant-advanced{display:grid;grid-template-columns:minmax(140px,1fr) minmax(160px,1.2fr) minmax(110px,.8fr) minmax(130px,.9fr) auto;gap:8px 10px;align-items:end;border:1px dashed var(--gold-soft);border-radius:8px;background:#fff8;padding:8px 10px}
+  .assistant-advanced label{display:grid;gap:4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .assistant-advanced .assistant-check{display:flex;align-items:center;gap:7px}
+  .assistant-check input{width:auto}.assistant-temp-value{margin-left:auto;color:var(--hint);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none}
+  .assistant-advanced input[type=range]{padding:0;align-self:center}
   .assistant-question{width:100%;box-sizing:border-box;resize:vertical;min-height:126px}
   .assistant-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
   .assistant-embed-row{justify-content:space-between;border:1px dashed var(--gold-soft);border-radius:8px;background:#fff8;padding:8px 10px}
   .assistant-embed-status{font-size:13px}
   .assistant-grounding{font-family:ui-monospace,Menlo,Consolas,monospace}
-  .assistant-answer{min-height:86px;border:1px solid var(--gold-soft);border-radius:10px;background:#fffdf7;padding:14px}
+  .assistant-answer{min-height:86px;border:1px solid var(--gold-soft);border-radius:10px;background:var(--paper-card);padding:14px}
   .assistant-answer-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;line-height:1.5;color:var(--ink-soft)}
   .assistant-outbound{display:grid;gap:8px;border-top:1px solid var(--gold-soft);padding-top:10px}
   .assistant-outbound input{min-width:180px}
-  @media(max-width:720px){.assistant-controls{grid-template-columns:1fr}.assistant-engine-actions{justify-content:flex-start}.assistant-head .usage-meter{margin-left:0;width:100%}}
+  @media(max-width:720px){.assistant-controls{grid-template-columns:1fr}.assistant-engine-actions{justify-content:flex-start}.assistant-head .usage-meter{margin-left:0;width:100%}.assistant-advanced{grid-template-columns:1fr}}
+  .query-panel{display:grid;gap:14px;max-width:980px;margin:0 auto}
+  .query-head h2{margin:0 0 4px}
+  .query-controls{display:grid;grid-template-columns:minmax(220px,1fr) minmax(240px,2fr);gap:12px;align-items:end}
+  .query-controls label{display:grid;gap:5px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .query-controls select,.query-search input,.query-sql{border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft);box-sizing:border-box;width:100%}
+  .query-canned{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .query-search{display:grid;grid-template-columns:1fr auto;gap:8px}
+  .query-sql{resize:vertical;min-height:132px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;line-height:1.45}
+  .query-results{border:1px solid var(--gold-soft);border-radius:10px;background:var(--paper-card);padding:12px;overflow:auto;-webkit-overflow-scrolling:touch}
+  .query-table{border-collapse:collapse;min-width:680px;width:100%;font-size:13px}
+  .query-table th,.query-table td{border-bottom:1px solid #e6dcc4;padding:7px 9px;text-align:left;vertical-align:top;overflow-wrap:anywhere}
+  .query-table th{color:var(--gold);font-size:11px;letter-spacing:.08em;text-transform:uppercase;background:#f7eedc}
+  @media(max-width:720px){.query-controls,.query-search{grid-template-columns:1fr}.query-table{min-width:560px}}
   .drafter label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
-  .drafter input, .drafter textarea, .drafter select{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .drafter input, .drafter textarea, .drafter select{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   .drafter textarea{ min-height:64px; resize:vertical; }
   .drafter .idline{ font-family:ui-monospace,monospace; color:var(--green); font-weight:600; }
-  .drafter .preview{ background:#f0e7d0; border-radius:8px; padding:12px 14px; white-space:pre-wrap; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; max-height:320px; overflow:auto; }
+  .drafter .preview{ background:var(--paper-slot); border-radius:8px; padding:12px 14px; white-space:pre-wrap; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; max-height:320px; overflow:auto; }
   /* tags */
   .taginput{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
   .tagchip{ background:#eef0e4; border:1px solid #cdd4b9; border-radius:999px; padding:3px 10px; font-size:13px; color:#4d5a36; display:inline-flex; gap:6px; align-items:center; }
   .tagchip button{ border:none; background:none; color:#8a8268; font-size:14px; padding:0; line-height:1; }
   .filter-row{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:16px; }
-  .filter-row input, .filter-row select{ border:1.5px solid var(--gold-soft); border-radius:999px; background:#fffdf7; padding:7px 14px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .filter-row input, .filter-row select{ border:1.5px solid var(--gold-soft); border-radius:999px; background:var(--paper-card); padding:7px 14px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   .navbtn.mode{ background:#f3ecda; }
   .modeswitch{ display:inline-flex; align-items:center; flex:0 0 auto; border:1.5px solid var(--gold-soft); border-radius:999px; overflow:hidden; }
   .modeswitch .seg{ border:none; background:transparent; padding:7px 14px; font-size:14px; color:var(--hint); }
@@ -404,7 +425,7 @@
 
   /* ---------- github panel ---------- */
   .gh label{ display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
-  .gh input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .gh input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   .gh .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .gh .warn{ font-size:13px; color:#9a7b3a; background:#f6edd6; border-radius:8px; padding:9px 12px; margin-top:14px; }
 
@@ -419,11 +440,11 @@
   .gauge-title{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
   .gauge-title h3{ font-size:25px; }
   .gauge-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:12px; margin-top:14px; }
-  .gauge{ padding:12px; border:1px solid #e7dcc4; border-radius:10px; background:#fffaf0; }
+  .gauge{ padding:12px; border:1px solid #e7dcc4; border-radius:10px; background:var(--paper-card); }
   .gauge-head{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
   .gauge-readout{ display:flex; align-items:center; gap:4px; color:var(--hint); }
   .gauge-number{
-    width:64px; border:1px solid var(--gold-soft); border-radius:7px; background:#fffdf7;
+    width:64px; border:1px solid var(--gold-soft); border-radius:7px; background:var(--paper-card);
     color:var(--ink); font:inherit; padding:4px 6px; text-align:right;
   }
   .gauge-track{ height:9px; overflow:hidden; border-radius:999px; background:var(--paper-slot); border:1px solid #e7dcc4; }
@@ -442,10 +463,10 @@
   .tracker-field label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
   .tracker-field textarea,.tracker-section-editor textarea{
     width:100%; box-sizing:border-box; resize:vertical; border:1px solid var(--gold-soft); border-radius:8px;
-    background:#fffdf7; color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
+    background:var(--paper-card); color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
   }
   .tracker-section-editors{ display:grid; gap:8px; }
-  .tracker-section-editor{ border:1px solid #e7dcc4; border-radius:9px; background:#fffaf0; padding:0 11px 11px; }
+  .tracker-section-editor{ border:1px solid #e7dcc4; border-radius:9px; background:var(--paper-card); padding:0 11px 11px; }
   .tracker-section-editor summary{ cursor:pointer; color:var(--green); font-weight:700; padding:10px 0; touch-action:manipulation; }
   .tracker-section-editor .hint{ margin:0 0 8px; font-size:12px; }
   .tracker-save-status{ min-height:1.35em; margin-top:7px; }
@@ -475,7 +496,7 @@
     background:linear-gradient(var(--gold-soft),rgba(207,177,113,.18));
   }
   .ledger-timeline-entry{
-    position:relative; border:1px solid #e7dcc4; border-radius:12px; background:#fffaf0;
+    position:relative; border:1px solid #e7dcc4; border-radius:12px; background:var(--paper-card);
     box-shadow:0 8px 18px -18px rgba(var(--shadow)/.5); overflow:hidden;
   }
   .ledger-timeline-summary{
@@ -493,7 +514,7 @@
     color:var(--hint); font-size:12px;
   }
   .ledger-timeline-label{
-    border:1px solid var(--gold-soft); border-radius:999px; background:#fffdf7; color:var(--green);
+    border:1px solid var(--gold-soft); border-radius:999px; background:var(--paper-card); color:var(--green);
     padding:2px 8px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
   }
   .ledger-timeline-preview{ color:var(--ink-soft); line-height:1.38; }
@@ -520,7 +541,7 @@
   .cast-card p{ margin:7px 0 0; line-height:1.42; }
   .cast-card-meta{ color:var(--hint); font-size:13px; }
   .cast-status{
-    border:1px solid var(--gold-soft); border-radius:999px; background:#fffdf7; color:var(--green);
+    border:1px solid var(--gold-soft); border-radius:999px; background:var(--paper-card); color:var(--green);
     padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
   }
   .cast-actions{ margin-top:10px; }
@@ -534,7 +555,7 @@
   .cast-field label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
   .cast-field input,.cast-field textarea{
     width:100%; box-sizing:border-box; border:1px solid var(--gold-soft); border-radius:8px;
-    background:#fffdf7; color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
+    background:var(--paper-card); color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
   }
   .cast-field textarea{ resize:vertical; }
   .cast-save-status{ min-height:1.35em; }
@@ -549,22 +570,22 @@
   .scratch-head .hint{ margin:3px 0 0; }
   .scratch-pad{
     width:100%; box-sizing:border-box; min-height:220px; margin-top:12px; resize:vertical;
-    border:1px solid var(--gold-soft); border-radius:12px; background:#fffdf7; color:var(--ink);
+    border:1px solid var(--gold-soft); border-radius:12px; background:var(--paper-card); color:var(--ink);
     font:inherit; line-height:1.48; padding:12px 13px;
   }
   .scratch-send{
-    margin-top:12px; padding:12px; border:1px solid #e7dcc4; border-radius:12px; background:#fffaf0;
+    margin-top:12px; padding:12px; border:1px solid #e7dcc4; border-radius:12px; background:var(--paper-card);
   }
   .scratch-send label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
   .scratch-send input,.scratch-send select{
     width:100%; box-sizing:border-box; border:1px solid var(--gold-soft); border-radius:8px;
-    background:#fffdf7; color:var(--ink); font:inherit; padding:8px 10px;
+    background:var(--paper-card); color:var(--ink); font:inherit; padding:8px 10px;
   }
   .scratch-status{ min-height:1.35em; }
   .scratch-picks{ display:grid; gap:7px; margin-top:8px; }
   .scratch-pick{
     display:flex; gap:8px; align-items:flex-start; border:1px solid #eadfc8; border-radius:9px;
-    background:#fffdf7; padding:8px 9px; color:var(--ink-soft); line-height:1.38;
+    background:var(--paper-card); padding:8px 9px; color:var(--ink-soft); line-height:1.38;
   }
   .scratch-pick input{ width:auto; margin-top:3px; flex:0 0 auto; }
   .scratch-pick span{ white-space:pre-wrap; }
@@ -576,7 +597,7 @@
   .condition-chip{ display:inline-flex; align-items:center; gap:7px; padding:6px 9px 6px 11px; border:1px solid var(--gold-soft); border-radius:999px; background:#fff8; }
   .condition-chip button{ border:0; background:transparent; color:#a85c45; font-size:18px; line-height:1; padding:0; }
   .survival-add{ display:flex; gap:8px; margin-top:10px; }
-  .survival-add input{ flex:1 1 240px; min-width:0; border:1px solid var(--gold-soft); border-radius:8px; background:#fffdf7; color:var(--ink); font:inherit; padding:8px 10px; }
+  .survival-add input{ flex:1 1 240px; min-width:0; border:1px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); color:var(--ink); font:inherit; padding:8px 10px; }
   @media (max-width:620px){
     .gauge-panel{ padding:14px; }
     .gauge-grid{ grid-template-columns:1fr; }
@@ -613,7 +634,7 @@
 .region-readonly b{color:var(--ink)}
 .region-readonly span{color:var(--hint);font-style:italic}
 .region-empty,.region-warning{padding:20px;border:1px dashed var(--gold-soft);border-radius:10px;background:var(--paper-card);text-align:center}
-.region-warning{text-align:left;border-style:solid;background:#fff8ef}
+.region-warning{text-align:left;border-style:solid;background:var(--paper-card)}
 .region-card{padding:18px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
 .region-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .region-card-head h3{font-size:25px}
@@ -622,7 +643,7 @@
 .region-badge.ok{background:#e7efe2;color:#436047;border:1px solid #bfd0b8}
 .region-badge.bad{background:#f8e8e2;color:#8b4b3d;border:1px solid #e1b8aa}
 .region-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px;margin-top:14px}
-.region-stat{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0}
+.region-stat{display:flex;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid #e7dcc4;border-radius:8px;background:var(--paper-card)}
 .region-stat-label{color:var(--hint)}
 .region-stat b{text-align:right;color:var(--ink);font-weight:600}
 .region-layer-list{margin:14px 0 8px}
@@ -644,7 +665,7 @@
 .region-view-toggle{margin-left:auto}
 .region-view-toggle[aria-pressed="false"]{background:#efe5c8;border-color:#cdb25e;color:#5b4720;font-weight:700}
 .region-view-toggle[aria-pressed="true"]{background:#e6edf0;border-color:#adc1ca;color:#365968;font-weight:700}
-.region-map-stage{border:1px solid #e7dcc4;border-radius:10px;background:#fbf7ec;overflow:hidden;touch-action:none}
+.region-map-stage{border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card);overflow:hidden;touch-action:none}
 .region-map-no-layers{padding:38px 18px;text-align:center}
 .region-map-svg{display:block;width:100%;height:min(60vh,460px);background:#f4eedd;cursor:grab}
 .region-map-svg:active{cursor:grabbing}
@@ -652,28 +673,28 @@
 .region-fog{fill:#cabfa4;opacity:.55}
 .region-conn-line{stroke:#5a4a36;stroke-width:.08;stroke-linecap:round;stroke-dasharray:.22 .18;opacity:.85}
 .region-feature-dot{fill:#7a3b2e;stroke:#fff;stroke-width:.05}
-.region-feature-label{fill:#43331f;font-family:system-ui,sans-serif;font-size:.42px;paint-order:stroke;stroke:#fff8ef;stroke-width:.12}
+.region-feature-label{fill:#43331f;font-family:system-ui,sans-serif;font-size:.42px;paint-order:stroke;stroke:var(--paper-card);stroke-width:.12}
 .region-map-item{cursor:pointer;outline:none}
 .region-pin-stem{stroke:#683c30;stroke-width:.12;stroke-linecap:round}
-.region-pin-dot{fill:#b55e45;stroke:#fff8ef;stroke-width:.08}
-.region-marker-dot{fill:#456f83;stroke:#fff8ef;stroke-width:.08}
-.region-map-item-label{fill:#30271d;font-family:system-ui,sans-serif;font-size:.38px;font-weight:700;paint-order:stroke;stroke:#fff8ef;stroke-width:.13}
+.region-pin-dot{fill:#b55e45;stroke:var(--paper-card);stroke-width:.08}
+.region-marker-dot{fill:#456f83;stroke:var(--paper-card);stroke-width:.08}
+.region-map-item-label{fill:#30271d;font-family:system-ui,sans-serif;font-size:.38px;font-weight:700;paint-order:stroke;stroke:var(--paper-card);stroke-width:.13}
 .region-map-item.selected .region-pin-dot,.region-map-item.selected .region-marker-dot{stroke:#d39d22;stroke-width:.14}
 .region-map-svg.is-placing{cursor:crosshair}
 .region-map-empty-text{fill:var(--hint);font-family:system-ui,sans-serif;font-size:.8px}
 .region-map-meta{margin-top:10px}
 .region-conn-list{margin:6px 0 0;padding-left:20px;color:var(--ink)}
-.region-map-text{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:8px;background:#fffaf0;white-space:pre-wrap;font-size:13px;max-height:340px;overflow:auto}
+.region-map-text{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:8px;background:var(--paper-card);white-space:pre-wrap;font-size:13px;max-height:340px;overflow:auto}
 .region-readonly-note{margin:10px 0 0;font-style:italic}
 
 /* ---------- Region Update 3: focused pin + marker editor ---------- */
 .region-edit-wrap{display:grid;gap:10px}
-.region-editor{padding:14px 16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:#fffaf0}
+.region-editor{padding:14px 16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card)}
 .region-editor-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .region-editor-head h3{font-size:20px;margin:0}
 .region-edit-create,.region-edit-inspector{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .region-edit-create label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--gold)}
-.region-edit-create input,.region-edit-create select,.region-edit-inspector input{min-width:0;border:1px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink);font:inherit;padding:8px 10px}
+.region-edit-create input,.region-edit-create select,.region-edit-inspector input{min-width:0;border:1px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);color:var(--ink);font:inherit;padding:8px 10px}
 .region-edit-create input{flex:1 1 180px}
 .region-edit-inspector{margin-top:10px;padding-top:10px;border-top:1px solid #e7dcc4}
 .region-edit-inspector input{flex:1 1 200px}
@@ -687,25 +708,25 @@
 .region-atlas-actions{justify-content:center}
 .region-atlas,.region-opened,.region-forge-stage{padding:16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
 .region-atlas-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
-.region-atlas-card{display:flex;flex-direction:column;gap:7px;align-items:stretch;text-align:left;padding:10px;border:1.5px solid #e7dcc4;border-radius:12px;background:#fffaf0;color:var(--ink);cursor:pointer;font:inherit}
+.region-atlas-card{display:flex;flex-direction:column;gap:7px;align-items:stretch;text-align:left;padding:10px;border:1.5px solid #e7dcc4;border-radius:12px;background:var(--paper-card);color:var(--ink);cursor:pointer;font:inherit}
 .region-atlas-card:hover,.region-atlas-card.selected{border-color:#cdb25e;box-shadow:0 8px 18px -18px rgba(var(--shadow)/.65)}
 .region-atlas-card.invalid{opacity:.75;cursor:not-allowed}
 .region-atlas-title{font-weight:700;font-size:16px}
-.region-atlas-thumb{height:120px;border:1px solid #e7dcc4;border-radius:10px;background:#fbf7ec;overflow:hidden;display:grid;place-items:center;color:var(--hint);font-size:13px}
+.region-atlas-thumb{height:120px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card);overflow:hidden;display:grid;place-items:center;color:var(--hint);font-size:13px}
 .region-atlas-svg{height:120px;min-height:120px;cursor:pointer}
 .region-forge{display:grid;gap:12px}
-.region-forge-stage{background:#fffaf0}
+.region-forge-stage{background:var(--paper-card)}
 .region-forge-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
 .region-forge-field{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:700;color:var(--ink)}
 .region-forge-field span{color:var(--gold);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-.region-forge-field input,.region-forge-field select,.region-forge-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink);font:inherit;padding:8px 10px}
+.region-forge-field input,.region-forge-field select,.region-forge-field textarea{width:100%;box-sizing:border-box;border:1px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);color:var(--ink);font:inherit;padding:8px 10px}
 .region-forge-field textarea{resize:vertical;min-height:82px}
 .region-forge-field small{font-weight:400;letter-spacing:0;text-transform:none}
-.region-forge-detected{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:#fffdf7}
+.region-forge-detected{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 .region-chip{display:inline-flex;align-items:center;border:1px solid #e2d0a8;border-radius:999px;background:#f3ead1;padding:3px 8px;font-size:12px;color:#5b4720}
 .region-forge-warning{margin:10px 0 0;text-align:left}
 .region-forge-seed-actions{align-content:end;align-items:end;margin:0}
-.region-forge-summary{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:#fffdf7}
+.region-forge-summary{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 .region-forge-summary p{margin:6px 0 0}
 .region-forge-accept{align-items:center;justify-content:flex-end}
 @media(max-width:620px){
@@ -726,7 +747,7 @@
 .engine-summary b{color:var(--green)}.engine-summary span{text-align:right;color:var(--ink-soft)}
 .engine-list{display:grid;gap:9px}
 .engine-empty{padding:16px;border:1px dashed var(--gold-soft);border-radius:9px;text-align:center}
-.engine-row{display:flex;align-items:stretch;gap:8px;padding:9px;border:1px solid #e6dcc4;border-radius:10px;background:#fffaf0}
+.engine-row{display:flex;align-items:stretch;gap:8px;padding:9px;border:1px solid #e6dcc4;border-radius:10px;background:var(--paper-card)}
 .engine-row.active{border-color:#aebd94;box-shadow:inset 3px 0 #71835a}
 .engine-select{display:grid;grid-template-columns:1fr auto;gap:2px 12px;align-items:center;flex:1;min-width:0;border:0;background:transparent;color:inherit;font:inherit;text-align:left;padding:4px 6px;cursor:pointer}
 .engine-select:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
@@ -735,11 +756,17 @@
 .engine-active{grid-column:2;grid-row:1 / span 2;align-self:center;border-radius:999px;padding:3px 7px;background:#e6edda;color:#50643e;font-size:10px;font-weight:800;letter-spacing:.08em}
 .engine-actions{display:flex;align-items:center;gap:6px}.engine-actions .navbtn{padding:5px 9px;font-size:12px}.engine-remove{color:#8b4338}
 .engine-add{margin-top:-2px}
-.engine-form{padding:14px;border:1.5px solid var(--gold-soft);border-radius:11px;background:#fffdf7}
+.engine-form{padding:14px;border:1.5px solid var(--gold-soft);border-radius:11px;background:var(--paper-card)}
 .engine-form label{display:block;margin:10px 0 4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
-.engine-form input,.engine-form select{width:100%;box-sizing:border-box;border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink-soft);font:inherit;padding:9px 11px}
+.engine-form input,.engine-form select{width:100%;box-sizing:border-box;border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);color:var(--ink-soft);font:inherit;padding:9px 11px}
+.engine-quick{display:grid;gap:7px;padding:10px 12px;border:1px dashed var(--gold-soft);border-radius:9px;background:#fff8}.engine-quick b{color:var(--green)}.engine-quick p{margin:0}.engine-quick-actions,.engine-model-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.engine-model-tools{margin-top:7px}.engine-model-tools .hint,.engine-quick .hint{font-size:13px}.panel-quick{background:var(--paper-card)}
+.engine-endpoint-tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:7px}.engine-endpoint-tools .hint{font-size:13px}.engine-endpoint-hint{margin:6px 0 0;color:#8b5a2b;font-weight:700}
+.engine-advanced{display:grid;grid-template-columns:minmax(140px,1fr) minmax(160px,1.2fr) minmax(110px,.8fr) minmax(130px,.9fr);gap:8px 10px;align-items:end;margin-top:10px;padding:10px;border:1px dashed var(--gold-soft);border-radius:9px;background:#fff8}
+.engine-advanced .engine-check{display:flex;align-items:center;gap:7px;margin:0;color:var(--gold)}
+.engine-advanced .engine-check input{width:auto}.engine-temp-value{margin-left:auto;color:var(--hint);font-size:12px;font-weight:700;letter-spacing:0;text-transform:none}
+.engine-advanced input[type=range]{padding:0;align-self:center}.engine-advanced .engine-secret-note{grid-column:1 / -1;margin:0}
 .engine-secret-note{margin:10px 0;color:var(--hint);font-size:13px;font-style:italic}
-.usage-meter{border:1px solid var(--gold-soft);border-radius:10px;background:#fffdf7;color:var(--ink-soft)}
+.usage-meter{border:1px solid var(--gold-soft);border-radius:10px;background:var(--paper-card);color:var(--ink-soft)}
 .usage-meter.warn{border-color:#d59b3a;background:#fff8e6;box-shadow:inset 3px 0 #d59b3a}
 .usage-meter summary{cursor:pointer;font-weight:700;padding:10px 12px;overflow-wrap:anywhere}
 .usage-meter.gap summary{color:#8b5a2b}
@@ -747,12 +774,13 @@
 .usage-breakdown-row{display:grid;grid-template-columns:76px repeat(4,1fr);gap:8px;align-items:center;font-size:13px}
 .usage-breakdown-row b{color:var(--green)}
 .usage-budget{display:flex;align-items:center;gap:8px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
-.usage-budget input{max-width:110px;border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink-soft);font:inherit;padding:7px 9px}
+.usage-budget input{max-width:110px;border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);color:var(--ink-soft);font:inherit;padding:7px 9px}
 .usage-warning{margin:0;color:#8b5a2b;font-size:13px;font-weight:700}
 .engine-status,.engine-notice{min-height:1.3em}.engine-form .toolrow{margin-top:10px}
 @media(max-width:620px){
   .engine-summary{align-items:flex-start;flex-direction:column}.engine-summary span{text-align:left}
   .engine-row{flex-direction:column}.engine-actions{justify-content:flex-end}
+  .engine-advanced{grid-template-columns:1fr}
   .usage-breakdown-row{grid-template-columns:1fr 1fr;gap:5px 8px}.usage-breakdown-row b{grid-column:1 / -1}
   .engine-form .toolrow{align-items:stretch;flex-direction:column}.engine-form .toolrow .navbtn{width:100%}
 }
@@ -774,7 +802,7 @@
 .space-tile:hover{transform:translateY(-2px);border-color:var(--gold);box-shadow:0 18px 34px -25px rgba(var(--shadow)/.55)}
 .space-tile:focus-visible{outline:3px solid var(--gold-soft);outline-offset:3px}
 .space-tile.current{border-color:#aebd94;background:#f4f6eb;box-shadow:inset 4px 0 #71835a}
-.space-icon{display:grid;place-items:center;width:54px;height:54px;border:1px solid var(--gold-soft);border-radius:50%;color:var(--green);font-size:27px;background:#fffaf0}
+.space-icon{display:grid;place-items:center;width:54px;height:54px;border:1px solid var(--gold-soft);border-radius:50%;color:var(--green);font-size:27px;background:var(--paper-card)}
 .space-copy{display:flex;min-width:0;flex-direction:column;gap:4px}
 .space-title{color:var(--ink);font-family:'EB Garamond',serif;font-size:27px;font-weight:600}
 .space-subtitle{color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.11em;text-transform:uppercase}
@@ -797,11 +825,11 @@
   .prc-h{ font-size:15px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:22px 0 8px; }
   .prc-sub{ font-size:14px; color:var(--ink); margin:6px 0 4px; }
   .prc-note{ font-size:14px; color:var(--ink-soft); font-style:italic; margin:8px 0; }
-  .prc-card{ background:#fffdf7; border:1px solid var(--gold-soft); border-radius:10px; padding:14px 16px; margin:10px 0; }
+  .prc-card{ background:var(--paper-card); border:1px solid var(--gold-soft); border-radius:10px; padding:14px 16px; margin:10px 0; }
   .prc-card.is-open{ border-color:#b08a3a; background:#fbf3df; }
   .prc-list{ margin:4px 0 8px; padding-left:20px; }
   .prc-list li{ margin:3px 0; }
-  .prc-code{ background:#f0e7d0; border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .prc-code{ background:var(--paper-slot); border-radius:8px; padding:12px 14px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.5; white-space:pre; max-width:100%; overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .prc-answer{ background:#f6efde; border-left:3px solid var(--green); border-radius:6px; padding:8px 12px; margin:8px 0; }
   .prc-answer summary{ cursor:pointer; color:var(--green); font-weight:600; }
 
@@ -813,7 +841,7 @@
   /* fields + outputs */
   .prc-field{ display:block; margin:8px 0; }
   .prc-label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin-bottom:3px; }
-  .prc-input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:8px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
+  .prc-input{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); padding:8px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   textarea.prc-input{ resize:vertical; min-height:42px; }
   textarea.prc-sandbox{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.55; tab-size:2; }
   .prc-block{ margin:10px 0; }
@@ -824,10 +852,10 @@
   .prc-gloss dt{ font-weight:600; color:var(--ink); margin-top:8px; }
   .prc-gloss dd{ margin:0 0 2px; }
 
-  .prc-flash .prc-flashface{ background:#f0e7d0; border-radius:8px; padding:14px 16px; text-align:center; }
+  .prc-flash .prc-flashface{ background:var(--paper-slot); border-radius:8px; padding:14px 16px; text-align:center; }
   .prc-flash .prc-flashface b{ font-size:20px; color:var(--ink); display:block; margin-bottom:6px; }
 
-  .prc-strip{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; background:#f0e7d0; border-radius:10px; padding:10px 14px; font-size:14px; margin-bottom:12px; }
+  .prc-strip{ display:flex; flex-wrap:wrap; gap:14px; justify-content:center; background:var(--paper-slot); border-radius:10px; padding:10px 14px; font-size:14px; margin-bottom:12px; }
 
   .prc-check{ display:flex; gap:10px; align-items:flex-start; padding:5px 0; }
   .prc-check input{ margin-top:4px; }
@@ -846,6 +874,124 @@
     .prc-input{ padding:11px 12px; font-size:16px; }
     .prc-check{ padding:9px 0; }
     .prc-check input{ width:22px; height:22px; margin-top:2px; }
+  }
+  /* ========================================================================
+     Cloud / Aetherial theme — the OVERARCHING look (floating sky, frosted glass,
+     glowing elemental accents). Loaded last so it can both (a) redefine the
+     shared surface tokens and (b) glass-ify chrome that earlier files style.
+
+     The warm parchment "Vael" look is NOT deleted — it is restored, scoped, on
+     any subtree carrying `.theme-vael` (keepsake cards + Field Journal pages).
+     Everything outside `.theme-vael` inherits the cloud palette below.
+     ======================================================================== */
+
+  /* ---- cloud palette: cool aetherial surfaces (was warm parchment) -------- */
+  :root{
+    --paper:#e9f1fb;          /* page / framed surface — cool sky-white       */
+    --paper-card:#f3f8fe;     /* card & input body — luminous cool white      */
+    --paper-slot:#e2ecf8;     /* field / slot fill                            */
+    --ink:#1e2a3a;            /* titles — cool charcoal (legible on light)    */
+    --ink-soft:#33435a;       /* body text                                    */
+    /* gold + green accents are kept: warm filigree + foliage read as the
+       "codex" detailing against the cool sky, and suit the tree-folk theme. */
+
+    /* sky backdrop stops + frosted-glass + glow tokens (new to cloud) */
+    --sky-1:#dfecfb;          /* top, palest                                  */
+    --sky-2:#c6d6f1;          /* middle                                       */
+    --sky-3:#cdc8ec;          /* foot, faint violet — high-altitude aether    */
+    --glass-bg:rgba(255,255,255,.46);
+    --glass-strong:rgba(255,255,255,.64);
+    --glass-border:rgba(255,255,255,.72);
+    --glass-blur:14px;
+    --glow:#7fb0ff;           /* aether cyan-blue glow                        */
+  }
+
+  /* ---- Vael surfaces: restore the printed-kit parchment palette ---------- */
+  .theme-vael{
+    --paper:#faf4e6;
+    --paper-card:#fbf7ec;
+    --paper-slot:#f0e7d0;
+    --ink:#2e2a24;
+    --ink-soft:#4a463b;
+  }
+
+  /* ---- sky backdrop: a fixed gradient with two slow-drifting light blobs -- */
+  body{
+    background:
+      radial-gradient(1200px 620px at 14% -12%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(1000px 720px at 102% 8%, rgba(150,190,255,.28), transparent 55%),
+      linear-gradient(165deg, var(--sky-1), var(--sky-2) 55%, var(--sky-3));
+    background-attachment:fixed;
+    background-size:200% 200%, 200% 200%, 100% 100%;
+    background-repeat:no-repeat;
+    animation:aether-drift 52s ease-in-out infinite alternate;
+    min-height:100dvh;
+  }
+  @keyframes aether-drift{
+    0%{ background-position:0% 0%, 100% 0%, 0 0; }
+    100%{ background-position:28% 22%, 62% 30%, 0 0; }
+  }
+
+  /* ---- reusable frosted-glass + glow utilities --------------------------- */
+  .glass{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.25);
+    backdrop-filter:blur(var(--glass-blur)) saturate(1.25);
+    border:1px solid var(--glass-border);
+  }
+  /* solid fallback where backdrop-filter is unsupported (old webviews) */
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .glass{ background:rgba(255,255,255,.9); }
+  }
+  .glow{ box-shadow:0 10px 34px -16px var(--glow), 0 0 0 1px var(--glass-border); }
+  /* glow tinted by the nearest element accent, falling back to aether cyan */
+  .glow-accent{ box-shadow:0 0 22px -6px var(--accent,var(--glow)); }
+
+  /* ---- chrome: float the shell on the sky -------------------------------- */
+  .topbar{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.3);
+    backdrop-filter:blur(var(--glass-blur)) saturate(1.3);
+    border-bottom:1px solid var(--glass-border);
+    border-radius:0 0 16px 16px;
+  }
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .topbar{ background:rgba(255,255,255,.92); }
+  }
+  .navbtn{ background:var(--glass-bg); }
+  .studio-tabs .tab{ background:var(--glass-bg); }
+
+  /* cards & tiles: lift on the sky, glow softly on hover */
+  .pick:hover, .space-tile:hover{
+    box-shadow:0 16px 34px -18px var(--glow), 0 0 0 1px var(--glass-border);
+  }
+
+  /* the AI answer reads as a pane of sky-glass — pairs with streaming text */
+  .assistant-answer{
+    background:var(--glass-strong);
+    -webkit-backdrop-filter:blur(8px) saturate(1.2);
+    backdrop-filter:blur(8px) saturate(1.2);
+    border-color:var(--glass-border);
+  }
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .assistant-answer{ background:rgba(255,255,255,.9); }
+  }
+
+  /* ---- streaming-text treatment (ready for Slice 2) ---------------------- */
+  .stream-text .chunk{ animation:stream-fade .18s ease both; }
+  .stream-text .cursor{
+    display:inline-block; width:.5ch; margin-left:1px; color:var(--glow);
+    animation:caret-blink 1.05s step-end infinite;
+  }
+  @keyframes stream-fade{ from{ opacity:0; transform:translateY(2px); } to{ opacity:1; transform:none; } }
+  @keyframes caret-blink{ 0%,100%{ opacity:1; } 50%{ opacity:0; } }
+
+  /* ---- respect reduced-motion: hold everything still --------------------- */
+  @media (prefers-reduced-motion:reduce){
+    body{ animation:none; }
+    .stream-text .chunk{ animation:none; }
+    .stream-text .cursor{ animation:none; }
+    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; }
   }
   /* ---------- print ---------- */
   .book-stage{ display:none; }
@@ -2402,6 +2548,7 @@ function viewCardEditor(w, editId){
 // re-open the same page pre-filled, without any router round-trip.
 function buildCardEditor(w, existing, state, seedImage){
   const f = framed(w.title, w.subtitle, w.kit==='field'? 'The Vael Field Journal — go gently, go slow' : "The Worldmaker's Pages — the world is wider because you're in it");
+  f.classList.add('theme-vael');   // Field Journal / Worldmaker pages keep the warm Vael parchment look
   const wrap = h('div',{class:'editor-wrap'});
   const editor = h('div',{class:'editor-col no-print'});
   const cardCol = h('div',{class:'card-col'});
@@ -2543,7 +2690,9 @@ function keepsake(w, state, image, opts){
   const quoteVal = (state[c.quote]||'').trim();
   const subVal = c.sub? (state[c.sub]||'').trim():'';
 
-  const k = h('div',{class:'keepsake'+(opts.flat?'':' tilt'), style:{ '--accent':accent, '--cardbg':cardBg, '--cardframe':cardFrame }});
+  // keepsake cards always wear the warm Vael (parchment) palette, even when the
+  // surrounding app is in the cloud/aetherial theme — they are a "vael-focused thing".
+  const k = h('div',{class:'keepsake theme-vael'+(opts.flat?'':' tilt'), style:{ '--accent':accent, '--cardbg':cardBg, '--cardframe':cardFrame }});
   k.append(h('div',{class:'ribbon', style:{background:accent}}));
   const body = h('div',{class:'body'});
 
@@ -3683,14 +3832,60 @@ const ENGINE_TYPES=[
   'OpenAI API',
   'OpenAI-compatible local endpoint',
   'Other HTTP endpoint',
+  'Private tailnet backend API',
 ];
 const ENGINE_ANTHROPIC_ENDPOINT='https://api.anthropic.com/v1/messages';
+const ENGINE_PRIVATE_BACKEND_TYPE='Private tailnet backend API';
+const ENGINE_CONTEXT_OPTIONS=[4096,8192,16384,32768];
+const ENGINE_TASK_PRESETS=[
+  {label:'Deep lore/logic',model:'mistral-small3.2:24b',temperature:0.35,hint:'Mistral Small 24B - stronger reasoning; on 12 GB VRAM it may partially offload to RAM and run slower.'},
+  {label:'Prose',model:'Gemma3:12b',temperature:0.85,hint:'Gemma 3 12B - warmer prose and rewrite passes.'},
+  {label:'Fast/code',model:'qwen3:14b',temperature:0.3,hint:'Qwen3 14B - fast local reasoning and code-shaped edits.'},
+  {label:'Fast/code',model:'qwen2.5-coder:latest',temperature:0.2,hint:'Qwen2.5-Coder - quick code and structured edits.'},
+];
+const ENGINE_SETUP_PRESETS=[
+  {id:'local-ollama',label:'Use local Ollama',name:'Ollama on this device',type:'OpenAI-compatible local endpoint',endpoint:'http://localhost:11434/v1',key:'',model:'',embeddingModel:'nomic-embed-text',hint:'Best when the app is open on the same computer as Ollama.'},
+  {id:'tailscale-ollama',label:'Use Ollama over Tailscale',name:'Ollama via Tailscale',type:'OpenAI-compatible local endpoint',endpoint:'https://your-pc.your-tailnet.ts.net/v1',key:'',model:'',embeddingModel:'nomic-embed-text',hint:'Use this from phone/iPad or GitHub Pages to avoid mixed-content blocking.'},
+  {id:'private-backend',label:'Use private backend',name:'Private tailnet backend',type:'Private tailnet backend API',endpoint:'https://your-pc.your-tailnet.ts.net',key:'',model:'',embeddingModel:'',hint:'Paste the backend bearer token into Key, then test the connection.'},
+];
 
 function defaultEngineModel(type){
   return type==='Anthropic API'?'claude-opus-4-8':'';
 }
+function engineIsPrivateBackendType(type){
+  return String(type||'')===ENGINE_PRIVATE_BACKEND_TYPE;
+}
 function engineProfileNeedsEndpoint(type){
   return type!=='Anthropic API';
+}
+function engineCanListModels(type){
+  return type==='OpenAI API'||type==='OpenAI-compatible local endpoint'||type==='Other HTTP endpoint';
+}
+function engineSetupPreset(id, base){
+  const preset=ENGINE_SETUP_PRESETS.find(item=>item.id===id)||ENGINE_SETUP_PRESETS[0];
+  const current=base&&typeof base==='object'?base:{};
+  return normalizeEngineProfile(Object.assign({},current,{
+    name:current.name||preset.name,
+    type:preset.type,
+    endpoint:preset.endpoint,
+    key:preset.key,
+    model:preset.model,
+    embeddingModel:preset.embeddingModel,
+  }));
+}
+function engineOptionalNumber(value,min,max,integer){
+  if(value==null||value==='') return '';
+  let n=Number(value);
+  if(!Number.isFinite(n)) return '';
+  if(Number.isFinite(min)&&n<min) n=min;
+  if(Number.isFinite(max)&&n>max) n=max;
+  return integer?Math.floor(n):n;
+}
+function engineMixedContentHint(endpoint,protocol){
+  const scheme=protocol||((typeof location!=='undefined'&&location&&location.protocol)||'');
+  return scheme==='https:'&&/^http:\/\//i.test(String(endpoint||'').trim())
+    ? 'Browsers block http:// endpoints from an https:// page - use an https tailnet URL.'
+    : '';
 }
 function normalizeEngineProfile(profile){
   const p=profile&&typeof profile==='object'?profile:{};
@@ -3704,6 +3899,9 @@ function normalizeEngineProfile(profile){
     key:typeof p.key==='string'?p.key.trim():'',
     model,
     embeddingModel:typeof p.embeddingModel==='string'?p.embeddingModel.trim():'',
+    temperature:engineOptionalNumber(p.temperature,0,1.5,false),
+    topP:engineOptionalNumber(p.topP!=null?p.topP:p.top_p,0,1,false),
+    numCtx:engineOptionalNumber(p.numCtx!=null?p.numCtx:p.num_ctx,1,65536,true),
   };
 }
 function normalizeEngineSettings(value){
@@ -3752,33 +3950,100 @@ function removeEngineProfile(id){
 
 function engineProfileForm(profile,onDone,onCancel){
   const current=normalizeEngineProfile(profile);
+  const modelListId='engine-models-'+(current.id||engineProfileId());
   const nameIn=h('input',{value:current.name,placeholder:'Local M5, Claude, Home server…',maxlength:'80'});
   const typeIn=h('select',null,...ENGINE_TYPES.map(type=>h('option',{value:type},type)));
   typeIn.value=current.type||ENGINE_TYPES[0];
   const endpointIn=h('input',{value:current.endpoint,placeholder:'http://127.0.0.1:8000/v1',spellcheck:'false'});
-  const modelIn=h('input',{value:current.model,placeholder:'qwen3:14b',spellcheck:'false'});
+  const endpointHint=h('p',{class:'engine-endpoint-hint hint',role:'status'});
+  const modelIn=h('input',{value:current.model,placeholder:'qwen3:14b',spellcheck:'false',list:modelListId});
+  const modelList=h('datalist',{id:modelListId});
+  const refreshModelsBtn=h('button',{class:'navbtn',type:'button'},'Refresh models');
   const embeddingModelIn=h('input',{value:current.embeddingModel,placeholder:'nomic-embed-text',spellcheck:'false'});
   const keyIn=h('input',{type:'password',value:current.key,placeholder:'optional for a local endpoint',autocomplete:'off',spellcheck:'false'});
+  const tempUse=h('input',{type:'checkbox'});
+  tempUse.checked=current.temperature!=='';
+  const temperatureIn=h('input',{type:'range',min:'0',max:'1.5',step:'0.05',value:current.temperature===''?'0.70':current.temperature});
+  const temperatureValue=h('span',{class:'engine-temp-value'});
+  const topPIn=h('input',{type:'number',min:'0',max:'1',step:'0.05',value:current.topP,placeholder:'default'});
+  const numCtxIn=h('select',null,
+    h('option',{value:''},'Default'),
+    ...ENGINE_CONTEXT_OPTIONS.map(n=>h('option',{value:String(n)},String(n))));
+  numCtxIn.value=current.numCtx===''?'':String(current.numCtx);
   const status=h('div',{class:'engine-status hint',role:'status'});
   const saveBtn=h('button',{class:'navbtn primary',type:'button'},current.id?'Save changes':'Add engine');
   const testBtn=h('button',{class:'navbtn',type:'button'},'Test connection');
   let lastModelDefault=defaultEngineModel(typeIn.value);
+  function refreshTemperature(){
+    temperatureIn.disabled=!tempUse.checked;
+    temperatureValue.textContent=tempUse.checked?Number(temperatureIn.value).toFixed(2):'default';
+  }
+  function refreshEndpointHint(){
+    endpointHint.textContent=engineMixedContentHint(endpointIn.value);
+  }
+  function setModelChoices(models){
+    const seen={}, choices=(Array.isArray(models)?models:[]).map(m=>String(m||'').trim()).filter(model=>model&&!seen[model]&&(seen[model]=true));
+    modelList.replaceChildren(...choices.map(model=>h('option',{value:model},model)));
+    if(!modelIn.value&&choices[0]) modelIn.value=choices[0];
+  }
   function refreshEngineFields(){
     const needsEndpoint=engineProfileNeedsEndpoint(typeIn.value), nextDefault=defaultEngineModel(typeIn.value);
+    const isPrivateBackend=engineIsPrivateBackendType(typeIn.value);
     endpointIn.disabled=!needsEndpoint;
     endpointIn.title=needsEndpoint?'':'Anthropic uses a fixed endpoint.';
     if(!needsEndpoint) endpointIn.value=ENGINE_ANTHROPIC_ENDPOINT;
     else if(endpointIn.value===ENGINE_ANTHROPIC_ENDPOINT) endpointIn.value='';
-    endpointIn.placeholder=needsEndpoint?'http://127.0.0.1:8000/v1':ENGINE_ANTHROPIC_ENDPOINT;
+    endpointIn.placeholder=isPrivateBackend?'https://your-pc.your-tailnet.ts.net':(needsEndpoint?'http://127.0.0.1:8000/v1':ENGINE_ANTHROPIC_ENDPOINT);
+    keyIn.placeholder=isPrivateBackend?'required private backend bearer token':'optional for a local endpoint';
+    modelIn.disabled=isPrivateBackend;
+    embeddingModelIn.disabled=isPrivateBackend;
+    refreshModelsBtn.disabled=!engineCanListModels(typeIn.value);
     if(!modelIn.value||modelIn.value===lastModelDefault) modelIn.value=nextDefault;
     modelIn.placeholder=nextDefault||'qwen3:14b, gpt-4.1, local model name';
     lastModelDefault=nextDefault;
+    refreshEndpointHint();
   }
   function collect(){
-    return normalizeEngineProfile({id:current.id,name:nameIn.value,type:typeIn.value,endpoint:endpointIn.value,key:keyIn.value,model:modelIn.value,embeddingModel:embeddingModelIn.value});
+    return normalizeEngineProfile({id:current.id,name:nameIn.value,type:typeIn.value,endpoint:endpointIn.value,key:keyIn.value,model:modelIn.value,embeddingModel:embeddingModelIn.value,temperature:tempUse.checked?temperatureIn.value:'',topP:topPIn.value,numCtx:numCtxIn.value});
+  }
+  function applySetupPreset(id){
+    const preset=engineSetupPreset(id,collect()), source=ENGINE_SETUP_PRESETS.find(item=>item.id===id)||ENGINE_SETUP_PRESETS[0];
+    nameIn.value=preset.name;
+    typeIn.value=preset.type;
+    endpointIn.value=preset.endpoint;
+    keyIn.value=preset.key;
+    modelIn.value=preset.model;
+    embeddingModelIn.value=preset.embeddingModel;
+    setModelChoices([]);
+    refreshEngineFields();
+    status.textContent=source.hint;
+    if(engineIsPrivateBackendType(preset.type)) keyIn.focus();
+  }
+  async function refreshModels(){
+    const engine=collect();
+    if(!engineCanListModels(engine.type)){
+      status.textContent='Model refresh is for OpenAI-compatible profiles.';
+      return;
+    }
+    status.textContent='Looking for models on this server...';
+    refreshModelsBtn.disabled=true;
+    try{
+      const models=await aiListModels(engine);
+      setModelChoices(models);
+      status.textContent=models.length?'Found '+models.length+' model'+(models.length===1?'':'s')+'. Pick one in Model, or type another name.':'No models were returned. You can still type a model name manually.';
+    }catch(error){
+      status.textContent='Could not refresh models: '+String(error&&error.message||error);
+    }finally{
+      refreshEngineFields();
+    }
   }
   typeIn.onchange=refreshEngineFields;
+  endpointIn.oninput=refreshEndpointHint;
+  refreshModelsBtn.onclick=refreshModels;
+  tempUse.onchange=refreshTemperature;
+  temperatureIn.oninput=refreshTemperature;
   refreshEngineFields();
+  refreshTemperature();
   saveBtn.onclick=()=>{
     try{
       const saved=saveEngineProfile(collect());
@@ -3790,19 +4055,39 @@ function engineProfileForm(profile,onDone,onCancel){
     status.textContent='Checking connection...';
     testBtn.disabled=true;
     try{
-      await aiTestConnection(engine);
+      if(engineIsPrivateBackendType(engine.type)) await privateApiTestConnection(engine);
+      else await aiTestConnection(engine);
       status.textContent='Reachable and authenticated.';
     }catch(error){ status.textContent='Could not connect: '+String(error&&error.message||error); }
     finally{ testBtn.disabled=false; }
   };
+  const setupButtons=ENGINE_SETUP_PRESETS.map(preset=>{
+    const btn=h('button',{class:'navbtn',type:'button'},preset.label);
+    btn.onclick=()=>applySetupPreset(preset.id);
+    return btn;
+  });
   return h('div',{class:'engine-form'},
+    h('div',{class:'engine-quick'},
+      h('b',null,'Quick setup'),
+      h('p',{class:'hint'},'Add one profile per server. Ollama models are chosen from that server after you refresh.'),
+      h('div',{class:'engine-quick-actions'},...setupButtons)),
     h('label',null,'Name'),nameIn,
     h('label',null,'Type'),typeIn,
-    h('label',null,'Model'),modelIn,
+    h('label',null,'Model'),modelIn,modelList,
+    h('div',{class:'engine-model-tools'},refreshModelsBtn,h('span',{class:'hint'},'Refresh reads the models already pulled on this server.')),
     h('label',null,'Embedding model'),embeddingModelIn,
     h('label',null,'Base URL / endpoint'),endpointIn,
+    h('div',{class:'engine-endpoint-tools'},h('span',{class:'hint'},'Use an https:// MagicDNS tailnet URL for phone/iPad access.')),
+    endpointHint,
     h('label',null,'Key'),keyIn,
-    h('p',{class:'engine-secret-note'},'Endpoint, key, chat model, and embedding model stay on this device. They are excluded from repo sync and backup files.'),
+    h('div',{class:'engine-advanced'},
+      h('label',{class:'engine-check'},tempUse,h('span',null,'Temperature'),temperatureValue),
+      temperatureIn,
+      h('label',null,'Top P'),topPIn,
+      h('label',null,'Context'),numCtxIn,
+      h('p',{class:'engine-secret-note'},'Larger context uses more VRAM. Context uses Ollama native chat only when set.')
+    ),
+    h('p',{class:'engine-secret-note'},'Endpoint, key, chat model, embedding model, sampling, and context stay on this device. They are excluded from repo sync and backup files.'),
     status,
     h('div',{class:'toolrow'},
       saveBtn,
@@ -3812,7 +4097,7 @@ function engineProfileForm(profile,onDone,onCancel){
 
 function engineSettingsPanel(){
   const root=h('div',{class:'engine-settings'});
-  let editing=null, adding=false, notice='';
+  let editing=null, adding=false, notice='', draftProfile=null;
   function draw(){
     const settings=engineSettings(), active=getActiveEngine();
     const list=h('div',{class:'engine-list'});
@@ -3838,13 +4123,22 @@ function engineSettingsPanel(){
     const summary=h('div',{class:'engine-summary'},
       h('b',null,'Active engine'),
       h('span',null,active?active.name+' · '+active.type:'None selected'));
-    const add=h('button',{class:'navbtn primary',type:'button',onclick:()=>{adding=true;editing=null;notice='';draw();}},'Add engine');
+    const add=h('button',{class:'navbtn primary',type:'button',onclick:()=>{adding=true;editing=null;draftProfile=null;notice='';draw();}},'Add engine');
+    const quick=h('div',{class:'engine-quick panel-quick'},
+      h('b',null,'Fast setup'),
+      h('p',{class:'hint'},'Choose a server first. You do not need a separate profile for every Ollama model.'),
+      h('div',{class:'engine-quick-actions'},...ENGINE_SETUP_PRESETS.map(preset=>{
+        const btn=h('button',{class:'navbtn',type:'button'},preset.label);
+        btn.onclick=()=>{draftProfile=engineSetupPreset(preset.id,{});adding=true;editing=null;notice=preset.hint;draw();};
+        return btn;
+      })));
     const editProfile=editing?settings.profiles.find(profile=>profile.id===editing):null;
-    const editor=(adding||editProfile)?engineProfileForm(editProfile||{},()=>{editing=null;adding=false;notice='Saved.';draw();},()=>{editing=null;adding=false;draw();}):null;
+    const editor=(adding||editProfile)?engineProfileForm(editProfile||draftProfile||{},()=>{editing=null;adding=false;draftProfile=null;notice='Saved.';draw();},()=>{editing=null;adding=false;draftProfile=null;draw();}):null;
     root.replaceChildren(
       h('p',{class:'hint'},'Choose which connection in-app AI tools will use. Profiles stay on this device; the test button only checks reachability and authentication.'),
       summary,
       usageMeter(),
+      quick,
       list,
       h('div',{class:'toolrow engine-add'},add),
       editor,
@@ -3890,6 +4184,27 @@ function aiTokenLimit(maxTokens){
   const n=Number(maxTokens);
   return Number.isFinite(n)&&n>0?Math.floor(n):512;
 }
+function aiOptionalNumber(value){
+  if(value==null||value==='') return null;
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
+}
+function aiChatTemperature(chat){
+  return aiOptionalNumber(chat&&chat.temperature);
+}
+function aiChatTopP(chat){
+  return aiOptionalNumber(chat&&(chat.topP!=null?chat.topP:chat.top_p));
+}
+function aiChatNumCtx(chat){
+  const n=aiOptionalNumber(chat&&(chat.numCtx!=null?chat.numCtx:chat.num_ctx));
+  return n&&n>0?Math.floor(n):0;
+}
+function aiAddSampling(body,chat){
+  const temperature=aiChatTemperature(chat), topP=aiChatTopP(chat);
+  if(temperature!==null) body.temperature=temperature;
+  if(topP!==null) body.top_p=topP;
+  return body;
+}
 function aiModelFor(engine,model){
   const chosen=typeof model==='string'&&model.trim()?model.trim():String(engine&&engine.model||'').trim();
   return chosen||defaultEngineModel(String(engine&&engine.type||''));
@@ -3925,6 +4240,7 @@ function aiBuildAnthropicRequest(engine,chat){
     messages:aiNormalizeMessages(chat.messages,false),
   };
   if(chat.system) body.system=String(chat.system);
+  aiAddSampling(body,chat);
   return {
     provider:'anthropic',
     url:ENGINE_ANTHROPIC_ENDPOINT,
@@ -3938,9 +4254,34 @@ function aiBuildOpenAIRequest(engine,chat){
   const messages=aiNormalizeMessages(chat.messages,true);
   if(chat.system) messages.unshift({role:'system',content:String(chat.system)});
   const body={model,messages,max_tokens:aiTokenLimit(chat.maxTokens)};
+  aiAddSampling(body,chat);
   return {
     provider:'openai',
     url:aiJoinUrl(engine&&engine.endpoint,'chat/completions'),
+    model,
+    opts:{method:'POST',headers:aiHeaders(engine,true),body:JSON.stringify(body)},
+  };
+}
+function aiOllamaNativeEndpoint(endpoint){
+  const base=aiCleanEndpoint(endpoint).replace(/\/v1$/i,'');
+  return base+'/api/chat';
+}
+function aiShouldUseOllamaNative(engine,chat){
+  return String(engine&&engine.type||'')==='OpenAI-compatible local endpoint'&&aiChatNumCtx(chat)>0;
+}
+function aiBuildOllamaNativeChatRequest(engine,chat){
+  chat=chat||{};
+  const model=aiModelFor(engine,chat.model);
+  const messages=aiNormalizeMessages(chat.messages,true);
+  if(chat.system) messages.unshift({role:'system',content:String(chat.system)});
+  const options={num_ctx:aiChatNumCtx(chat)};
+  const temperature=aiChatTemperature(chat), topP=aiChatTopP(chat);
+  if(temperature!==null) options.temperature=temperature;
+  if(topP!==null) options.top_p=topP;
+  const body={model,messages,stream:false,options};
+  return {
+    provider:'ollama',
+    url:aiOllamaNativeEndpoint(engine&&engine.endpoint),
     model,
     opts:{method:'POST',headers:aiHeaders(engine,true),body:JSON.stringify(body)},
   };
@@ -3974,6 +4315,7 @@ function aiBuildOpenAIEmbeddingRequest(engine,request){
   };
 }
 function aiBuildRequest(engine,chat){
+  if(aiShouldUseOllamaNative(engine,chat||{})) return aiBuildOllamaNativeChatRequest(engine,chat||{});
   return aiProvider(engine)==='anthropic'?aiBuildAnthropicRequest(engine,chat):aiBuildOpenAIRequest(engine,chat);
 }
 function aiNumber(value){
@@ -3999,7 +4341,17 @@ function aiNormalizeOpenAIUsage(usage){
     cacheWrite:0,
   };
 }
+function aiNormalizeOllamaUsage(raw){
+  raw=raw&&typeof raw==='object'?raw:{};
+  return {
+    inputTokens:aiNumber(raw.prompt_eval_count),
+    outputTokens:aiNumber(raw.eval_count),
+    cacheRead:0,
+    cacheWrite:0,
+  };
+}
 function aiNormalizeUsage(provider,usage){
+  if(provider==='ollama') return aiNormalizeOllamaUsage(usage);
   return provider==='anthropic'?aiNormalizeAnthropicUsage(usage):aiNormalizeOpenAIUsage(usage);
 }
 function aiParseAnthropicResponse(raw,fallbackModel){
@@ -4013,7 +4365,13 @@ function aiParseOpenAIResponse(raw,fallbackModel){
   const first=choices[0]&&choices[0].message?choices[0].message:{};
   return {text:String(first.content||''),model:String(raw.model||fallbackModel||''),usage:aiNormalizeOpenAIUsage(raw.usage),raw};
 }
+function aiParseOllamaChatResponse(raw,fallbackModel){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const message=raw.message&&typeof raw.message==='object'?raw.message:{};
+  return {text:String(message.content||''),model:String(raw.model||fallbackModel||''),usage:aiNormalizeOllamaUsage(raw),raw};
+}
 function aiParseResponse(provider,raw,fallbackModel){
+  if(provider==='ollama') return aiParseOllamaChatResponse(raw,fallbackModel);
   return provider==='anthropic'?aiParseAnthropicResponse(raw,fallbackModel):aiParseOpenAIResponse(raw,fallbackModel);
 }
 function aiEmbeddingVector(value){
@@ -4070,12 +4428,111 @@ async function aiSend(engine,chat){
   if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
   return result;
 }
+// ---- streaming -----------------------------------------------------------
+// Same request as aiSend, but with stream:true so the answer arrives in pieces.
+// Each text fragment is handed to onChunk(piece, {text, model}); the resolved
+// result matches aiSend's shape ({text, model, usage}). Usage still records.
+function aiStreamRequestOpts(request){
+  let body=request.opts.body;
+  try{
+    const parsed=JSON.parse(body||'{}');
+    parsed.stream=true;
+    if(request.provider==='openai') parsed.stream_options={include_usage:true};   // ask Ollama/OpenAI for a final usage chunk
+    body=JSON.stringify(parsed);
+  }catch(e){}
+  return Object.assign({},request.opts,{body});
+}
+function aiMergeUsage(a,b){
+  a=a||{}; b=b||{};
+  return {
+    inputTokens:Math.max(aiNumber(a.inputTokens),aiNumber(b.inputTokens)),
+    outputTokens:Math.max(aiNumber(a.outputTokens),aiNumber(b.outputTokens)),
+    cacheRead:Math.max(aiNumber(a.cacheRead),aiNumber(b.cacheRead)),
+    cacheWrite:Math.max(aiNumber(a.cacheWrite),aiNumber(b.cacheWrite)),
+  };
+}
+// One decoded SSE data object -> {text?, usage?, model?}. Anthropic emits typed
+// events (content_block_delta/message_start/message_delta); OpenAI/Ollama emit
+// choice deltas with an optional trailing usage-only chunk.
+function aiStreamPiece(provider, json){
+  json=json&&typeof json==='object'?json:{};
+  if(provider==='anthropic'){
+    const type=String(json.type||'');
+    if(type==='content_block_delta'){ const d=json.delta||{}; return typeof d.text==='string'?{text:d.text}:{}; }
+    if(type==='message_start'&&json.message&&json.message.usage) return {usage:aiNormalizeAnthropicUsage(json.message.usage),model:String(json.message.model||'')};
+    if(type==='message_delta'&&json.usage) return {usage:aiNormalizeAnthropicUsage(json.usage)};
+    return {};
+  }
+  if(provider==='ollama'){
+    const message=json.message&&typeof json.message==='object'?json.message:{};
+    const out={};
+    if(typeof message.content==='string'&&message.content) out.text=message.content;
+    if(json.model) out.model=String(json.model);
+    if(json.done||json.prompt_eval_count||json.eval_count) out.usage=aiNormalizeOllamaUsage(json);
+    return out;
+  }
+  const choices=Array.isArray(json.choices)?json.choices:[];
+  const delta=choices[0]&&choices[0].delta?choices[0].delta:{};
+  const out={};
+  if(typeof delta.content==='string'&&delta.content) out.text=delta.content;
+  if(json.usage) out.usage=aiNormalizeOpenAIUsage(json.usage);
+  if(json.model) out.model=String(json.model);
+  return out;
+}
+async function aiStream(engine,chat,onChunk){
+  const request=aiBuildRequest(engine,chat||{});
+  const secret=engine&&engine.key;
+  const r=await aiFetch(request.url,aiStreamRequestOpts(request),{provider:request.provider,secret},1);
+  if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
+  // graceful fallback: a server (or test stub) that answered without a readable
+  // body is treated as a single non-streamed chunk.
+  if(!r.body||typeof r.body.getReader!=='function'){
+    const result=aiParseResponse(request.provider,await r.json(),request.model);
+    if(typeof onChunk==='function'&&result.text) onChunk(result.text,{text:result.text,model:result.model});
+    if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+    return result;
+  }
+  const reader=r.body.getReader(), decoder=new TextDecoder();
+  let buffer='',text='',model=request.model,usage={inputTokens:0,outputTokens:0,cacheRead:0,cacheWrite:0},done=false;
+  while(!done){
+    const step=await reader.read();
+    if(step.done) break;
+    buffer+=decoder.decode(step.value,{stream:true});
+    let nl;
+    while((nl=buffer.indexOf('\n'))>=0){
+      const line=buffer.slice(0,nl).trim(); buffer=buffer.slice(nl+1);
+      if(!line||line[0]===':'||line.indexOf('event:')===0) continue;
+      const data=line.indexOf('data:')===0?line.slice(5).trim():line;
+      if(data==='[DONE]'){ done=true; break; }
+      let json; try{ json=JSON.parse(data); }catch(e){ continue; }
+      const piece=aiStreamPiece(request.provider,json);
+      if(piece.model) model=piece.model;
+      if(piece.usage) usage=aiMergeUsage(usage,piece.usage);
+      if(piece.text){ text+=piece.text; if(typeof onChunk==='function') onChunk(piece.text,{text,model}); }
+    }
+  }
+  const result={text,model,usage,raw:null};
+  if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+  return result;
+}
 async function aiEmbed(engine,request){
   const built=aiBuildOpenAIEmbeddingRequest(engine,request||{});
   const secret=engine&&engine.key;
   const r=await aiFetch(built.url,built.opts,{provider:built.provider,secret},1);
   if(!r.ok) throw aiErr(r.status,built.url,built.provider,await r.text().catch(()=>''),secret);
   return aiParseEmbeddingResponse(await r.json(),built.model);
+}
+// List model ids an OpenAI-compatible endpoint (Ollama/LM Studio) advertises.
+// Anthropic has no equivalent here, so it returns [].
+async function aiListModels(engine){
+  if(aiProvider(engine)!=='openai') return [];
+  const request=aiBuildOpenAIModelsRequest(engine);
+  const secret=engine&&engine.key;
+  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},1);
+  if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
+  let raw=null; try{ raw=await r.json(); }catch(e){}
+  const data=raw&&Array.isArray(raw.data)?raw.data:[];
+  return data.map(m=>String(m&&m.id||'').trim()).filter(Boolean);
 }
 async function aiTestConnection(engine){
   const provider=aiProvider(engine);
@@ -4859,6 +5316,7 @@ const STUDIO_TABS=[
   ['drafter','Draft a card','Turn an idea into a Canon Card (Draft) — it lands in the queue with its own reserved ID.'],
   ['browse','Look up','Read and search your promoted canon. Reference only — nothing here changes canon.'],
   ['assistant','Assistant','Ask a local-first AI helper grounded only in promoted canon. Suggestions stay Draft or campaign-only until you choose.'],
+  ['query','Query','Ask your private tailnet backend for read-only SQL and vector search results.'],
   ['graph','Canon graph','See promoted canon as a read-only web: foundation entries, promoted cards, domains, and cross-references.'],
 ];
 function viewStudio(tab, params){
@@ -4882,6 +5340,7 @@ function viewStudio(tab, params){
   else if(tab==='inbox') studioInbox(host);
   else if(tab==='drafter') studioDrafter(host, params&&params.prefill);
   else if(tab==='assistant') studioAssistant(host);
+  else if(tab==='query') studioQuery(host);
   else if(tab==='graph') studioGraph(host);
   else if(tab==='board') studioBoard(host);
   return f;
@@ -5554,6 +6013,297 @@ async function canonGroundingForQuestion(cfg, engine, question, opts){
   if(!entries) entries=canonRetrieve(question,corpus,opts);
   return Object.assign(canonGrounding(question,entries,opts),{embeddingStatus,warning});
 }
+/* ========================================================================== *
+   PRIVATE BACKEND QUERY CLIENT
+
+   Thin, token-protected calls to Del's self-hosted tailnet service. This path is
+   read-only from the PWA's point of view: SQL is SELECT-only, search is retrieval,
+   and canon writes remain impossible here.
+ * ========================================================================== */
+
+const PRIVATE_QUERY_CANNED=[
+  {
+    label:'Vael folk bonded to Water',
+    sql:"SELECT id, title, domain, file FROM canon WHERE body ILIKE '%Vael%' AND body ILIKE '%Water%' ORDER BY id LIMIT 50",
+  },
+  {
+    label:'Canon citing COS-001',
+    sql:"SELECT id, title, domain, file FROM canon WHERE body ILIKE '%COS-001%' ORDER BY id LIMIT 50",
+  },
+  {
+    label:'Recent campaign ledger',
+    sql:'SELECT id, date, label, status, body FROM campaign_ledger ORDER BY date DESC, id DESC LIMIT 25',
+  },
+];
+
+const privateApiSleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function privateApiEndpoint(endpoint){
+  return String(endpoint||'').trim().replace(/\/+$/,'');
+}
+
+function privateApiSafeEndpoint(endpoint){
+  return String(endpoint||'private backend').trim().split('?')[0].replace(/\/\/([^/@:]+):([^/@]+)@/,'//[redacted]@').replace(/\/+$/,'')||'private backend';
+}
+
+function privateApiJoinUrl(endpoint,path){
+  const base=privateApiEndpoint(endpoint);
+  return base+'/'+String(path||'').replace(/^\/+/,'');
+}
+
+function privateApiHeaderText(value){
+  return String(value||'').trim();
+}
+
+function privateApiHeaders(profile, withJson){
+  const headers=withJson?{'content-type':'application/json'}:{};
+  const key=privateApiHeaderText(profile&&profile.key);
+  if(key) headers.Authorization='Bearer '+key;
+  return headers;
+}
+
+function privateApiSafeErrorText(body, secret){
+  let text=String(body||'').replace(/\s+/g,' ').trim();
+  const key=String(secret||'');
+  if(key) text=text.split(key).join('[redacted]');
+  text=text.replace(/Bearer\s+[^\s"']+/gi,'Bearer [redacted]');
+  text=text.replace(/\bsk-[A-Za-z0-9_-]+/g,'[redacted]');
+  return text.slice(0,140);
+}
+
+function privateApiErr(status, endpoint, body, secret){
+  const safeEndpoint=privateApiSafeEndpoint(endpoint);
+  const message=(status===401||status===403)?'Private backend key rejected - check this device bearer token.'
+    : status===404?'Private backend endpoint not found at '+safeEndpoint+'.'
+    : status===0?'Private backend could not be reached at '+safeEndpoint+' - make sure this device is on Tailscale and the HTTPS tailnet URL is being served.'
+    : status>=500?'Private backend server error - check the service on your PC.'
+    : status?('Private backend error '+status):'Private backend could not be reached at '+safeEndpoint+'.';
+  const detail=privateApiSafeErrorText(body,secret);
+  const e=new Error(message+(detail?' '+detail:''));
+  e.status=status||0; e.endpoint=safeEndpoint; e.provider='private-backend';
+  return e;
+}
+
+async function privateApiFetch(url, opts, meta, tries){
+  meta=meta||{}; tries=tries||1; let last;
+  for(let i=0;i<tries;i++){
+    if(i) await privateApiSleep(350*Math.pow(2,i-1)+Math.floor(Math.random()*150));
+    let r; try{ r=await fetch(url,opts); }catch(e){ last=privateApiErr(0,url,'',meta.secret); continue; }
+    if(r.status===429||r.status>=500){ last=privateApiErr(r.status,url,'',meta.secret); continue; }
+    return r;
+  }
+  throw last||privateApiErr(0,url,'',meta&&meta.secret);
+}
+
+function privateSqlLooksReadOnly(sql){
+  const cleaned=String(sql||'').replace(/--.*$/mg,'').replace(/\/\*[\s\S]*?\*\//g,'').trim();
+  if(!/^(select|with)\b/i.test(cleaned)) return false;
+  if(/;\s*\S/.test(cleaned)) return false;
+  return !/\b(insert|update|delete|drop|alter|create|truncate|grant|revoke|copy|call|do|merge|vacuum|analyze|refresh|comment)\b/i.test(cleaned);
+}
+
+function privateApiBuildQueryRequest(profile, sql, params){
+  const body={sql:String(sql||''),params:Array.isArray(params)||params&&typeof params==='object'?params:[]};
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'query'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
+  };
+}
+
+function privateApiBuildSearchRequest(profile, query, opts){
+  opts=opts||{};
+  const body={q:String(query||''),limit:opts.limit||8};
+  if(Array.isArray(opts.embedding)) body.embedding=opts.embedding;
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'search'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
+  };
+}
+
+function privateApiBuildEmbedRequest(profile, input, opts){
+  opts=opts||{};
+  const body={input:Array.isArray(input)?input.map(String):String(input||'')};
+  if(opts.model) body.model=String(opts.model);
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'embed'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
+  };
+}
+
+function privateApiBuildHealthRequest(profile){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'health'),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+
+function privateApiRows(raw){
+  raw=raw&&typeof raw==='object'?raw:{};
+  return Array.isArray(raw.rows)?raw.rows:(Array.isArray(raw.items)?raw.items:[]);
+}
+
+async function privateApiJson(profile, request){
+  const secret=profile&&profile.key;
+  const r=await privateApiFetch(request.url,request.opts,{secret},1);
+  if(!r.ok) throw privateApiErr(r.status,request.url,await r.text().catch(()=>''),secret);
+  return r.json();
+}
+
+async function privateApiQuery(profile, sql, params){
+  if(!profile||!engineIsPrivateBackendType(profile.type)) throw new Error('Choose a private tailnet backend profile first.');
+  if(!privateSqlLooksReadOnly(sql)) throw new Error('Only read-only SELECT queries are allowed.');
+  const raw=await privateApiJson(profile,privateApiBuildQueryRequest(profile,sql,params));
+  return {rows:privateApiRows(raw),raw};
+}
+
+async function privateApiSearch(profile, query, opts){
+  if(!profile||!engineIsPrivateBackendType(profile.type)) throw new Error('Choose a private tailnet backend profile first.');
+  const raw=await privateApiJson(profile,privateApiBuildSearchRequest(profile,query,opts));
+  return {items:privateApiRows(raw),raw};
+}
+
+async function privateApiEmbed(profile, input, opts){
+  if(!profile||!engineIsPrivateBackendType(profile.type)) throw new Error('Choose a private tailnet backend profile first.');
+  return privateApiJson(profile,privateApiBuildEmbedRequest(profile,input,opts));
+}
+
+async function privateApiTestConnection(profile){
+  if(!profile||!engineIsPrivateBackendType(profile.type)) throw new Error('Choose a private tailnet backend profile first.');
+  const raw=await privateApiJson(profile,privateApiBuildHealthRequest(profile));
+  return {ok:true,raw};
+}
+
+function privateBackendProfiles(){
+  const settings=engineSettings();
+  return (Array.isArray(settings.profiles)?settings.profiles:[]).filter(profile=>engineIsPrivateBackendType(profile.type));
+}
+
+function privateActiveBackendProfile(){
+  const settings=engineSettings(), profiles=privateBackendProfiles();
+  return profiles.find(profile=>profile.id===settings.activeId)||profiles[0]||null;
+}
+
+async function privateSqlQuery(sql, params, opts){
+  opts=opts||{};
+  return privateApiQuery(opts.profile||privateActiveBackendProfile(),sql,params);
+}
+
+async function privateSqlSearch(query, opts){
+  opts=opts||{};
+  return privateApiSearch(opts.profile||privateActiveBackendProfile(),query,opts);
+}
+
+async function privateSqlEmbed(input, opts){
+  opts=opts||{};
+  return privateApiEmbed(opts.profile||privateActiveBackendProfile(),input,opts);
+}
+
+function privateRenderRows(host, rows){
+  rows=Array.isArray(rows)?rows:[];
+  if(!rows.length){
+    host.replaceChildren(h('p',{class:'hint'},'No rows returned.'));
+    return;
+  }
+  const columns=Array.from(new Set(rows.slice(0,25).flatMap(row=>Object.keys(row&&typeof row==='object'?row:{})))).slice(0,8);
+  const table=h('table',{class:'query-table'},
+    h('thead',null,h('tr',null,...columns.map(col=>h('th',null,col)))),
+    h('tbody',null,...rows.slice(0,100).map(row=>h('tr',null,...columns.map(col=>h('td',null,String(row&&row[col]!=null?row[col]:'')))))));
+  host.replaceChildren(table,rows.length>100?h('p',{class:'hint'},'Showing first 100 rows.'):null);
+}
+
+function studioQuery(host){
+  const profiles=privateBackendProfiles();
+  if(!profiles.length){
+    const settingsBtn=h('button',{class:'primary',type:'button'},'Open Engine settings');
+    settingsBtn.onclick=()=>openEngineSettings();
+    host.replaceChildren(h('div',{class:'panel query-panel'},
+      h('h2',null,'Query'),
+      h('p',{class:'hint'},'Add a Private tailnet backend API profile first. This view is read-only and never writes canon.'),
+      settingsBtn
+    ));
+    return;
+  }
+  const profileSel=h('select',null,...profiles.map(profile=>h('option',{value:profile.id},(profile.name||profile.type)+' - '+privateApiSafeEndpoint(profile.endpoint))));
+  const active=privateActiveBackendProfile();
+  if(active) profileSel.value=active.id;
+  const rawSql=h('textarea',{class:'query-sql',rows:'7',spellcheck:'false',value:PRIVATE_QUERY_CANNED[0].sql});
+  const runBtn=h('button',{class:'primary',type:'button'},'Run SELECT');
+  const searchBox=h('input',{placeholder:'Search canon and app exports...',spellcheck:'false'});
+  const searchBtn=h('button',{class:'secondary',type:'button'},'Search');
+  const status=h('div',{class:'sync-status',role:'status'});
+  const results=h('div',{class:'query-results'},h('p',{class:'hint'},'Run a canned query, a read-only SELECT, or a vector/keyword search.'));
+
+  function selectedProfile(){
+    return profiles.find(profile=>profile.id===profileSel.value)||profiles[0];
+  }
+  PRIVATE_QUERY_CANNED.forEach(item=>{
+    const btn=h('button',{class:'navbtn',type:'button'},item.label);
+    btn.onclick=()=>{ rawSql.value=item.sql; };
+    item.button=btn;
+  });
+  async function runQuery(){
+    const sql=rawSql.value.trim();
+    if(!privateSqlLooksReadOnly(sql)){
+      status.textContent='Only read-only SELECT queries are allowed.';
+      return;
+    }
+    status.textContent='Querying private tailnet backend...';
+    runBtn.disabled=true;
+    try{
+      const result=await privateApiQuery(selectedProfile(),sql,[]);
+      status.textContent='Returned '+result.rows.length+' row'+(result.rows.length===1?'':'s')+'.';
+      privateRenderRows(results,result.rows);
+    }catch(e){
+      status.textContent=e&&e.message?e.message:String(e);
+    }finally{
+      runBtn.disabled=false;
+    }
+  }
+  async function runSearch(){
+    const q=searchBox.value.trim();
+    if(!q){
+      status.textContent='Enter a search question first.';
+      return;
+    }
+    status.textContent='Searching private tailnet backend...';
+    searchBtn.disabled=true;
+    try{
+      const result=await privateApiSearch(selectedProfile(),q,{limit:12});
+      status.textContent='Returned '+result.items.length+' result'+(result.items.length===1?'':'s')+'.';
+      privateRenderRows(results,result.items);
+    }catch(e){
+      status.textContent=e&&e.message?e.message:String(e);
+    }finally{
+      searchBtn.disabled=false;
+    }
+  }
+  runBtn.onclick=runQuery;
+  searchBtn.onclick=runSearch;
+  searchBox.onkeydown=e=>{ if(e.key==='Enter') runSearch(); };
+
+  host.replaceChildren(h('div',{class:'panel query-panel'},
+    h('div',{class:'query-head'},
+      h('div',null,
+        h('h2',null,'Query'),
+        h('p',{class:'hint'},'Private SQL and vector search over your local service. Read-only; canon remains governed Markdown.')
+      )
+    ),
+    h('div',{class:'query-controls'},
+      h('label',null,'Backend',profileSel),
+      h('div',{class:'query-canned'},...PRIVATE_QUERY_CANNED.map(item=>item.button))
+    ),
+    h('div',{class:'query-search'},searchBox,searchBtn),
+    rawSql,
+    h('div',{class:'assistant-actions'},runBtn,status),
+    results
+  ));
+}
+
+if(typeof window!=='undefined'){
+  window.__sqlQuery=privateSqlQuery;
+  window.__sqlQuery.search=privateSqlSearch;
+  window.__sqlQuery.embed=privateSqlEmbed;
+}
 const ASSISTANT_MAX_TOKENS=900;
 
 function assistantClampText(text, max){
@@ -5574,17 +6324,69 @@ function assistantNormalizeGrounding(value){
   return {system:String(value.system||''),ids,entries,embeddingStatus:String(value.embeddingStatus||''),warning:String(value.warning||'')};
 }
 
+function assistantPrivateResultEntry(row, index){
+  row=row&&typeof row==='object'?row:{};
+  const id=String(row.id||row.canon_id||row.ref||'private-'+(index+1)).trim();
+  const title=String(row.title||row.label||row.name||id).trim();
+  const body=String(row.body||row.text||row.summary||JSON.stringify(row)).trim();
+  return {
+    id,
+    corpusId:id,
+    title,
+    domain:String(row.domain||row.source||'Private backend').trim(),
+    file:String(row.file||row.path||'private backend').trim(),
+    body
+  };
+}
+
+async function assistantPrivateBackendGrounding(question){
+  const api=typeof window!=='undefined'&&window.__sqlQuery?window.__sqlQuery:null;
+  if(!api||typeof api.search!=='function') return null;
+  try{
+    const result=await api.search(question,{limit:3});
+    const rows=Array.isArray(result&&result.items)?result.items:[];
+    const entries=rows.map(assistantPrivateResultEntry).filter(entry=>entry.body||entry.title);
+    if(!entries.length) return null;
+    return {
+      system:[
+        'READ-ONLY PRIVATE BACKEND RESULTS:',
+        'These rows came from the private tailnet service. Use them as retrieval context only; do not treat app exports as promoted canon.',
+        canonGroundingText(entries,1200)
+      ].join('\n\n'),
+      ids:canonGroundingIds(entries),
+      entries,
+      warning:''
+    };
+  }catch(e){
+    return {system:'',ids:[],entries:[],warning:'Private backend search unavailable: '+String(e&&e.message||e)};
+  }
+}
+
+function assistantMergeGrounding(base, extra){
+  base=assistantNormalizeGrounding(base);
+  if(!extra) return base;
+  extra=assistantNormalizeGrounding(extra);
+  if(extra.system) base.system=[base.system,extra.system].filter(Boolean).join('\n\n');
+  base.entries=base.entries.concat(extra.entries);
+  base.ids=Array.from(new Set(base.ids.concat(extra.ids).filter(Boolean)));
+  base.warning=[base.warning,extra.warning].filter(Boolean).join(' ');
+  return base;
+}
+
 async function assistantCanonGrounding(question, engine, opts){
   const cfg=ghCfg();
   const hook=typeof window!=='undefined'&&window.__canonRag?window.__canonRag:null;
   opts=opts||{};
-  if(hook&&typeof hook.canonGroundingForQuestion==='function') return assistantNormalizeGrounding(await hook.canonGroundingForQuestion(cfg,engine,question,opts));
-  if(hook&&typeof hook.loadCanonCorpus==='function'&&typeof hook.canonRetrieve==='function'&&typeof hook.canonGrounding==='function'){
+  let grounding;
+  if(hook&&typeof hook.canonGroundingForQuestion==='function') grounding=assistantNormalizeGrounding(await hook.canonGroundingForQuestion(cfg,engine,question,opts));
+  else if(hook&&typeof hook.loadCanonCorpus==='function'&&typeof hook.canonRetrieve==='function'&&typeof hook.canonGrounding==='function'){
     const corpus=await hook.loadCanonCorpus(cfg);
     const entries=hook.canonRetrieve(question,corpus);
-    return assistantNormalizeGrounding(hook.canonGrounding(question,entries));
+    grounding=assistantNormalizeGrounding(hook.canonGrounding(question,entries));
+  }else{
+    grounding=assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
   }
-  return assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
+  return assistantMergeGrounding(grounding,await assistantPrivateBackendGrounding(question));
 }
 
 async function assistantRebuildEmbeddingIndex(engine, onStatus){
@@ -5601,7 +6403,7 @@ function assistantIsLocalEngine(engine){
 
 function assistantEngineProfiles(){
   const settings=engineSettings();
-  return Array.isArray(settings.profiles)?settings.profiles.slice():[];
+  return (Array.isArray(settings.profiles)?settings.profiles.slice():[]).filter(profile=>!engineIsPrivateBackendType(profile.type));
 }
 
 function assistantDefaultEngine(profiles){
@@ -5628,6 +6430,65 @@ async function assistantCallAi(engine, chat){
   const result=hook?await hook(engine,chat):await aiSend(engine,chat);
   if(hook&&typeof recordAiUsage==='function') recordAiUsage(engine,result);
   return result;
+}
+
+// Streaming variant: pieces flow to onChunk; resolves to the same result shape.
+// aiStream records usage itself, so only the test hook needs the explicit record.
+async function assistantStreamAi(engine, chat, onChunk){
+  const win=typeof window!=='undefined'?window:null;
+  const streamHook=win&&typeof win.__assistantAiStream==='function'?win.__assistantAiStream:null;
+  if(streamHook){
+    const result=await streamHook(engine,chat,onChunk);
+    if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+    return result;
+  }
+  // a non-streaming send hook (tests / older path) still drives the UI: emit the
+  // whole answer as one chunk.
+  const sendHook=win&&typeof win.__assistantAiSend==='function'?win.__assistantAiSend:null;
+  if(sendHook){
+    const result=await sendHook(engine,chat);
+    if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+    if(typeof onChunk==='function'&&result&&result.text) onChunk(result.text,{text:result.text,model:result.model});
+    return result;
+  }
+  if(typeof aiStream==='function') return aiStream(engine,chat,onChunk);   // real streaming
+  const result=await aiSend(engine,chat);                                  // last-resort non-stream
+  if(typeof onChunk==='function'&&result&&result.text) onChunk(result.text,{text:result.text,model:result.model});
+  return result;
+}
+
+// Pick the model for a request: the explicit choice from the model picker, else
+// the engine profile's saved model.
+function assistantModelFor(state, engine){
+  const chosen=String(state&&state.model||'').trim();
+  return chosen||(engine&&engine.model)||'';
+}
+
+function assistantOptionalNumber(value){
+  if(value==null||value==='') return null;
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
+}
+
+function assistantChatOptions(engine){
+  const out={}, temperature=assistantOptionalNumber(engine&&engine.temperature), topP=assistantOptionalNumber(engine&&engine.topP), numCtx=assistantOptionalNumber(engine&&engine.numCtx);
+  if(temperature!==null) out.temperature=temperature;
+  if(topP!==null) out.topP=topP;
+  if(numCtx!==null&&numCtx>0) out.numCtx=Math.floor(numCtx);
+  return out;
+}
+
+function assistantPresetByIndex(index){
+  const n=Number(index);
+  return Number.isFinite(n)&&ENGINE_TASK_PRESETS[n]?ENGINE_TASK_PRESETS[n]:null;
+}
+
+function assistantSaveEnginePatch(profiles, engine, patch){
+  if(!engine||typeof saveEngineProfile!=='function') return engine;
+  const saved=saveEngineProfile(Object.assign({},engine,patch||{}));
+  const i=(profiles||[]).findIndex(p=>p.id===saved.id);
+  if(i>=0) profiles[i]=saved;
+  return saved;
 }
 
 function assistantAnswerToCard(state){
@@ -5708,6 +6569,87 @@ function studioAssistant(host){
   const apiEngine=assistantFirstApiEngine(profiles);
   const engineSel=h('select',{},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' - '+p.type)));
   if(defaultEngine) engineSel.value=defaultEngine.id;
+  const modelSel=h('select',{class:'assistant-model'});
+  const presetSel=h('select',{class:'assistant-preset'},
+    h('option',{value:''},'Choose a task preset...'),
+    ...ENGINE_TASK_PRESETS.map((preset,i)=>h('option',{value:String(i)},preset.label+' - '+preset.model))
+  );
+  const tempUse=h('input',{type:'checkbox'});
+  const temperatureIn=h('input',{type:'range',min:'0',max:'1.5',step:'0.05',value:'0.70'});
+  const temperatureValue=h('span',{class:'assistant-temp-value'});
+  const topPIn=h('input',{type:'number',min:'0',max:'1',step:'0.05',placeholder:'default'});
+  const numCtxSel=h('select',{class:'assistant-context'},
+    h('option',{value:''},'Default context'),
+    ...ENGINE_CONTEXT_OPTIONS.map(n=>h('option',{value:String(n)},String(n)))
+  );
+
+  function ensureModelChoice(model){
+    const value=String(model||'').trim();
+    if(!value) return;
+    const exists=Array.from(modelSel.children||[]).some(option=>option.value===value);
+    if(!exists) modelSel.prepend(h('option',{value},value));
+    modelSel.value=value; state.model=value;
+  }
+  function refreshTemperatureControl(){
+    temperatureIn.disabled=!tempUse.checked;
+    temperatureValue.textContent=tempUse.checked?Number(temperatureIn.value).toFixed(2):'default';
+  }
+  function refreshAdvancedControls(engine){
+    tempUse.checked=engine&&engine.temperature!=='';
+    temperatureIn.value=tempUse.checked?String(engine.temperature):'0.70';
+    topPIn.value=engine&&engine.topP!==''?String(engine.topP):'';
+    numCtxSel.value=engine&&engine.numCtx!==''?String(engine.numCtx):'';
+    presetSel.value='';
+    refreshTemperatureControl();
+  }
+  function persistCurrentEngine(patch){
+    const engine=assistantEngineById(profiles,engineSel.value);
+    return assistantSaveEnginePatch(profiles,engine,patch);
+  }
+  modelSel.onchange=()=>{
+    state.model=modelSel.value;
+    persistCurrentEngine({model:modelSel.value});
+  };
+  presetSel.onchange=()=>{
+    const preset=assistantPresetByIndex(presetSel.value);
+    if(!preset) return;
+    ensureModelChoice(preset.model);
+    tempUse.checked=true;
+    temperatureIn.value=String(preset.temperature);
+    refreshTemperatureControl();
+    persistCurrentEngine({model:preset.model,temperature:preset.temperature});
+  };
+  tempUse.onchange=()=>{
+    refreshTemperatureControl();
+    persistCurrentEngine({temperature:tempUse.checked?temperatureIn.value:''});
+  };
+  temperatureIn.oninput=refreshTemperatureControl;
+  temperatureIn.onchange=()=>persistCurrentEngine({temperature:tempUse.checked?temperatureIn.value:''});
+  topPIn.onchange=()=>persistCurrentEngine({topP:topPIn.value});
+  numCtxSel.onchange=()=>persistCurrentEngine({numCtx:numCtxSel.value});
+
+  // Fill the model picker for the chosen engine: the saved model first, then any
+  // models the local endpoint advertises (GET /v1/models). Failures are silent —
+  // the saved model still works.
+  function populateModels(engine, list){
+    const saved=String(engine&&engine.model||'').trim();
+    const seen=new Set(), models=[];
+    [saved].concat(Array.isArray(list)?list:[]).forEach(m=>{ const v=String(m||'').trim(); if(v&&!seen.has(v)){ seen.add(v); models.push(v); } });
+    if(models.length){
+      modelSel.replaceChildren(...models.map(v=>h('option',{value:v},v)));
+      modelSel.value=models[0]; state.model=models[0];
+    }else{
+      modelSel.replaceChildren(h('option',{value:''},'(engine default)'));
+      modelSel.value=''; state.model='';
+    }
+  }
+  async function refreshModels(engine){
+    populateModels(engine,[]);
+    if(!engine||typeof aiListModels!=='function') return;
+    let isOpenAI=false; try{ isOpenAI=aiProvider(engine)==='openai'; }catch(e){}
+    if(!isOpenAI) return;
+    try{ populateModels(engine, await aiListModels(engine)); }catch(e){}
+  }
   const spend=h('span',{class:'assistant-spend'},assistantSpendLabel(defaultEngine));
   const settingsBtn=h('button',{},'Engine settings');
   settingsBtn.onclick=()=>openEngineSettings();
@@ -5734,6 +6676,8 @@ function studioAssistant(host){
     const engine=assistantEngineById(profiles,engineSel.value);
     spend.textContent=assistantSpendLabel(engine);
     escalateBtn.disabled=!apiEngine||engine&&engine.id===apiEngine.id;
+    refreshAdvancedControls(engine);
+    refreshModels(engine);
   }
 
   function setGroundingLine(ids){
@@ -5768,17 +6712,29 @@ function studioAssistant(host){
     try{
       const grounding=await assistantCanonGrounding(q,engine,{onStatus:setEmbedStatus});
       status.textContent=assistantIsLocalEngine(engine)?'Asking local engine...':'Asking API engine. Metered usage will be recorded.';
-      const result=await assistantCallAi(engine,{
+      // stream the answer in: chunks fade in (.chunk) after a blinking caret (.cursor)
+      const answerPre=h('pre',{class:'assistant-answer-text stream-text'});
+      const cursor=h('span',{class:'cursor'},'▋');
+      answerPre.append(cursor);
+      answerHost.replaceChildren(answerPre);
+      const onChunk=(piece)=>{
+        cursor.remove();
+        answerPre.append(h('span',{class:'chunk'},piece),cursor);
+        answerHost.scrollTop=answerHost.scrollHeight;
+      };
+      const chat=Object.assign({
         system:grounding.system,
         messages:[{role:'user',content:q}],
-        model:engine.model,
+        model:assistantModelFor(state,engine),
         maxTokens:ASSISTANT_MAX_TOKENS
-      });
+      },assistantChatOptions(engine));
+      const result=await assistantStreamAi(engine,chat,onChunk);
+      cursor.remove();
       state.question=q;
       state.answer=result.text||'';
       state.grounding=grounding;
-      state.model=result.model||engine.model||'';
-      answerHost.replaceChildren(h('pre',{class:'assistant-answer-text'},state.answer||'(No text returned.)'));
+      state.model=result.model||assistantModelFor(state,engine)||'';
+      if(!state.answer) answerPre.append(document.createTextNode('(No text returned.)'));
       setGroundingLine(grounding.ids);
       setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning);
       status.textContent='Answer ready. Suggestions only; promote through the normal pipeline.';
@@ -5832,8 +6788,19 @@ function studioAssistant(host){
       usageMeter()
     ),
     h('div',{class:'assistant-controls'},
-      h('label',{},'Engine',engineSel),
+      h('div',{class:'assistant-engine-pick'},
+        h('label',{},'Engine',engineSel),
+        h('label',{},'Model',modelSel),
+        h('label',{},'Preset',presetSel)
+      ),
       h('div',{class:'assistant-engine-actions'},spend,settingsBtn,escalateBtn)
+    ),
+    h('div',{class:'assistant-advanced'},
+      h('label',{class:'assistant-check'},tempUse,h('span',null,'Temperature'),temperatureValue),
+      temperatureIn,
+      h('label',{},'Top P',topPIn),
+      h('label',{},'Context',numCtxSel),
+      h('span',{class:'hint'},'Larger context uses more VRAM.')
     ),
     question,
     h('div',{class:'assistant-actions'},askBtn,status),
