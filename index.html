@@ -1015,6 +1015,30 @@
     .book-page{ page-break-after:always; display:flex; justify-content:center; padding:26px 0; }
   }
   .print-only{ display:none; }
+  /* ---------- phone tier (<=480px) ----------
+     iPad (>=768px) keeps its existing layout untouched. This only de-crowds the
+     two things that pinch on an iPhone: the top nav row and form/button rows.
+     Loaded last so these win the cascade over the base rules. */
+  @media (max-width:480px){
+    /* reclaim horizontal room so cards/forms aren't a thin column. Frame side
+       padding shrinks only — top/bottom stay so the corner sprigs still clear. */
+    #app{ padding:16px 10px 84px; }
+    .framed{ padding:34px 16px 30px; margin:6px 2px 0; }
+
+    /* nav bar: smaller pills + tighter gaps so the top row reads calmer
+       one-handed (it still scrolls sideways when there are many buttons). */
+    .topbar{ gap:8px; padding:8px 2px 10px; }
+    .navmid{ gap:8px; }
+    .navutil{ gap:8px; }
+    .brand .mark{ width:26px; height:26px; }
+    .topbar .navbtn{ padding:6px 12px; font-size:14px; }
+
+    /* form/toolbar button rows: comfortable taps that share the row width and
+       wrap cleanly instead of crowding together. Components that already stack
+       full-width (e.g. .engine-form .toolrow) keep doing so — higher specificity. */
+    .toolrow{ gap:8px; }
+    .toolrow .navbtn{ flex:1 1 auto; min-height:42px; }
+  }
 </style>
 </head>
 <body>
@@ -3861,6 +3885,9 @@ function engineProfileNeedsEndpoint(type){
 function engineCanListModels(type){
   return type==='OpenAI API'||type==='OpenAI-compatible local endpoint'||type==='Other HTTP endpoint';
 }
+function engineModelIsEmbedding(id){
+  return /embed/i.test(String(id||''));
+}
 function engineSetupPreset(id, base){
   const preset=ENGINE_SETUP_PRESETS.find(item=>item.id===id)||ENGINE_SETUP_PRESETS[0];
   const current=base&&typeof base==='object'?base:{};
@@ -3950,7 +3977,8 @@ function removeEngineProfile(id){
 
 function engineProfileForm(profile,onDone,onCancel){
   const current=normalizeEngineProfile(profile);
-  const modelListId='engine-models-'+(current.id||engineProfileId());
+  const formKey=current.id||engineProfileId();
+  const modelListId='engine-models-'+formKey, embedListId='engine-embed-'+formKey;
   const nameIn=h('input',{value:current.name,placeholder:'Local M5, Claude, Home server…',maxlength:'80'});
   const typeIn=h('select',null,...ENGINE_TYPES.map(type=>h('option',{value:type},type)));
   typeIn.value=current.type||ENGINE_TYPES[0];
@@ -3959,7 +3987,8 @@ function engineProfileForm(profile,onDone,onCancel){
   const modelIn=h('input',{value:current.model,placeholder:'qwen3:14b',spellcheck:'false',list:modelListId});
   const modelList=h('datalist',{id:modelListId});
   const refreshModelsBtn=h('button',{class:'navbtn',type:'button'},'Refresh models');
-  const embeddingModelIn=h('input',{value:current.embeddingModel,placeholder:'nomic-embed-text',spellcheck:'false'});
+  const embeddingModelIn=h('input',{value:current.embeddingModel,placeholder:'nomic-embed-text',spellcheck:'false',list:embedListId});
+  const embedList=h('datalist',{id:embedListId});
   const keyIn=h('input',{type:'password',value:current.key,placeholder:'optional for a local endpoint',autocomplete:'off',spellcheck:'false'});
   const tempUse=h('input',{type:'checkbox'});
   tempUse.checked=current.temperature!=='';
@@ -3983,8 +4012,13 @@ function engineProfileForm(profile,onDone,onCancel){
   }
   function setModelChoices(models){
     const seen={}, choices=(Array.isArray(models)?models:[]).map(m=>String(m||'').trim()).filter(model=>model&&!seen[model]&&(seen[model]=true));
+    const chatModels=choices.filter(model=>!engineModelIsEmbedding(model)), embedModels=choices.filter(engineModelIsEmbedding);
     modelList.replaceChildren(...choices.map(model=>h('option',{value:model},model)));
-    if(!modelIn.value&&choices[0]) modelIn.value=choices[0];
+    embedList.replaceChildren(...embedModels.map(model=>h('option',{value:model},model)));
+    // Auto-fill the chat field with a real chat model, never an embedding model
+    // (those are the first thing Ollama lists); route embeddings to their field.
+    if(!modelIn.value){ const pick=chatModels[0]||choices[0]; if(pick) modelIn.value=pick; }
+    if(!embeddingModelIn.value&&embedModels[0]) embeddingModelIn.value=embedModels[0];
   }
   function refreshEngineFields(){
     const needsEndpoint=engineProfileNeedsEndpoint(typeIn.value), nextDefault=defaultEngineModel(typeIn.value);
@@ -4075,7 +4109,7 @@ function engineProfileForm(profile,onDone,onCancel){
     h('label',null,'Type'),typeIn,
     h('label',null,'Model'),modelIn,modelList,
     h('div',{class:'engine-model-tools'},refreshModelsBtn,h('span',{class:'hint'},'Refresh reads the models already pulled on this server.')),
-    h('label',null,'Embedding model'),embeddingModelIn,
+    h('label',null,'Embedding model'),embeddingModelIn,embedList,
     h('label',null,'Base URL / endpoint'),endpointIn,
     h('div',{class:'engine-endpoint-tools'},h('span',{class:'hint'},'Use an https:// MagicDNS tailnet URL for phone/iPad access.')),
     endpointHint,
