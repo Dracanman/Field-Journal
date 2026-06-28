@@ -325,7 +325,48 @@
   .card-reader-promoted b{color:var(--green);font-size:18px}
   .card-reader-promoted p{margin:6px 0 0;color:var(--ink-soft)}
   .card-reader-actions{margin-top:20px}
+  .canon-graph{display:grid;gap:12px}
+  .canon-graph-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1.5px solid var(--gold-soft);border-radius:10px;background:#fff8}
+  .canon-graph-summary span{color:var(--hint);font-style:italic}
+  .canon-graph-stage{border:1.5px solid var(--gold-soft);border-radius:12px;background:#fffdf7;overflow:auto;-webkit-overflow-scrolling:touch;box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+  .canon-graph-svg{display:block;min-width:760px;width:100%;height:auto;background:linear-gradient(180deg,#fffdf7,#f6edd8)}
+  .canon-graph-edge{stroke-linecap:round;vector-effect:non-scaling-stroke}
+  .canon-graph-edge.domain{stroke:#cdbf99;stroke-width:1.2;stroke-dasharray:5 7;opacity:.7}
+  .canon-graph-edge.citation{stroke:#5f8c53;stroke-width:2;opacity:.82}
+  .canon-graph-domain{fill:var(--gold);font:700 14px system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}
+  .canon-graph-domain-count{fill:var(--hint);font:12px system-ui,sans-serif}
+  .canon-graph-node{cursor:pointer;outline:none}
+  .canon-graph-node circle{stroke:#fff8ef;stroke-width:3;filter:drop-shadow(0 2px 2px #2e2a2420)}
+  .canon-graph-node:hover circle,.canon-graph-node:focus-visible circle{stroke:#d39d22;stroke-width:4}
+  .canon-graph-node-id{fill:#fffdf7;font:700 11px system-ui,sans-serif;pointer-events:none}
+  .canon-graph-node-title{fill:var(--ink);font:600 13px system-ui,sans-serif;pointer-events:none}
+  .canon-graph-node-meta{fill:var(--hint);font:11px system-ui,sans-serif;pointer-events:none}
+  .canon-graph-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;color:var(--hint);font-size:13px}
+  .canon-graph-key{display:inline-block;width:28px;height:0;border-top:2px solid #cdbf99;margin-right:6px;vertical-align:middle}
+  .canon-graph-key.domain{border-top-style:dashed}
+  .canon-graph-key.citation{border-color:#5f8c53}
+  .canon-graph-reader-doc{max-height:58vh;overflow:auto;margin-top:10px}
+  .canon-graph-refresh{justify-content:flex-end;margin:-2px 0 2px}
   @media(max-width:620px){.card-reader-meta div{grid-template-columns:1fr;gap:1px}.card-reader-modal{padding:20px 18px}}
+  .assistant-panel{display:grid;gap:14px;max-width:920px;margin:0 auto}
+  .assistant-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
+  .assistant-head h2{margin:0 0 4px}
+  .assistant-head .usage-meter{margin-left:auto}
+  .assistant-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:12px;align-items:end}
+  .assistant-controls label{display:grid;gap:5px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .assistant-controls select,.assistant-question,.assistant-outbound input{border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft)}
+  .assistant-engine-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+  .assistant-spend{color:var(--hint);font-size:13px}
+  .assistant-question{width:100%;box-sizing:border-box;resize:vertical;min-height:126px}
+  .assistant-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+  .assistant-embed-row{justify-content:space-between;border:1px dashed var(--gold-soft);border-radius:8px;background:#fff8;padding:8px 10px}
+  .assistant-embed-status{font-size:13px}
+  .assistant-grounding{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .assistant-answer{min-height:86px;border:1px solid var(--gold-soft);border-radius:10px;background:#fffdf7;padding:14px}
+  .assistant-answer-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;line-height:1.5;color:var(--ink-soft)}
+  .assistant-outbound{display:grid;gap:8px;border-top:1px solid var(--gold-soft);padding-top:10px}
+  .assistant-outbound input{min-width:180px}
+  @media(max-width:720px){.assistant-controls{grid-template-columns:1fr}.assistant-engine-actions{justify-content:flex-start}.assistant-head .usage-meter{margin-left:0;width:100%}}
   .drafter label{ display:block; font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
   .drafter input, .drafter textarea, .drafter select{ width:100%; border:1.5px solid var(--gold-soft); border-radius:8px; background:#fffdf7; padding:9px 11px; font-family:inherit; font-size:15px; color:var(--ink-soft); }
   .drafter textarea{ min-height:64px; resize:vertical; }
@@ -409,6 +450,125 @@
   .tracker-section-editor .hint{ margin:0 0 8px; font-size:12px; }
   .tracker-save-status{ min-height:1.35em; margin-top:7px; }
 
+  /* read-only Campaign Ledger timeline */
+  .ledger-timeline{
+    margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:14px;
+    background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .ledger-timeline-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .ledger-timeline-head h3{ margin:0; font-size:25px; }
+  .ledger-timeline-head .hint{ margin:3px 0 0; }
+  .ledger-timeline-total{
+    border:1px solid var(--gold-soft); border-radius:999px; background:#fff8; color:var(--hint);
+    padding:5px 10px; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.08em;
+  }
+  .ledger-timeline-filters{ justify-content:flex-start; margin:14px 0 6px; }
+  .ledger-timeline-filters .navbtn.on{
+    background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:700;
+  }
+  .ledger-timeline-count{ margin:8px 0 12px; }
+  .ledger-timeline-list{
+    position:relative; display:grid; gap:10px; margin-top:10px; padding-left:18px;
+  }
+  .ledger-timeline-list::before{
+    content:""; position:absolute; left:6px; top:6px; bottom:6px; width:2px;
+    background:linear-gradient(var(--gold-soft),rgba(207,177,113,.18));
+  }
+  .ledger-timeline-entry{
+    position:relative; border:1px solid #e7dcc4; border-radius:12px; background:#fffaf0;
+    box-shadow:0 8px 18px -18px rgba(var(--shadow)/.5); overflow:hidden;
+  }
+  .ledger-timeline-summary{
+    display:flex; gap:10px; align-items:flex-start; padding:12px 13px; cursor:pointer; touch-action:manipulation;
+  }
+  .ledger-timeline-summary::-webkit-details-marker{ display:none; }
+  .ledger-timeline-dot{
+    position:absolute; left:-18px; top:19px; width:10px; height:10px; border-radius:999px;
+    background:var(--gold); box-shadow:0 0 0 4px var(--paper-card);
+  }
+  .ledger-timeline-main{ display:grid; gap:5px; min-width:0; }
+  .ledger-timeline-meta{ display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+  .ledger-timeline-meta b{ color:var(--ink); }
+  .ledger-timeline-phase,.ledger-timeline-date{
+    color:var(--hint); font-size:12px;
+  }
+  .ledger-timeline-label{
+    border:1px solid var(--gold-soft); border-radius:999px; background:#fffdf7; color:var(--green);
+    padding:2px 8px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .ledger-timeline-preview{ color:var(--ink-soft); line-height:1.38; }
+  .ledger-timeline-full{
+    border-top:1px solid #eadfc8; padding:0 13px 13px 35px; color:var(--ink); line-height:1.48;
+  }
+  .ledger-timeline-full p{ margin:10px 0 0; }
+  .ledger-timeline-status{ color:var(--hint); font-size:12px; }
+  .ledger-timeline-empty{ text-align:center; }
+
+  /* manual campaign cast / relationship tracker */
+  .cast-panel{
+    margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:14px;
+    background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .cast-panel-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .cast-panel-head h3{ margin:0; font-size:25px; }
+  .cast-panel-head .hint{ margin:3px 0 0; }
+  .cast-file-note{ margin:12px 0; }
+  .cast-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:10px; margin-top:12px; }
+  .cast-card{ margin:0; }
+  .cast-card-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .cast-card h4{ margin:0; font-size:20px; color:var(--ink); }
+  .cast-card p{ margin:7px 0 0; line-height:1.42; }
+  .cast-card-meta{ color:var(--hint); font-size:13px; }
+  .cast-status{
+    border:1px solid var(--gold-soft); border-radius:999px; background:#fffdf7; color:var(--green);
+    padding:3px 8px; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase;
+  }
+  .cast-actions{ margin-top:10px; }
+  .cast-actions .danger{ color:#9d4d3d; border-color:#e0b7aa; }
+  .cast-empty{
+    margin-top:12px; padding:18px; border:1px dashed var(--gold-soft); border-radius:12px;
+    background:#fff8; text-align:center;
+  }
+  .cast-empty h4{ margin:0 0 4px; }
+  .cast-editor{ display:grid; gap:10px; }
+  .cast-field label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
+  .cast-field input,.cast-field textarea{
+    width:100%; box-sizing:border-box; border:1px solid var(--gold-soft); border-radius:8px;
+    background:#fffdf7; color:var(--ink); font:inherit; line-height:1.4; padding:9px 10px;
+  }
+  .cast-field textarea{ resize:vertical; }
+  .cast-save-status{ min-height:1.35em; }
+
+  /* device-local session scratch pad */
+  .scratch-panel{
+    margin-top:16px; padding:18px; border:1.5px solid var(--gold-soft); border-radius:14px;
+    background:var(--paper-card); box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .scratch-head{ display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .scratch-head h3{ margin:0; font-size:25px; }
+  .scratch-head .hint{ margin:3px 0 0; }
+  .scratch-pad{
+    width:100%; box-sizing:border-box; min-height:220px; margin-top:12px; resize:vertical;
+    border:1px solid var(--gold-soft); border-radius:12px; background:#fffdf7; color:var(--ink);
+    font:inherit; line-height:1.48; padding:12px 13px;
+  }
+  .scratch-send{
+    margin-top:12px; padding:12px; border:1px solid #e7dcc4; border-radius:12px; background:#fffaf0;
+  }
+  .scratch-send label{ display:block; margin:0 0 4px; color:var(--ink-soft); font-size:13px; font-weight:700; }
+  .scratch-send input,.scratch-send select{
+    width:100%; box-sizing:border-box; border:1px solid var(--gold-soft); border-radius:8px;
+    background:#fffdf7; color:var(--ink); font:inherit; padding:8px 10px;
+  }
+  .scratch-status{ min-height:1.35em; }
+  .scratch-picks{ display:grid; gap:7px; margin-top:8px; }
+  .scratch-pick{
+    display:flex; gap:8px; align-items:flex-start; border:1px solid #eadfc8; border-radius:9px;
+    background:#fffdf7; padding:8px 9px; color:var(--ink-soft); line-height:1.38;
+  }
+  .scratch-pick input{ width:auto; margin-top:3px; flex:0 0 auto; }
+  .scratch-pick span{ white-space:pre-wrap; }
+
   /* mortal survival — the named-conditions editor (survival-specific) */
   .survival-condition-editor{ margin-top:16px; }
   .survival-condition-editor > label{ display:block; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--gold); margin-bottom:7px; }
@@ -422,8 +582,31 @@
     .gauge-grid{ grid-template-columns:1fr; }
     .tracker-editor{ padding:14px; }
     .tracker-edit-grid{ grid-template-columns:1fr; }
+    .ledger-timeline{ padding:14px; }
+    .ledger-timeline-list{ padding-left:15px; }
+    .ledger-timeline-summary{ padding:11px; }
+    .ledger-timeline-full{ padding-left:31px; }
+    .cast-panel{ padding:14px; }
+    .cast-grid{ grid-template-columns:1fr; }
+    .scratch-panel{ padding:14px; }
+    .scratch-pad{ min-height:190px; }
     .survival-add{ flex-direction:column; }
   }
+
+  /* ---------- cast status tones + the Game-tools demo preview ---------- */
+  .cast-status.tone-ally{ border-color:#9ec78a; background:#eef6e6; color:#3f6f33; }
+  .cast-status.tone-enemy{ border-color:#d8a08f; background:#f8ebe6; color:#9c4a35; }
+  .cast-status.tone-unknown{ border-color:#c9b6cf; background:#f1ecf3; color:#6f5f76; }
+  .demo-banner{
+    margin-top:12px; padding:11px 14px; border:1px solid var(--gold-soft);
+    border-left:4px solid var(--gold); border-radius:10px; background:#fff8;
+    color:var(--ink-soft); line-height:1.45; font-size:14px;
+  }
+  .demo-banner b{ color:var(--gold); }
+  .demo-section{ margin-top:22px; }
+  .demo-section > h3{ margin:0 0 2px; font-size:21px; }
+  .region-demo-modal{ width:min(880px,94vw); }
+  .region-demo-modal .region-map-svg{ height:min(56vh,440px); }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
 .region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
@@ -556,10 +739,21 @@
 .engine-form label{display:block;margin:10px 0 4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
 .engine-form input,.engine-form select{width:100%;box-sizing:border-box;border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink-soft);font:inherit;padding:9px 11px}
 .engine-secret-note{margin:10px 0;color:var(--hint);font-size:13px;font-style:italic}
+.usage-meter{border:1px solid var(--gold-soft);border-radius:10px;background:#fffdf7;color:var(--ink-soft)}
+.usage-meter.warn{border-color:#d59b3a;background:#fff8e6;box-shadow:inset 3px 0 #d59b3a}
+.usage-meter summary{cursor:pointer;font-weight:700;padding:10px 12px;overflow-wrap:anywhere}
+.usage-meter.gap summary{color:#8b5a2b}
+.usage-meter-body{display:grid;gap:8px;border-top:1px solid var(--gold-soft);padding:10px 12px}
+.usage-breakdown-row{display:grid;grid-template-columns:76px repeat(4,1fr);gap:8px;align-items:center;font-size:13px}
+.usage-breakdown-row b{color:var(--green)}
+.usage-budget{display:flex;align-items:center;gap:8px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.usage-budget input{max-width:110px;border:1.5px solid var(--gold-soft);border-radius:8px;background:#fffdf7;color:var(--ink-soft);font:inherit;padding:7px 9px}
+.usage-warning{margin:0;color:#8b5a2b;font-size:13px;font-weight:700}
 .engine-status,.engine-notice{min-height:1.3em}.engine-form .toolrow{margin-top:10px}
 @media(max-width:620px){
   .engine-summary{align-items:flex-start;flex-direction:column}.engine-summary span{text-align:left}
   .engine-row{flex-direction:column}.engine-actions{justify-content:flex-end}
+  .usage-breakdown-row{grid-template-columns:1fr 1fr;gap:5px 8px}.usage-breakdown-row b{grid-column:1 / -1}
   .engine-form .toolrow{align-items:stretch;flex-direction:column}.engine-form .toolrow .navbtn{width:100%}
 }
 /* ---------- Spaces: iPad-friendly front door ------------------------------ */
@@ -1795,11 +1989,57 @@ function namingDefault(){ return {
 // drill code, flashcard progress, the per-session checklist, the confusion log,
 // and the paste-lock toggle. Free-text inputs live in .fields, keyed by name.
 function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function usageMetric(value){
+  const n=Number(value);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function usageBucketDefault(){
+  return {cost:0,inputTokens:0,outputTokens:0,cacheRead:0,cacheWrite:0,calls:0,models:{},priceGaps:{}};
+}
+function normalizeUsageBucket(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{}, out=usageBucketDefault();
+  out.cost=usageMetric(source.cost);
+  out.inputTokens=usageMetric(source.inputTokens);
+  out.outputTokens=usageMetric(source.outputTokens);
+  out.cacheRead=usageMetric(source.cacheRead);
+  out.cacheWrite=usageMetric(source.cacheWrite);
+  out.calls=usageMetric(source.calls);
+  const models=source.models&&typeof source.models==='object'&&!Array.isArray(source.models)?source.models:{};
+  Object.keys(models).forEach(model=>{
+    const name=String(model||'').trim(); if(!name) return;
+    const bucket=normalizeUsageBucket(models[model]);
+    delete bucket.models; delete bucket.priceGaps;
+    bucket.priceGap=!!(models[model]&&models[model].priceGap);
+    out.models[name]=bucket;
+  });
+  const gaps=source.priceGaps&&typeof source.priceGaps==='object'&&!Array.isArray(source.priceGaps)?source.priceGaps:{};
+  Object.keys(gaps).forEach(model=>{ const name=String(model||'').trim(); if(name&&gaps[model]) out.priceGaps[name]=true; });
+  return out;
+}
+function normalizeUsageBucketMap(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{}, out={};
+  Object.keys(source).forEach(key=>{ if(/^\d{4}-\d{2}(-\d{2})?$/.test(key)) out[key]=normalizeUsageBucket(source[key]); });
+  return out;
+}
+function usageLedgerDefault(){ return {session:usageBucketDefault(),byDay:{},byMonth:{},monthlyBudget:0,lastModel:'',lastPriceGap:false}; }
+function normalizeUsageLedger(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  return {
+    session:normalizeUsageBucket(source.session),
+    byDay:normalizeUsageBucketMap(source.byDay),
+    byMonth:normalizeUsageBucketMap(source.byMonth),
+    monthlyBudget:usageMetric(source.monthlyBudget),
+    lastModel:typeof source.lastModel==='string'?source.lastModel.trim():'',
+    lastPriceGap:!!source.lastPriceGap,
+  };
+}
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
   merged.openTo=d.openTo==='frontdoor'?'frontdoor':'last';
+  merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
+  merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.naming=Object.assign(namingDefault(), d.naming||{});
   merged.practice=Object.assign(practiceDefault(), d.practice||{});
   merged.engines={
@@ -3322,6 +3562,8 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
 function stripForBackup(db){
   const d=Object.assign({},db);
   if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
+  delete d.campaignScratch;
+  delete d.usageLedger;
   if(d.engines){
     const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
     d.engines={
@@ -3334,7 +3576,7 @@ function stripForBackup(db){
     };
   }
   return d;
-} // never write tokens, engine keys, or engine endpoints into a backup
+} // never write tokens, engine keys, engine endpoints, engine models, usage ledger, or session scratch into a backup
 // merge an incoming journal (from the repo or a backup file) into DB. Additive for new
 // work (existing items win, new ones appended by id), but deletions are honored via
 // tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
@@ -3362,7 +3604,7 @@ function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).fo
 
 /* ---------- local backup file (a safety net against data eviction) --------- */
 // the journal travels with its images inline; device secrets (GitHub token,
-// engine key, engine endpoint) are never written into a backup.
+// engine key, engine endpoint, engine model, usage ledger) are never written into a backup.
 function exportBackup(){
   const data=JSON.stringify(stripForBackup(DB), null, 1);
   const b=new Blob([data],{type:'application/json'});
@@ -3433,8 +3675,8 @@ function openGitHubPanel(){
    ENGINE SETTINGS — storage and switching groundwork only.
 
    Profiles live in the same device-local state as the GitHub token. This module
-   never calls an endpoint, never logs a key, and never schedules repo sync.
-   syncPayload excludes all engine settings; stripForBackup removes endpoint/key.
+   owns form/storage only, never logs a key, and never schedules repo sync.
+   syncPayload excludes all engine settings; stripForBackup removes endpoint/key/model/embeddingModel.
  * ========================================================================== */
 const ENGINE_TYPES=[
   'Anthropic API',
@@ -3442,15 +3684,26 @@ const ENGINE_TYPES=[
   'OpenAI-compatible local endpoint',
   'Other HTTP endpoint',
 ];
+const ENGINE_ANTHROPIC_ENDPOINT='https://api.anthropic.com/v1/messages';
 
+function defaultEngineModel(type){
+  return type==='Anthropic API'?'claude-opus-4-8':'';
+}
+function engineProfileNeedsEndpoint(type){
+  return type!=='Anthropic API';
+}
 function normalizeEngineProfile(profile){
   const p=profile&&typeof profile==='object'?profile:{};
+  const type=typeof p.type==='string'?p.type.trim():'';
+  const model=typeof p.model==='string'&&p.model.trim()?p.model.trim():defaultEngineModel(type);
   return {
     id:typeof p.id==='string'?p.id:'',
     name:typeof p.name==='string'?p.name.trim():'',
-    type:typeof p.type==='string'?p.type.trim():'',
-    endpoint:typeof p.endpoint==='string'?p.endpoint.trim():'',
+    type,
+    endpoint:engineProfileNeedsEndpoint(type)?(typeof p.endpoint==='string'?p.endpoint.trim():''):ENGINE_ANTHROPIC_ENDPOINT,
     key:typeof p.key==='string'?p.key.trim():'',
+    model,
+    embeddingModel:typeof p.embeddingModel==='string'?p.embeddingModel.trim():'',
   };
 }
 function normalizeEngineSettings(value){
@@ -3474,7 +3727,7 @@ function saveEngineProfile(profile){
   const next=normalizeEngineProfile(profile);
   if(!next.name) throw new Error('Engine name is required');
   if(!next.type) throw new Error('Engine type is required');
-  if(!next.endpoint) throw new Error('Base URL / endpoint is required');
+  if(engineProfileNeedsEndpoint(next.type)&&!next.endpoint) throw new Error('Base URL / endpoint is required');
   if(!next.id) next.id=engineProfileId();
   const settings=engineSettings(), index=settings.profiles.findIndex(p=>p.id===next.id);
   if(index>=0) settings.profiles[index]=next; else settings.profiles.push(next);
@@ -3503,26 +3756,58 @@ function engineProfileForm(profile,onDone,onCancel){
   const typeIn=h('select',null,...ENGINE_TYPES.map(type=>h('option',{value:type},type)));
   typeIn.value=current.type||ENGINE_TYPES[0];
   const endpointIn=h('input',{value:current.endpoint,placeholder:'http://127.0.0.1:8000/v1',spellcheck:'false'});
+  const modelIn=h('input',{value:current.model,placeholder:'qwen3:14b',spellcheck:'false'});
+  const embeddingModelIn=h('input',{value:current.embeddingModel,placeholder:'nomic-embed-text',spellcheck:'false'});
   const keyIn=h('input',{type:'password',value:current.key,placeholder:'optional for a local endpoint',autocomplete:'off',spellcheck:'false'});
   const status=h('div',{class:'engine-status hint',role:'status'});
   const saveBtn=h('button',{class:'navbtn primary',type:'button'},current.id?'Save changes':'Add engine');
+  const testBtn=h('button',{class:'navbtn',type:'button'},'Test connection');
+  let lastModelDefault=defaultEngineModel(typeIn.value);
+  function refreshEngineFields(){
+    const needsEndpoint=engineProfileNeedsEndpoint(typeIn.value), nextDefault=defaultEngineModel(typeIn.value);
+    endpointIn.disabled=!needsEndpoint;
+    endpointIn.title=needsEndpoint?'':'Anthropic uses a fixed endpoint.';
+    if(!needsEndpoint) endpointIn.value=ENGINE_ANTHROPIC_ENDPOINT;
+    else if(endpointIn.value===ENGINE_ANTHROPIC_ENDPOINT) endpointIn.value='';
+    endpointIn.placeholder=needsEndpoint?'http://127.0.0.1:8000/v1':ENGINE_ANTHROPIC_ENDPOINT;
+    if(!modelIn.value||modelIn.value===lastModelDefault) modelIn.value=nextDefault;
+    modelIn.placeholder=nextDefault||'qwen3:14b, gpt-4.1, local model name';
+    lastModelDefault=nextDefault;
+  }
+  function collect(){
+    return normalizeEngineProfile({id:current.id,name:nameIn.value,type:typeIn.value,endpoint:endpointIn.value,key:keyIn.value,model:modelIn.value,embeddingModel:embeddingModelIn.value});
+  }
+  typeIn.onchange=refreshEngineFields;
+  refreshEngineFields();
   saveBtn.onclick=()=>{
     try{
-      const saved=saveEngineProfile({id:current.id,name:nameIn.value,type:typeIn.value,endpoint:endpointIn.value,key:keyIn.value});
+      const saved=saveEngineProfile(collect());
       status.textContent='Saved on this device.'; onDone(saved);
     }catch(error){ status.textContent=String(error&&error.message||error); }
+  };
+  testBtn.onclick=async()=>{
+    const engine=collect();
+    status.textContent='Checking connection...';
+    testBtn.disabled=true;
+    try{
+      await aiTestConnection(engine);
+      status.textContent='Reachable and authenticated.';
+    }catch(error){ status.textContent='Could not connect: '+String(error&&error.message||error); }
+    finally{ testBtn.disabled=false; }
   };
   return h('div',{class:'engine-form'},
     h('label',null,'Name'),nameIn,
     h('label',null,'Type'),typeIn,
+    h('label',null,'Model'),modelIn,
+    h('label',null,'Embedding model'),embeddingModelIn,
     h('label',null,'Base URL / endpoint'),endpointIn,
     h('label',null,'Key'),keyIn,
-    h('p',{class:'engine-secret-note'},'Endpoint and key stay on this device. They are excluded from repo sync and backup files.'),
+    h('p',{class:'engine-secret-note'},'Endpoint, key, chat model, and embedding model stay on this device. They are excluded from repo sync and backup files.'),
     status,
     h('div',{class:'toolrow'},
       saveBtn,
       h('button',{class:'navbtn',type:'button',onclick:onCancel},'Cancel'),
-      h('button',{class:'navbtn',type:'button',disabled:true,title:'Connection testing arrives with the AI integration.'},'Test connection — later')));
+      testBtn));
 }
 
 function engineSettingsPanel(){
@@ -3532,7 +3817,7 @@ function engineSettingsPanel(){
     const settings=engineSettings(), active=getActiveEngine();
     const list=h('div',{class:'engine-list'});
     if(!settings.profiles.length){
-      list.append(h('p',{class:'engine-empty hint'},'No engines saved yet. Add a profile now; model calls come in a later update.'));
+      list.append(h('p',{class:'engine-empty hint'},'No engines saved yet. Add a profile, then test the connection.'));
     }else settings.profiles.forEach(profile=>{
       const isActive=profile.id===settings.activeId;
       list.append(h('div',{class:'engine-row'+(isActive?' active':'')},
@@ -3557,8 +3842,9 @@ function engineSettingsPanel(){
     const editProfile=editing?settings.profiles.find(profile=>profile.id===editing):null;
     const editor=(adding||editProfile)?engineProfileForm(editProfile||{},()=>{editing=null;adding=false;notice='Saved.';draw();},()=>{editing=null;adding=false;draw();}):null;
     root.replaceChildren(
-      h('p',{class:'hint'},'Choose which connection future in-app AI tools will use. This update stores settings only; it makes no model or network calls.'),
+      h('p',{class:'hint'},'Choose which connection in-app AI tools will use. Profiles stay on this device; the test button only checks reachability and authentication.'),
       summary,
+      usageMeter(),
       list,
       h('div',{class:'toolrow engine-add'},add),
       editor,
@@ -3569,6 +3855,402 @@ function engineSettingsPanel(){
 }
 function openEngineSettings(){
   return showModalNode('Engine','Profiles and secrets are stored only on this device.',engineSettingsPanel());
+}
+/* ========================================================================== *
+   AI provider adapters - request/parse helpers plus one thin fetch wrapper.
+
+   No SDKs, no secrets in logs, no canon retrieval. Callers pass the active
+   engine profile and receive the same normalized result shape for each provider.
+ * ========================================================================== */
+const AI_OPENAI_TYPES=[
+  'OpenAI API',
+  'OpenAI-compatible local endpoint',
+  'Other HTTP endpoint',
+];
+const aiSleep=ms=>new Promise(r=>setTimeout(r,ms));
+
+function aiProvider(engine){
+  const type=String(engine&&engine.type||'').trim();
+  if(type==='Anthropic API') return 'anthropic';
+  if(AI_OPENAI_TYPES.includes(type)) return 'openai';
+  throw new Error('Unsupported engine type: '+(type||'(none)'));
+}
+function aiCleanEndpoint(endpoint){
+  return String(endpoint||'').trim().replace(/\/+$/,'');
+}
+function aiSafeEndpoint(endpoint){
+  const clean=String(endpoint||'configured endpoint').split('?')[0].replace(/\/\/([^/@:]+):([^/@]+)@/,'//[redacted]@');
+  return clean||'configured endpoint';
+}
+function aiJoinUrl(endpoint,path){
+  const base=aiCleanEndpoint(endpoint);
+  return base+'/'+String(path||'').replace(/^\/+/,'');
+}
+function aiTokenLimit(maxTokens){
+  const n=Number(maxTokens);
+  return Number.isFinite(n)&&n>0?Math.floor(n):512;
+}
+function aiModelFor(engine,model){
+  const chosen=typeof model==='string'&&model.trim()?model.trim():String(engine&&engine.model||'').trim();
+  return chosen||defaultEngineModel(String(engine&&engine.type||''));
+}
+function aiHeaderText(value){
+  return String(value||'').trim();
+}
+function aiHeaders(engine, withJson){
+  const headers=withJson?{'content-type':'application/json'}:{};
+  const key=aiHeaderText(engine&&engine.key);
+  if(aiProvider(engine)==='anthropic'){
+    headers['x-api-key']=key;
+    headers['anthropic-version']='2023-06-01';
+    headers['anthropic-dangerous-direct-browser-access']='true';
+  }else if(key){
+    headers.Authorization='Bearer '+key;
+  }
+  return headers;
+}
+function aiNormalizeMessages(messages, allowSystem){
+  const allowed=allowSystem?{system:1,user:1,assistant:1}:{user:1,assistant:1};
+  return (Array.isArray(messages)?messages:[]).map(message=>{
+    const role=allowed[String(message&&message.role||'').trim()]?String(message.role).trim():'user';
+    return {role,content:String(message&&message.content||'')};
+  }).filter(message=>message.content);
+}
+function aiBuildAnthropicRequest(engine,chat){
+  chat=chat||{};
+  const model=aiModelFor(engine,chat.model);
+  const body={
+    model,
+    max_tokens:aiTokenLimit(chat.maxTokens),
+    messages:aiNormalizeMessages(chat.messages,false),
+  };
+  if(chat.system) body.system=String(chat.system);
+  return {
+    provider:'anthropic',
+    url:ENGINE_ANTHROPIC_ENDPOINT,
+    model,
+    opts:{method:'POST',headers:aiHeaders(engine,true),body:JSON.stringify(body)},
+  };
+}
+function aiBuildOpenAIRequest(engine,chat){
+  chat=chat||{};
+  const model=aiModelFor(engine,chat.model);
+  const messages=aiNormalizeMessages(chat.messages,true);
+  if(chat.system) messages.unshift({role:'system',content:String(chat.system)});
+  const body={model,messages,max_tokens:aiTokenLimit(chat.maxTokens)};
+  return {
+    provider:'openai',
+    url:aiJoinUrl(engine&&engine.endpoint,'chat/completions'),
+    model,
+    opts:{method:'POST',headers:aiHeaders(engine,true),body:JSON.stringify(body)},
+  };
+}
+function aiBuildOpenAIModelsRequest(engine){
+  return {
+    provider:'openai',
+    url:aiJoinUrl(engine&&engine.endpoint,'models'),
+    opts:{method:'GET',headers:aiHeaders(engine,false)},
+  };
+}
+function aiEmbeddingModelFor(engine,model){
+  const chosen=typeof model==='string'&&model.trim()?model.trim():String(engine&&engine.embeddingModel||'').trim();
+  if(!chosen) throw new Error('Embedding model is required for this local engine.');
+  return chosen;
+}
+function aiEmbeddingInput(input){
+  if(Array.isArray(input)) return input.map(value=>String(value||''));
+  return String(input||'');
+}
+function aiBuildOpenAIEmbeddingRequest(engine,request){
+  if(String(engine&&engine.type||'')!=='OpenAI-compatible local endpoint') throw new Error('Embeddings require an OpenAI-compatible local endpoint.');
+  request=request||{};
+  const model=aiEmbeddingModelFor(engine,request.model);
+  const body={model,input:aiEmbeddingInput(request.input)};
+  return {
+    provider:'openai',
+    url:aiJoinUrl(engine&&engine.endpoint,'embeddings'),
+    model,
+    opts:{method:'POST',headers:aiHeaders(engine,true),body:JSON.stringify(body)},
+  };
+}
+function aiBuildRequest(engine,chat){
+  return aiProvider(engine)==='anthropic'?aiBuildAnthropicRequest(engine,chat):aiBuildOpenAIRequest(engine,chat);
+}
+function aiNumber(value){
+  const n=Number(value);
+  return Number.isFinite(n)&&n>0?n:0;
+}
+function aiNormalizeAnthropicUsage(usage){
+  usage=usage&&typeof usage==='object'?usage:{};
+  return {
+    inputTokens:aiNumber(usage.input_tokens),
+    outputTokens:aiNumber(usage.output_tokens),
+    cacheRead:aiNumber(usage.cache_read_input_tokens),
+    cacheWrite:aiNumber(usage.cache_creation_input_tokens),
+  };
+}
+function aiNormalizeOpenAIUsage(usage){
+  usage=usage&&typeof usage==='object'?usage:{};
+  const details=usage.prompt_tokens_details&&typeof usage.prompt_tokens_details==='object'?usage.prompt_tokens_details:{};
+  return {
+    inputTokens:aiNumber(usage.prompt_tokens),
+    outputTokens:aiNumber(usage.completion_tokens),
+    cacheRead:aiNumber(details.cached_tokens),
+    cacheWrite:0,
+  };
+}
+function aiNormalizeUsage(provider,usage){
+  return provider==='anthropic'?aiNormalizeAnthropicUsage(usage):aiNormalizeOpenAIUsage(usage);
+}
+function aiParseAnthropicResponse(raw,fallbackModel){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const text=(Array.isArray(raw.content)?raw.content:[]).filter(part=>part&&part.type==='text').map(part=>String(part.text||'')).join('');
+  return {text,model:String(raw.model||fallbackModel||''),usage:aiNormalizeAnthropicUsage(raw.usage),raw};
+}
+function aiParseOpenAIResponse(raw,fallbackModel){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const choices=Array.isArray(raw.choices)?raw.choices:[];
+  const first=choices[0]&&choices[0].message?choices[0].message:{};
+  return {text:String(first.content||''),model:String(raw.model||fallbackModel||''),usage:aiNormalizeOpenAIUsage(raw.usage),raw};
+}
+function aiParseResponse(provider,raw,fallbackModel){
+  return provider==='anthropic'?aiParseAnthropicResponse(raw,fallbackModel):aiParseOpenAIResponse(raw,fallbackModel);
+}
+function aiEmbeddingVector(value){
+  return (Array.isArray(value)?value:[]).map(Number).filter(n=>Number.isFinite(n));
+}
+function aiParseEmbeddingResponse(raw,fallbackModel){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const data=(Array.isArray(raw.data)?raw.data:[]).slice().sort((a,b)=>(a&&Number.isFinite(a.index)?a.index:0)-(b&&Number.isFinite(b.index)?b.index:0));
+  return {
+    model:String(raw.model||fallbackModel||''),
+    embeddings:data.map(row=>aiEmbeddingVector(row&&row.embedding)),
+    usage:aiNormalizeOpenAIUsage(raw.usage),
+    raw,
+  };
+}
+function aiSafeErrorText(body,secret){
+  let text=String(body||'').replace(/\s+/g,' ').trim();
+  const key=String(secret||'');
+  if(key) text=text.split(key).join('[redacted]');
+  text=text.replace(/Bearer\s+[^\s"']+/gi,'Bearer [redacted]');
+  text=text.replace(/\bsk-[A-Za-z0-9_-]+/g,'[redacted]');
+  return text.slice(0,120);
+}
+function aiErr(status, endpoint, provider, body, secret){
+  const safeEndpoint=aiSafeEndpoint(endpoint);
+  let pageOrigin='null'; try{ if(typeof location!=='undefined'&&location.origin) pageOrigin=location.origin; }catch(e){}
+  const message=(status===401||status===403)?'AI key rejected - check the key for this engine.'
+    : status===404?'AI endpoint or model not found at '+safeEndpoint+'.'
+    : status===0?("AI couldn't reach "+safeEndpoint+" - the server isn't running, or it's blocking this page (CORS). Allow origin "+pageOrigin+": set OLLAMA_ORIGINS=* and restart Ollama, or enable CORS in LM Studio (see kit/AI_LOCAL_SETUP.md). Anthropic's browser header is already sent.")
+    : status===429?'AI provider is rate-limiting - try again in a moment.'
+    : status>=500?'AI provider is having trouble (server error) - try again shortly.'
+    : status?('AI provider error '+status):"AI couldn't reach "+safeEndpoint+'.';
+  const detail=aiSafeErrorText(body,secret);
+  const e=new Error(message+(detail?' '+detail:''));
+  e.status=status||0; e.provider=provider||''; e.endpoint=safeEndpoint;
+  return e;
+}
+async function aiFetch(url, opts, meta, tries){
+  meta=meta||{}; tries=tries||1; let last;
+  for(let i=0;i<tries;i++){
+    if(i) await aiSleep(400*Math.pow(2,i-1)+Math.floor(Math.random()*200));
+    let r; try{ r=await fetch(url,opts); }catch(e){ last=aiErr(0,url,meta.provider,'',meta.secret); continue; }
+    if(r.status===429||r.status>=500){ last=aiErr(r.status,url,meta.provider,'',meta.secret); continue; }
+    return r;
+  }
+  throw last||aiErr(0,url,meta&&meta.provider,'',meta&&meta.secret);
+}
+async function aiSend(engine,chat){
+  const request=aiBuildRequest(engine,chat||{});
+  const secret=engine&&engine.key;
+  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},1);
+  if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
+  const result=aiParseResponse(request.provider,await r.json(),request.model);
+  if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+  return result;
+}
+async function aiEmbed(engine,request){
+  const built=aiBuildOpenAIEmbeddingRequest(engine,request||{});
+  const secret=engine&&engine.key;
+  const r=await aiFetch(built.url,built.opts,{provider:built.provider,secret},1);
+  if(!r.ok) throw aiErr(r.status,built.url,built.provider,await r.text().catch(()=>''),secret);
+  return aiParseEmbeddingResponse(await r.json(),built.model);
+}
+async function aiTestConnection(engine){
+  const provider=aiProvider(engine);
+  if(provider==='anthropic'){
+    await aiSend(engine,{messages:[{role:'user',content:'ping'}],model:engine&&engine.model,maxTokens:1});
+    return {ok:true,provider};
+  }
+  const request=aiBuildOpenAIModelsRequest(engine);
+  const secret=engine&&engine.key;
+  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},1);
+  if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
+  let raw=null; try{ raw=await r.json(); }catch(e){}
+  return {ok:true,provider,raw};
+}
+/* ========================================================================== *
+   AI usage ledger - device-local cost tracking from normalized token usage.
+
+   Prices are tunable data, expressed in dollars per million billed tokens.
+   Unknown cloud models cost 0 and keep a visible price-gap flag.
+ * ========================================================================== */
+const AI_PRICE_TABLE={
+  anthropic:{
+    'claude-opus-4-8':{in:5,out:25,cacheRead:0.5,cacheWrite:6.25},
+    'claude-sonnet-4-6':{in:3,out:15,cacheRead:0.3,cacheWrite:3.75},
+    'claude-haiku-4-5':{in:1,out:5,cacheRead:0.1,cacheWrite:1.25},
+  },
+  openai:{
+    // Fill from OpenAI pricing rows as needed.
+  },
+  local:{
+    '*':{in:0,out:0,cacheRead:0,cacheWrite:0},
+  },
+};
+let usageMeterRefreshers=[];
+
+function usagePriceProvider(engine){
+  const type=typeof engine==='string'?engine:String(engine&&engine.type||'');
+  if(type==='Anthropic API'||type==='anthropic') return 'anthropic';
+  if(type==='OpenAI-compatible local endpoint'||type==='local') return 'local';
+  if(type==='OpenAI API'||type==='Other HTTP endpoint'||type==='openai') return 'openai';
+  return '';
+}
+function usageModelName(model){
+  return String(model||'').trim()||'(unknown model)';
+}
+function usageTokens(usage){
+  usage=usage&&typeof usage==='object'?usage:{};
+  return {
+    inputTokens:usageMetric(usage.inputTokens),
+    outputTokens:usageMetric(usage.outputTokens),
+    cacheRead:usageMetric(usage.cacheRead),
+    cacheWrite:usageMetric(usage.cacheWrite),
+  };
+}
+function priceForModel(model, provider){
+  const name=usageModelName(model), table=AI_PRICE_TABLE;
+  if(provider==='local') return {provider:'local',price:table.local['*']};
+  if(provider&&table[provider]&&table[provider][name]) return {provider,price:table[provider][name]};
+  const found=Object.keys(table).find(key=>key!=='local'&&table[key]&&table[key][name]);
+  return found?{provider:found,price:table[found][name]}:{provider:provider||'',price:null};
+}
+function costOf(model, normalizedUsage, provider){
+  const name=usageModelName(model), usage=usageTokens(normalizedUsage), pricing=priceForModel(name,provider);
+  const price=pricing.price;
+  if(!price) return {model:name,provider:pricing.provider,cost:0,usage,price:null,priceGap:true,note:'no price set'};
+  const cost=((usage.inputTokens*usageMetric(price.in))+(usage.outputTokens*usageMetric(price.out))+(usage.cacheRead*usageMetric(price.cacheRead))+(usage.cacheWrite*usageMetric(price.cacheWrite)))/1000000;
+  return {model:name,provider:pricing.provider,cost,usage,price,priceGap:false,note:''};
+}
+function usageDateParts(now){
+  const d=now instanceof Date?now:new Date(now||Date.now());
+  const pad=n=>String(n).padStart(2,'0');
+  const day=d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+  return {day,month:day.slice(0,7)};
+}
+function usageCostRecord(cost){
+  if(typeof cost==='number') return {cost:usageMetric(cost),usage:usageTokens({}),priceGap:false};
+  cost=cost&&typeof cost==='object'?cost:{};
+  return {cost:usageMetric(cost.cost),usage:usageTokens(cost.usage),priceGap:!!cost.priceGap};
+}
+function usageAddToBucket(bucket, model, cost){
+  const name=usageModelName(model), rec=usageCostRecord(cost);
+  bucket.cost+=rec.cost;
+  bucket.inputTokens+=rec.usage.inputTokens;
+  bucket.outputTokens+=rec.usage.outputTokens;
+  bucket.cacheRead+=rec.usage.cacheRead;
+  bucket.cacheWrite+=rec.usage.cacheWrite;
+  bucket.calls+=1;
+  const m=bucket.models[name]||{cost:0,inputTokens:0,outputTokens:0,cacheRead:0,cacheWrite:0,calls:0,priceGap:false};
+  m.cost+=rec.cost;
+  m.inputTokens+=rec.usage.inputTokens;
+  m.outputTokens+=rec.usage.outputTokens;
+  m.cacheRead+=rec.usage.cacheRead;
+  m.cacheWrite+=rec.usage.cacheWrite;
+  m.calls+=1;
+  m.priceGap=!!(m.priceGap||rec.priceGap);
+  bucket.models[name]=m;
+  if(rec.priceGap) bucket.priceGaps[name]=true;
+  return bucket;
+}
+function currentUsageLedger(){
+  DB.usageLedger=normalizeUsageLedger(DB.usageLedger);
+  return DB.usageLedger;
+}
+function recordUsage(model, cost, now){
+  const ledger=currentUsageLedger(), parts=usageDateParts(now);
+  ledger.byDay[parts.day]=normalizeUsageBucket(ledger.byDay[parts.day]);
+  ledger.byMonth[parts.month]=normalizeUsageBucket(ledger.byMonth[parts.month]);
+  usageAddToBucket(ledger.session,model,cost);
+  usageAddToBucket(ledger.byDay[parts.day],model,cost);
+  usageAddToBucket(ledger.byMonth[parts.month],model,cost);
+  ledger.lastModel=usageModelName(model);
+  ledger.lastPriceGap=!!(cost&&typeof cost==='object'&&cost.priceGap);
+  if(typeof saveLocal==='function') saveLocal({forceMirror:true});
+  if(typeof notifyUsageMeters==='function') notifyUsageMeters();
+  return ledger;
+}
+function recordAiUsage(engine,result){
+  result=result&&typeof result==='object'?result:{};
+  const model=usageModelName(result.model||(engine&&engine.model));
+  const cost=costOf(model,result.usage,usagePriceProvider(engine));
+  return recordUsage(model,cost);
+}
+function setUsageMonthlyBudget(value){
+  const ledger=currentUsageLedger();
+  ledger.monthlyBudget=usageMetric(value);
+  if(typeof saveLocal==='function') saveLocal({forceMirror:true});
+  if(typeof notifyUsageMeters==='function') notifyUsageMeters();
+  return ledger.monthlyBudget;
+}
+function usageFormatCost(value){
+  const n=usageMetric(value);
+  return '$'+(n>=1?n.toFixed(2):n>=0.01?n.toFixed(4):n.toFixed(6));
+}
+function usageFormatTokens(value){
+  return String(Math.round(usageMetric(value))).replace(/\B(?=(\d{3})+(?!\d))/g,',');
+}
+function usageSummary(now){
+  const ledger=currentUsageLedger(), parts=usageDateParts(now);
+  const today=normalizeUsageBucket(ledger.byDay[parts.day]), month=normalizeUsageBucket(ledger.byMonth[parts.month]);
+  const active=typeof getActiveEngine==='function'?getActiveEngine():null;
+  return {ledger,today,month,model:ledger.lastModel||(active&&active.model)||'(no calls yet)'};
+}
+function notifyUsageMeters(){
+  if(typeof usageMeterRefreshers==='undefined') return;
+  usageMeterRefreshers=usageMeterRefreshers.filter(fn=>{ try{ fn(); return true; }catch(e){ return false; } });
+}
+function usageBreakdownRows(bucket,label){
+  return h('div',{class:'usage-breakdown-row'},
+    h('b',null,label),
+    h('span',null,'in '+usageFormatTokens(bucket.inputTokens)),
+    h('span',null,'out '+usageFormatTokens(bucket.outputTokens)),
+    h('span',null,'read '+usageFormatTokens(bucket.cacheRead)),
+    h('span',null,'write '+usageFormatTokens(bucket.cacheWrite)));
+}
+function usageMeter(){
+  const root=h('details',{class:'usage-meter'});
+  function draw(){
+    const wasOpen=!!root.open, summary=usageSummary(), ledger=summary.ledger, over=ledger.monthlyBudget>0&&summary.month.cost>=ledger.monthlyBudget;
+    const gap=ledger.lastPriceGap||Object.keys(summary.month.priceGaps||{}).length>0;
+    root.className='usage-meter'+(over?' warn':'')+(gap?' gap':'');
+    root.open=wasOpen;
+    const budgetIn=h('input',{type:'number',min:'0',step:'1',value:ledger.monthlyBudget||'',placeholder:'0'});
+    budgetIn.onchange=()=>setUsageMonthlyBudget(budgetIn.value);
+    root.replaceChildren(
+      h('summary',null,'session '+usageFormatCost(ledger.session.cost)+' | today '+usageFormatCost(summary.today.cost)+' | this month '+usageFormatCost(summary.month.cost)+' | '+summary.model+(gap?' | no price set':'')),
+      h('div',{class:'usage-meter-body'},
+        usageBreakdownRows(ledger.session,'Session'),
+        usageBreakdownRows(summary.today,'Today'),
+        usageBreakdownRows(summary.month,'Month'),
+        h('label',{class:'usage-budget'},'Soft monthly budget',budgetIn),
+        over?h('p',{class:'usage-warning'},'Monthly budget reached.'):null));
+  }
+  usageMeterRefreshers.push(draw);
+  draw();
+  return root;
 }
 /* ========================================================================== *
    THE VAEL NAMING TREE — an illustrated plate (ported faithfully from the
@@ -4046,6 +4728,120 @@ function checkConsistency(queueText, indexText){
   reserved.forEach(id=>{ if(!queueSet.has(id)) issues.push({level:'info', msg:`${id} is reserved in the index but has no queue card (likely already promoted, or the card was retired).`}); });
   return issues;
 }
+
+/* ---- promoted canon graph helpers ---------------------------------------- */
+function canonGraphSlug(value){
+  return String(value||'').toLowerCase().replace(/[`*_~]/g,'').replace(/&/g,' and ')
+    .replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'')||'canon';
+}
+function canonGraphTitleKey(value){
+  return canonGraphSlug(value).replace(/\b(the|a|an|of|and)\b/g,'').replace(/-+/g,'-').replace(/(^-|-$)/g,'');
+}
+function canonGraphDomainLabel(file){
+  const row=DOMAIN_FILES.find(d=>d.file===file);
+  if(row) return row.topic.split('—')[0].replace(/\s*\([^)]*\)\s*/g,'').trim();
+  const base=String(file||'').replace(/^domains\//,'').replace(/\.md$/,'').replace(/^\d+_/,'').replace(/_/g,' ').toLowerCase();
+  return base.replace(/\b\w/g,ch=>ch.toUpperCase());
+}
+function canonGraphDomainAliases(file){
+  const label=canonGraphDomainLabel(file), row=DOMAIN_FILES.find(d=>d.file===file);
+  const bits=[label, file, String(file||'').replace(/^domains\/\d*_?/,'').replace(/\.md$/,'').replace(/_/g,' ')];
+  if(row) bits.push(row.topic, ...row.topic.split(/[—,&/()]+/));
+  if(/20_GODS/.test(file)) bits.push('Gods', 'Divinity');
+  if(/30_GODLINGS/.test(file)) bits.push('Godlings', 'System');
+  if(/40_PEOPLES/.test(file)) bits.push('Peoples', 'Races');
+  if(/50_ARKBORNE/.test(file)) bits.push('Arkborne', 'Seeds');
+  if(/60_MAGIC/.test(file)) bits.push('Magic', 'Elements', 'Domains');
+  return [...new Set(bits.map(canonGraphTitleKey).filter(Boolean))];
+}
+function canonGraphDomainFileForLabel(label){
+  const key=canonGraphTitleKey(label);
+  return (DOMAIN_FILES.find(d=>canonGraphDomainAliases(d.file).includes(key))||{}).file || '';
+}
+function parseCanonIndexPromotedIds(indexText){
+  const out=[];
+  String(indexText||'').split('\n').forEach((line,idx)=>{
+    const trimmed=line.trim();
+    const idMatch=/^-\s+([A-Z]{3}-\d{3})\s+[—-]\s+/.exec(trimmed);
+    if(!idMatch || !/promoted/i.test(trimmed) || /not yet promoted/i.test(trimmed)) return;
+    const file=(/domains\/[0-9A-Za-z_]+\.md/.exec(trimmed)||[])[0]||'';
+    if(!file) return;
+    const rest=trimmed.replace(new RegExp('^-\\s+'+idMatch[1]+'\\s+[—-]\\s+'),'');
+    const cut=rest.search(/\s+(?:→|—)\s+`?domains\//);
+    const title=(cut>=0?rest.slice(0,cut):rest.replace(/`?domains\/[0-9A-Za-z_]+\.md`?.*$/,'')).trim();
+    out.push({id:idMatch[1],title,file,domain:canonGraphDomainLabel(file),line:idx+1});
+  });
+  return out;
+}
+function parsePromotedDomainEntries(text,file){
+  const lines=String(text||'').split('\n'), entries=[];
+  const startEntry=(kind,title,id,line,start)=>{
+    entries.push({kind,id:id||'',title:title.trim(),file,domain:canonGraphDomainLabel(file),line,start,end:lines.length,body:''});
+  };
+  for(let i=0;i<lines.length;i++){
+    const idHead=/^##\s+([A-Z]{3}-\d{3})\s+[—-]\s+(.+?)\s*$/.exec(lines[i]);
+    const foundation=/^###\s+(.+?)\s*$/.exec(lines[i]);
+    if(idHead) startEntry('id',idHead[2],idHead[1],i+1,i+1);
+    else if(foundation) startEntry('foundation',foundation[1],'',i+1,i+1);
+  }
+  entries.forEach((entry,index)=>{
+    const next=entries[index+1];
+    entry.end=next?next.start-1:lines.length;
+    entry.body=lines.slice(entry.start,entry.end).join('\n').trim();
+    entry.nodeId=entry.id || file+'#'+canonGraphSlug(entry.title);
+    entry.shortId=entry.id || canonGraphSlug(entry.title);
+  });
+  return entries.filter(entry=>entry.title && entry.body);
+}
+function canonCitationRefs(text){
+  const refs=[], re=/\(([^()\n—-]{2,50})\s+[—-]\s+([^()\n]{2,120})\)/g;
+  let m; while((m=re.exec(String(text||'')))){
+    const domain=m[1].trim(), title=m[2].trim();
+    if(domain && title) refs.push({domain,title});
+  }
+  return refs;
+}
+function canonGraphResolveTitle(nodes,domainLabel,title){
+  const file=canonGraphDomainFileForLabel(domainLabel), titleKey=canonGraphTitleKey(title);
+  const inDomain=nodes.filter(node=>file?node.file===file:canonGraphTitleKey(node.domain)===canonGraphTitleKey(domainLabel));
+  const scored=inDomain.map(node=>{
+    const key=canonGraphTitleKey(node.title);
+    const score=key===titleKey?4:key.startsWith(titleKey)||titleKey.startsWith(key)?3:key.includes(titleKey)||titleKey.includes(key)?2:0;
+    return {node,score};
+  }).filter(x=>x.score).sort((a,b)=>b.score-a.score || a.node.order-b.node.order);
+  return scored[0]&&scored[0].node||null;
+}
+function buildCanonGraph(indexText,domainDocs){
+  const indexEntries=parseCanonIndexPromotedIds(indexText), nodes=[], byNodeId=new Map(), byId=new Map();
+  const domainOrder=new Map(DOMAIN_FILES.map((d,i)=>[d.file,i]));
+  (Array.isArray(domainDocs)?domainDocs:[]).forEach(doc=>{
+    parsePromotedDomainEntries(doc&&doc.text,doc&&doc.file).forEach(entry=>{
+      entry.order=(domainOrder.has(entry.file)?domainOrder.get(entry.file)*1000:9000)+nodes.length;
+      const indexed=entry.id && indexEntries.find(row=>row.id===entry.id);
+      if(indexed) entry.index=indexed;
+      nodes.push(entry); byNodeId.set(entry.nodeId,entry); if(entry.id) byId.set(entry.id,entry);
+    });
+  });
+  indexEntries.forEach(entry=>{
+    if(byId.has(entry.id)) return;
+    const node={kind:'id',id:entry.id,title:entry.title,file:entry.file,domain:entry.domain,line:entry.line,start:0,end:0,body:'',nodeId:entry.id,shortId:entry.id,index:entry,
+      order:(domainOrder.has(entry.file)?domainOrder.get(entry.file)*1000:9000)+nodes.length};
+    nodes.push(node); byNodeId.set(node.nodeId,node); byId.set(node.id,node);
+  });
+  nodes.sort((a,b)=>a.order-b.order);
+  const edges=[], seen=new Set();
+  const addEdge=(source,target,type,label)=>{
+    if(!source||!target||source.nodeId===target.nodeId) return;
+    const key=source.nodeId+'→'+target.nodeId+'|'+type;
+    if(seen.has(key)) return; seen.add(key);
+    edges.push({source:source.nodeId,target:target.nodeId,type,label:label||''});
+  };
+  const byFile={};
+  nodes.forEach(node=>{ (byFile[node.file]=byFile[node.file]||[]).push(node); });
+  Object.values(byFile).forEach(list=>list.sort((a,b)=>a.order-b.order).forEach((node,i)=>{ if(i) addEdge(list[i-1],node,'domain','same domain'); }));
+  nodes.forEach(node=>canonCitationRefs(node.body).forEach(ref=>addEdge(node,canonGraphResolveTitle(nodes,ref.domain,ref.title),'citation',ref.domain+' — '+ref.title)));
+  return {nodes,edges,indexEntries};
+}
 /* ========================================================================== *
    CANON STUDIO (Worldbuilder profile) — browse canon, an inbox of her work,
    a Canon Card drafter (+ auto ID), and a promotion board. All repo-backed
@@ -4062,6 +4858,8 @@ const STUDIO_TABS=[
   ['inbox','In-tray','Raw ideas and the maker’s creations, waiting to be turned into Canon Cards.'],
   ['drafter','Draft a card','Turn an idea into a Canon Card (Draft) — it lands in the queue with its own reserved ID.'],
   ['browse','Look up','Read and search your promoted canon. Reference only — nothing here changes canon.'],
+  ['assistant','Assistant','Ask a local-first AI helper grounded only in promoted canon. Suggestions stay Draft or campaign-only until you choose.'],
+  ['graph','Canon graph','See promoted canon as a read-only web: foundation entries, promoted cards, domains, and cross-references.'],
 ];
 function viewStudio(tab, params){
   tab = tab || 'board';
@@ -4083,6 +4881,8 @@ function viewStudio(tab, params){
   else if(tab==='threads') studioThreads(host);
   else if(tab==='inbox') studioInbox(host);
   else if(tab==='drafter') studioDrafter(host, params&&params.prefill);
+  else if(tab==='assistant') studioAssistant(host);
+  else if(tab==='graph') studioGraph(host);
   else if(tab==='board') studioBoard(host);
   return f;
 }
@@ -4288,6 +5088,763 @@ function consistencyBanner(issues){
   warns.forEach(i=> ul.append(h('li',{style:{color:'#9a5b1c', margin:'2px 0'}}, i.msg)));
   infos.forEach(i=> ul.append(h('li',{style:{color:'var(--ink-soft)', margin:'2px 0'}}, i.msg)));
   box.append(ul); return box;
+}
+/* ========================================================================== *
+   CANON GRAPH — read-only promoted-canon map for Canon Studio.
+
+   Reads the live domain files plus 01_CANON_INDEX.md, builds a deterministic
+   graph, and opens promoted/foundational entries in the existing read-only
+   Studio overlay language. No writes; no queue mutation; no graph dependency.
+ * ========================================================================== */
+const CANON_GRAPH_COLORS=['#9c6b2f','#5f8c53','#6f6076','#456f83','#b55e45','#6d7f48','#8a6ca8','#a67c52','#608c8e'];
+const CANON_GRAPH_NS='http://www.w3.org/2000/svg';
+
+function canonGraphDomainColor(file){
+  const idx=Math.max(0,DOMAIN_FILES.findIndex(d=>d.file===file));
+  return CANON_GRAPH_COLORS[idx%CANON_GRAPH_COLORS.length];
+}
+function canonGraphShortTitle(title){
+  const text=String(title||'Canon');
+  return text.length>34?text.slice(0,31)+'…':text;
+}
+function canonGraphLayout(graph){
+  const g=graph||{}, nodes=(g.nodes||[]).slice().sort((a,b)=>a.order-b.order);
+  const files=[...new Set(nodes.map(node=>node.file))].sort((a,b)=>{
+    const ai=DOMAIN_FILES.findIndex(d=>d.file===a), bi=DOMAIN_FILES.findIndex(d=>d.file===b);
+    return (ai<0?999:ai)-(bi<0?999:bi)||String(a).localeCompare(String(b));
+  });
+  const colW=230, rowH=74, top=88, left=92, bottom=70;
+  const byFile={}; nodes.forEach(node=>{ (byFile[node.file]=byFile[node.file]||[]).push(node); });
+  const positioned=[];
+  files.forEach((file,fi)=>{
+    const list=(byFile[file]||[]).sort((a,b)=>a.order-b.order);
+    list.forEach((node,ni)=>positioned.push({...node,x:left+fi*colW,y:top+ni*rowH,color:canonGraphDomainColor(file)}));
+  });
+  const byId=new Map(positioned.map(node=>[node.nodeId,node]));
+  const edgeRows=(g.edges||[]).map(edge=>({...edge,from:byId.get(edge.source),to:byId.get(edge.target)})).filter(edge=>edge.from&&edge.to);
+  const maxRows=Math.max(1,...files.map(file=>(byFile[file]||[]).length));
+  return {
+    width:Math.max(620,left*2+Math.max(1,files.length-1)*colW+190),
+    height:Math.max(360,top+maxRows*rowH+bottom),
+    files:files.map((file,idx)=>({file,domain:canonGraphDomainLabel(file),x:left+idx*colW,color:canonGraphDomainColor(file),count:(byFile[file]||[]).length})),
+    nodes:positioned,
+    edges:edgeRows,
+  };
+}
+function canonGraphSvg(tag,attrs,...kids){
+  const el=document.createElementNS(CANON_GRAPH_NS,tag);
+  if(attrs) Object.entries(attrs).forEach(([k,v])=>{ if(v!=null&&v!==false) el.setAttribute(k,String(v)); });
+  kids.flat().forEach(kid=>{ if(kid!=null&&kid!==false) el.append(kid.nodeType?kid:document.createTextNode(String(kid))); });
+  return el;
+}
+function canonGraphSvgNode(node,onOpen){
+  const group=canonGraphSvg('g',{class:'canon-graph-node'+(node.id?' id-bearing':' foundational'),role:'button',tabindex:'0','aria-label':'Read '+node.title});
+  group.append(canonGraphSvg('circle',{cx:node.x,cy:node.y,r:15,fill:node.color}));
+  group.append(canonGraphSvg('text',{x:node.x,y:node.y+4,'text-anchor':'middle',class:'canon-graph-node-id'},node.id?node.id.split('-')[0]:'•'));
+  group.append(canonGraphSvg('text',{x:node.x+24,y:node.y-3,class:'canon-graph-node-title'},canonGraphShortTitle(node.title)));
+  group.append(canonGraphSvg('text',{x:node.x+24,y:node.y+15,class:'canon-graph-node-meta'},node.id||'foundational'));
+  group.addEventListener('click',()=>onOpen(node));
+  group.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onOpen(node); } });
+  return group;
+}
+function canonGraphSvgView(graph,onOpen){
+  const layout=canonGraphLayout(graph);
+  const svg=canonGraphSvg('svg',{class:'canon-graph-svg',role:'img','aria-label':'Promoted canon graph',viewBox:'0 0 '+layout.width+' '+layout.height,preserveAspectRatio:'xMinYMin meet'});
+  const edgeLayer=canonGraphSvg('g',{class:'canon-graph-edges'});
+  layout.edges.forEach(edge=>{
+    const citation=edge.type==='citation';
+    edgeLayer.append(canonGraphSvg('line',{
+      x1:edge.from.x,y1:edge.from.y,x2:edge.to.x,y2:edge.to.y,
+      class:'canon-graph-edge '+(citation?'citation':'domain'),
+      'data-label':edge.label||'',
+    }));
+  });
+  svg.append(edgeLayer);
+  const labelLayer=canonGraphSvg('g',{class:'canon-graph-domain-labels'});
+  layout.files.forEach(file=>{
+    labelLayer.append(canonGraphSvg('text',{x:file.x,y:34,'text-anchor':'middle',class:'canon-graph-domain'},file.domain));
+    labelLayer.append(canonGraphSvg('text',{x:file.x,y:52,'text-anchor':'middle',class:'canon-graph-domain-count'},file.count+' node'+(file.count===1?'':'s')));
+  });
+  svg.append(labelLayer);
+  const nodeLayer=canonGraphSvg('g',{class:'canon-graph-nodes'});
+  layout.nodes.forEach(node=>nodeLayer.append(canonGraphSvgNode(node,onOpen)));
+  svg.append(nodeLayer);
+  return svg;
+}
+function canonGraphReaderNode(entry,close){
+  const body=h('div',{class:'card-reader canon-graph-reader'});
+  body.append(h('dl',{class:'card-reader-meta'},
+    h('div',null,h('dt',null,'Kind'),h('dd',null,entry.id?'Promoted Canon Card':'Foundational canon')),
+    h('div',null,h('dt',null,'Domain'),h('dd',null,entry.domain||'—')),
+    h('div',null,h('dt',null,'File'),h('dd',null,entry.file||'—')),
+    h('div',null,h('dt',null,'Line'),h('dd',null,entry.line||'—'))));
+  if(entry.id) body.append(studioCardReaderSection('Canon ID',entry.id));
+  const doc=h('div',{class:'canon-doc canon-graph-reader-doc'});
+  doc.innerHTML=mdToHtml(entry.body||'_No domain body found for this index entry._');
+  body.append(doc,h('div',{class:'toolrow card-reader-actions'},h('button',{class:'navbtn primary',type:'button',onclick:close},'Close')));
+  return body;
+}
+function openCanonGraphEntryReader(entry){
+  return openOverlay(close=>h('div',{class:'modal card-reader-modal canon-graph-modal'},
+    h('h2',{class:'display'},entry.title||entry.id||'Canon entry'),
+    h('p',{class:'hint'},'Read-only promoted canon from '+(entry.file||'a domain file')+'.'),
+    canonGraphReaderNode(entry,close)));
+}
+function canonGraphPanel(graph){
+  const count=(graph.nodes||[]).length, citationCount=(graph.edges||[]).filter(edge=>edge.type==='citation').length;
+  const panel=h('div',{class:'canon-graph'});
+  panel.append(h('div',{class:'canon-graph-summary'},
+    h('b',null,count+' canon node'+(count===1?'':'s')),
+    h('span',null,citationCount+' cross-reference link'+(citationCount===1?'':'s')+' resolved from “(Domain — Title)” citations')));
+  if(!count){
+    panel.append(h('p',{class:'hint',style:{textAlign:'center'}},'No promoted canon entries found in the domain files yet.'));
+    return panel;
+  }
+  panel.append(h('div',{class:'canon-graph-stage'},canonGraphSvgView(graph,openCanonGraphEntryReader)));
+  panel.append(h('div',{class:'canon-graph-legend'},
+    h('span',null,h('i',{class:'canon-graph-key domain'}),' same-domain chain'),
+    h('span',null,h('i',{class:'canon-graph-key citation'}),' cross-reference citation'),
+    h('span',null,'Tap a node to read its domain entry.')));
+  return panel;
+}
+// Session cache: the index + nine domain files don't change mid-session unless the user
+// promotes a card, so we build the graph once and reuse it across tab switches. "Refresh"
+// busts it to re-pull live canon (e.g. after a promotion). viewStudio already gates ghReady,
+// so studioGraph only runs when the file is connected.
+let canonGraphCache=null;
+async function canonGraphBuild(){
+  const cfg=ghCfg();
+  const [index,...docs]=await Promise.all([
+    ghGetText(cfg,INDEX_PATH),
+    ...DOMAIN_FILES.map(d=>ghGetText(cfg,d.file).then(r=>({file:d.file,text:r&&r.text||''})).catch(()=>({file:d.file,text:''}))),
+  ]);
+  return buildCanonGraph(index&&index.text||'',docs);
+}
+function studioGraph(host){
+  const render=graph=>{
+    const panel=canonGraphPanel(graph);
+    panel.prepend(h('div',{class:'toolrow canon-graph-refresh'},
+      h('button',{class:'navbtn',title:'Re-pull the live domain files (after a promotion)',
+        onclick:()=>{ canonGraphCache=null; studioGraph(host); }},'↻ Refresh from canon')));
+    host.replaceChildren(panel);
+  };
+  if(canonGraphCache){ render(canonGraphCache); return; }
+  host.replaceChildren(h('p',{class:'hint',style:{textAlign:'center'}},'Building the canon graph from the live domain files…'));
+  (async()=>{
+    try{ canonGraphCache=await canonGraphBuild(); render(canonGraphCache); }
+    catch(e){ host.replaceChildren(h('p',{class:'hint'},'Canon graph unavailable: '+e.message)); }
+  })();
+}
+const CANON_RAG_MAX_GROUNDING_ENTRIES=5;
+const CANON_RAG_MAX_ENTRY_CHARS=1200;
+const CANON_RAG_GROUNDING_CHAR_BUDGET=4000;
+const CANON_EMBED_TEXT_CHARS=3000;
+const CANON_EMBED_DB='vfj-canon-embeddings';
+const CANON_EMBED_STORE='vectors';
+const CANON_RAG_STOPWORDS={
+  a:1, an:1, and:1, are:1, as:1, at:1, be:1, but:1, by:1, can:1, do:1,
+  does:1, for:1, from:1, how:1, i:1, if:1, in:1, into:1, is:1, it:1,
+  me:1, my:1, of:1, on:1, or:1, should:1, that:1, the:1, their:1,
+  them:1, this:1, to:1, was:1, what:1, when:1, where:1, who:1, why:1,
+  with:1, would:1, you:1, your:1
+};
+
+let canonCorpusCache=null;
+let canonEmbedDb=null;
+
+function canonRagTerms(text){
+  return Array.from(new Set(String(text||'').toLowerCase().replace(/[`*_~#[\](){}>"']/g,' ').replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(t=>t.length>2&&!CANON_RAG_STOPWORDS[t])));
+}
+
+function canonRagClampText(text, max){
+  const s=String(text||'').trim();
+  if(s.length<=max) return s;
+  return s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...';
+}
+
+function canonDomainOrder(file){
+  const index=DOMAIN_FILES.findIndex(d=>d.file===file);
+  return index>=0?index:999;
+}
+
+function canonEntryRef(entry){
+  return String(entry&&entry.id||entry&&entry.shortId||entry&&entry.nodeId||entry&&entry.corpusId||entry&&entry.title||'canon').trim();
+}
+
+function canonEntrySortKey(entry){
+  const line=Number(entry&&entry.start||entry&&entry.line||0);
+  return canonDomainOrder(entry&&entry.file)*100000+(Number.isFinite(line)?line:0);
+}
+
+function canonCorpusFromDocs(indexText, domainDocs){
+  const rows=parseCanonIndexPromotedIds(indexText||''), byId={}, seen={};
+  rows.forEach(row=>{ byId[row.id]=row; });
+  const out=[];
+  (domainDocs||[]).forEach(doc=>{
+    const file=doc&&doc.file||'';
+    parsePromotedDomainEntries(doc&&doc.text||'',file).forEach(entry=>{
+      if(entry.id&&!byId[entry.id]) return;
+      const indexed=entry.id?byId[entry.id]:null;
+      const ref=entry.id||entry.nodeId||file+'#'+canonGraphSlug(entry.title);
+      out.push(Object.assign({},indexed||{},entry,{
+        id:entry.id||'',
+        corpusId:ref,
+        title:entry.title||(indexed&&indexed.title)||ref,
+        file:entry.file||file,
+        domain:entry.domain||canonGraphDomainLabel(file),
+        body:entry.body||'',
+        indexRow:indexed||null,
+        order:canonEntrySortKey(entry)
+      }));
+      if(entry.id) seen[entry.id]=true;
+    });
+  });
+  rows.forEach(row=>{
+    if(seen[row.id]) return;
+    out.push(Object.assign({},row,{corpusId:row.id,body:'',indexRow:row,order:canonDomainOrder(row.file)*100000+(row.line||0)}));
+  });
+  return out.sort((a,b)=>(a.order||0)-(b.order||0)||canonEntryRef(a).localeCompare(canonEntryRef(b)));
+}
+
+function canonPromotedCorpus(indexText, domainDocs){
+  return canonCorpusFromDocs(indexText,domainDocs);
+}
+
+function canonScoreEntry(questionTerms, entry){
+  const title=String(entry.title||'').toLowerCase();
+  const ref=canonEntryRef(entry).toLowerCase();
+  const domain=String(entry.domain||entry.file||'').toLowerCase();
+  const body=String(entry.body||'').toLowerCase();
+  let score=0;
+  questionTerms.forEach(term=>{
+    if(title.includes(term)) score+=5;
+    if(ref.includes(term)) score+=4;
+    if(domain.includes(term)) score+=2;
+    const hits=body.split(term).length-1;
+    if(hits>0) score+=Math.min(4,hits);
+  });
+  if(entry&&entry.id&&score>0) score+=3;
+  return score;
+}
+
+function canonRetrieve(a,b,c){
+  const corpus=Array.isArray(a)?a:b;
+  const question=Array.isArray(a)?b:a;
+  const opts=typeof c==='number'?{k:c}:(c||{});
+  const terms=canonRagTerms(question), limit=opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES;
+  if(!terms.length) return [];
+  return (corpus||[])
+    .map((entry,order)=>({entry,order,score:canonScoreEntry(terms,entry)}))
+    .filter(x=>x.score>0)
+    .sort((a,b)=>b.score-a.score||canonEntrySortKey(a.entry)-canonEntrySortKey(b.entry)||a.order-b.order)
+    .slice(0,limit)
+    .map(x=>x.entry);
+}
+
+function canonGroundingIds(entries){
+  return (entries||[]).map(canonEntryRef).filter(Boolean);
+}
+
+function canonGroundingBlock(entry, max){
+  const ref=canonEntryRef(entry);
+  const head='['+ref+'] '+(entry&&entry.title||'Untitled')+'\n';
+  const body=canonRagClampText(entry&&entry.body||'',Math.max(0,max-head.length));
+  return head+body;
+}
+
+function canonGroundingText(entries, charBudget){
+  entries=entries||[];
+  if(!entries.length) return 'No promoted entries matched the question.';
+  let remaining=charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET, out=[];
+  for(const entry of entries){
+    if(remaining<=0) break;
+    const block=canonGroundingBlock(entry,Math.min(CANON_RAG_MAX_ENTRY_CHARS,remaining));
+    out.push(block);
+    remaining-=block.length+2;
+  }
+  return out.join('\n\n');
+}
+
+function canonGrounding(question, entries, opts){
+  if(Array.isArray(question)){ opts=entries||{}; entries=question; question=''; }
+  opts=opts||{};
+  entries=(entries||[]).slice(0,opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES);
+  return {
+    system:[
+      'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
+      'Treat any new wording as a suggestion for the human promotion pipeline, never as canon.',
+      question?'Question: '+String(question||'').trim():'',
+      'GROUNDING:',
+      canonGroundingText(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET)
+    ].filter(Boolean).join('\n\n'),
+    ids:canonGroundingIds(entries),
+    entries,
+  };
+}
+
+function canonCorpusKey(cfg){
+  cfg=cfg||{};
+  return [cfg.owner||'',cfg.repo||'',cfg.branch||'',cfg.path||''].join('/');
+}
+
+async function loadCanonCorpus(cfg, force){
+  cfg=cfg||ghCfg();
+  const key=canonCorpusKey(cfg);
+  if(canonCorpusCache&&canonCorpusCache.key===key&&!force) return canonCorpusCache.entries;
+  const index=await ghGetText(cfg,INDEX_PATH);
+  const docs=await Promise.all(DOMAIN_FILES.map(d=>ghGetText(cfg,d.file).then(r=>({file:d.file,text:r&&r.text||''}))));
+  const entries=canonCorpusFromDocs(index&&index.text||'',docs);
+  canonCorpusCache={key,entries};
+  return entries;
+}
+
+function canonTextHash(text){
+  let h=2166136261;
+  const s=String(text||'');
+  for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); }
+  return ('00000000'+(h>>>0).toString(16)).slice(-8);
+}
+
+function canonSafeEndpoint(endpoint){
+  return String(endpoint||'').trim().split('?')[0].replace(/\/\/([^/@:]+):([^/@]+)@/,'//[redacted]@').replace(/\/+$/,'');
+}
+
+function canonEmbeddingModel(engine){
+  return String(engine&&engine.embeddingModel||'').trim();
+}
+
+function canonCanEmbed(engine){
+  return !!(engine&&engine.type==='OpenAI-compatible local endpoint'&&engine.endpoint&&canonEmbeddingModel(engine));
+}
+
+function canonEmbeddingScopeKey(cfg, engine){
+  cfg=cfg||{}; engine=engine||{};
+  return [cfg.owner||'',cfg.repo||'',cfg.branch||'',canonSafeEndpoint(engine.endpoint),canonEmbeddingModel(engine)].join('|');
+}
+
+function canonEmbeddingText(entry){
+  return canonRagClampText([
+    '['+canonEntryRef(entry)+'] '+(entry&&entry.title||'Untitled'),
+    'Domain: '+String(entry&&entry.domain||''),
+    'File: '+String(entry&&entry.file||''),
+    String(entry&&entry.body||'').trim()
+  ].filter(Boolean).join('\n'),CANON_EMBED_TEXT_CHARS);
+}
+
+function canonEmbeddingRecordKey(scope, entry){
+  return canonTextHash(String(scope||''))+'|'+canonEntryRef(entry);
+}
+
+function canonVector(value){
+  return (Array.isArray(value)?value:[]).map(Number).filter(n=>Number.isFinite(n));
+}
+
+function canonCosine(a,b){
+  a=canonVector(a); b=canonVector(b);
+  const n=Math.min(a.length,b.length);
+  let dot=0, aa=0, bb=0;
+  for(let i=0;i<n;i++){ dot+=a[i]*b[i]; aa+=a[i]*a[i]; bb+=b[i]*b[i]; }
+  return aa&&bb?dot/(Math.sqrt(aa)*Math.sqrt(bb)):0;
+}
+
+function canonEmbedOpen(){
+  if(canonEmbedDb) return Promise.resolve(canonEmbedDb);
+  return new Promise((resolve,reject)=>{
+    let req; try{ req=indexedDB.open(CANON_EMBED_DB,1); }catch(e){ reject(e); return; }
+    req.onupgradeneeded=()=>{ const db=req.result; if(!db.objectStoreNames.contains(CANON_EMBED_STORE)) db.createObjectStore(CANON_EMBED_STORE); };
+    req.onsuccess=()=>{ canonEmbedDb=req.result; resolve(canonEmbedDb); };
+    req.onerror=()=>reject(req.error||new Error('embedding index open failed'));
+  });
+}
+
+function canonEmbedGet(key){
+  return canonEmbedOpen().then(db=>new Promise((resolve,reject)=>{
+    const req=db.transaction(CANON_EMBED_STORE,'readonly').objectStore(CANON_EMBED_STORE).get(key);
+    req.onsuccess=()=>resolve(req.result||null);
+    req.onerror=()=>reject(req.error);
+  }));
+}
+
+function canonEmbedPut(key,value){
+  return canonEmbedOpen().then(db=>new Promise((resolve,reject)=>{
+    const tx=db.transaction(CANON_EMBED_STORE,'readwrite');
+    tx.objectStore(CANON_EMBED_STORE).put(value,key);
+    tx.oncomplete=()=>resolve(value);
+    tx.onerror=()=>reject(tx.error);
+    tx.onabort=()=>reject(tx.error||new Error('embedding index write aborted'));
+  }));
+}
+
+function canonRagStatus(opts, message){
+  if(opts&&typeof opts.onStatus==='function') opts.onStatus(message);
+}
+
+async function canonEnsureEmbeddingIndex(cfg, engine, corpus, opts){
+  opts=opts||{};
+  if(!canonCanEmbed(engine)) throw new Error('Add a local embedding model to this engine to use embedding RAG.');
+  const scope=canonEmbeddingScopeKey(cfg,engine), records=[], missing=[];
+  canonRagStatus(opts,'checking');
+  for(const entry of (corpus||[])){
+    const text=canonEmbeddingText(entry), hash=canonTextHash(text), key=canonEmbeddingRecordKey(scope,entry);
+    let rec=null;
+    if(!opts.force) rec=await canonEmbedGet(key);
+    if(rec&&rec.hash===hash&&Array.isArray(rec.vector)&&rec.vector.length){
+      records.push(Object.assign({},rec,{entry}));
+    }else{
+      missing.push({key,hash,text,entry});
+    }
+  }
+  if(missing.length){
+    canonRagStatus(opts,'building '+missing.length);
+    const result=await aiEmbed(engine,{model:canonEmbeddingModel(engine),input:missing.map(item=>item.text)});
+    for(let i=0;i<missing.length;i++){
+      const item=missing[i], vector=canonVector(result.embeddings&&result.embeddings[i]);
+      if(!vector.length) throw new Error('Embedding server returned no vector for canon entry.');
+      const rec={scope,ref:canonEntryRef(item.entry),hash:item.hash,vector,updatedAt:Date.now()};
+      await canonEmbedPut(item.key,rec);
+      records.push(Object.assign({},rec,{entry:item.entry}));
+    }
+  }
+  canonRagStatus(opts,missing.length?'ready':'ready');
+  return {scope,records,rebuilt:missing.length,total:(corpus||[]).length};
+}
+
+async function canonEmbedQuery(engine, question){
+  const result=await aiEmbed(engine,{model:canonEmbeddingModel(engine),input:String(question||'')});
+  const vector=canonVector(result.embeddings&&result.embeddings[0]);
+  if(!vector.length) throw new Error('Embedding server returned no vector for the question.');
+  return vector;
+}
+
+function canonRetrieveHybrid(question, corpus, index, queryVector, opts){
+  opts=typeof opts==='number'?{k:opts}:(opts||{});
+  const limit=opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES;
+  const records=(index&&index.records)||index||[], byRef={};
+  records.forEach(record=>{ byRef[record.ref||canonEntryRef(record.entry)]=record; });
+  const terms=canonRagTerms(question), qv=canonVector(queryVector);
+  if(!qv.length||!records.length) return canonRetrieve(question,corpus,opts);
+  const ranked=(corpus||[]).map((entry,order)=>{
+    const record=byRef[canonEntryRef(entry)];
+    const vectorScore=record?canonCosine(qv,record.vector):0;
+    const keywordScore=canonScoreEntry(terms,entry);
+    return {entry,order,vectorScore,keywordScore};
+  }).filter(x=>x.vectorScore>0||x.keywordScore>0)
+    .sort((a,b)=>b.vectorScore-a.vectorScore||b.keywordScore-a.keywordScore||canonEntrySortKey(a.entry)-canonEntrySortKey(b.entry)||a.order-b.order);
+  return (ranked.length?ranked.map(x=>x.entry):canonRetrieve(question,corpus,opts)).slice(0,limit);
+}
+
+async function canonGroundingForQuestion(cfg, engine, question, opts){
+  opts=opts||{};
+  const corpus=await loadCanonCorpus(cfg,opts.forceCorpus);
+  let entries=null, embeddingStatus='fallback', warning='';
+  if(canonCanEmbed(engine)){
+    try{
+      const index=await canonEnsureEmbeddingIndex(cfg,engine,corpus,{force:opts.forceIndex,onStatus:opts.onStatus});
+      const queryVector=await canonEmbedQuery(engine,question);
+      entries=canonRetrieveHybrid(question,corpus,index,queryVector,opts);
+      embeddingStatus='ready';
+    }catch(e){
+      warning=e&&e.message?e.message:String(e);
+      canonRagStatus(opts,'fallback');
+    }
+  }else{
+    warning='Embedding model not configured for this local engine.';
+    canonRagStatus(opts,'fallback');
+  }
+  if(!entries) entries=canonRetrieve(question,corpus,opts);
+  return Object.assign(canonGrounding(question,entries,opts),{embeddingStatus,warning});
+}
+const ASSISTANT_MAX_TOKENS=900;
+
+function assistantClampText(text, max){
+  const s=String(text||'').trim();
+  if(s.length<=max) return s;
+  return s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...';
+}
+
+function assistantIdsText(ids){
+  ids=(Array.isArray(ids)?ids:[]).filter(Boolean);
+  return ids.length?ids.join(', '):'none';
+}
+
+function assistantNormalizeGrounding(value){
+  value=value&&typeof value==='object'?value:{};
+  const entries=Array.isArray(value.entries)?value.entries:[];
+  const ids=Array.isArray(value.ids)?value.ids:canonGroundingIds(entries);
+  return {system:String(value.system||''),ids,entries,embeddingStatus:String(value.embeddingStatus||''),warning:String(value.warning||'')};
+}
+
+async function assistantCanonGrounding(question, engine, opts){
+  const cfg=ghCfg();
+  const hook=typeof window!=='undefined'&&window.__canonRag?window.__canonRag:null;
+  opts=opts||{};
+  if(hook&&typeof hook.canonGroundingForQuestion==='function') return assistantNormalizeGrounding(await hook.canonGroundingForQuestion(cfg,engine,question,opts));
+  if(hook&&typeof hook.loadCanonCorpus==='function'&&typeof hook.canonRetrieve==='function'&&typeof hook.canonGrounding==='function'){
+    const corpus=await hook.loadCanonCorpus(cfg);
+    const entries=hook.canonRetrieve(question,corpus);
+    return assistantNormalizeGrounding(hook.canonGrounding(question,entries));
+  }
+  return assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
+}
+
+async function assistantRebuildEmbeddingIndex(engine, onStatus){
+  const cfg=ghCfg();
+  const hook=typeof window!=='undefined'&&window.__canonRag?window.__canonRag:null;
+  if(hook&&typeof hook.rebuildEmbeddingIndex==='function') return hook.rebuildEmbeddingIndex(cfg,engine,onStatus);
+  const corpus=await loadCanonCorpus(cfg,true);
+  return canonEnsureEmbeddingIndex(cfg,engine,corpus,{force:true,onStatus});
+}
+
+function assistantIsLocalEngine(engine){
+  return engine&&engine.type==='OpenAI-compatible local endpoint';
+}
+
+function assistantEngineProfiles(){
+  const settings=engineSettings();
+  return Array.isArray(settings.profiles)?settings.profiles.slice():[];
+}
+
+function assistantDefaultEngine(profiles){
+  const local=(profiles||[]).find(assistantIsLocalEngine);
+  if(local) return local;
+  return getActiveEngine()||(profiles&&profiles[0])||null;
+}
+
+function assistantEngineById(profiles, id){
+  return (profiles||[]).find(p=>p.id===id)||(profiles&&profiles[0])||null;
+}
+
+function assistantFirstApiEngine(profiles){
+  return (profiles||[]).find(p=>!assistantIsLocalEngine(p))||null;
+}
+
+function assistantSpendLabel(engine){
+  if(!engine) return 'No engine selected.';
+  return assistantIsLocalEngine(engine)?'Local endpoint - $0 on this meter.':'API engine - metered usage will be recorded.';
+}
+
+async function assistantCallAi(engine, chat){
+  const hook=typeof window!=='undefined'&&typeof window.__assistantAiSend==='function'?window.__assistantAiSend:null;
+  const result=hook?await hook(engine,chat):await aiSend(engine,chat);
+  if(hook&&typeof recordAiUsage==='function') recordAiUsage(engine,result);
+  return result;
+}
+
+function assistantAnswerToCard(state){
+  const question=String(state&&state.question||'').trim();
+  const answer=String(state&&state.answer||'').trim();
+  const grounding=assistantNormalizeGrounding(state&&state.grounding);
+  const ids=assistantIdsText(grounding.ids);
+  const title=assistantClampText(question||'Canon assistant suggestion',60);
+  const domainHints=Array.from(new Set(grounding.entries.map(e=>e.domain||e.file).filter(Boolean))).join(', ');
+  return {
+    tag:'PEO',
+    title:title,
+    category:domainHints,
+    source:'Canon-grounded AI assistant',
+    claim:assistantClampText(answer,900),
+    means:'Grounded on: '+ids,
+    donot:'Do not treat this as promoted canon until it is reviewed and promoted through the normal pipeline.',
+    notes:'Suggestion only. Drafted from an assistant answer for the question: '+question
+  };
+}
+
+function assistantDraftCanonCard(state){
+  go('studio',{tab:'drafter',params:{prefill:assistantAnswerToCard(state)}});
+}
+
+function assistantLedgerBody(state){
+  const question=String(state&&state.question||'').trim();
+  const answer=String(state&&state.answer||'').trim();
+  const grounding=assistantNormalizeGrounding(state&&state.grounding);
+  return [
+    'Canon assistant suggestion.',
+    'Question: '+question,
+    'Grounded on: '+assistantIdsText(grounding.ids),
+    '',
+    answer
+  ].join('\n');
+}
+
+function assistantLedgerEntry(state, id, date){
+  return {
+    id:id,
+    date:date,
+    phase:'canon-assistant',
+    label:'LORE',
+    body:assistantLedgerBody(state),
+    status:'CAMPAIGN-ONLY'
+  };
+}
+
+async function assistantSendAnswerToLedger(campaignName, state){
+  const name=String(campaignName||'').trim();
+  if(!name) throw new Error('Choose a campaign name before sending to the ledger.');
+  const cfg=ghCfg();
+  const files=await campaignFiles(cfg,name);
+  if(!files||!files.ledger) throw new Error('Campaign ledger not found for '+name+'.');
+  const today=new Date().toISOString().slice(0,10);
+  await ghUpdate(cfg,files.ledger,text=>{
+    const entries=parseLedger(text);
+    return addLedgerEntry(text,assistantLedgerEntry(state,ledgerNextId(entries),today));
+  },'Ledger entry via Canon Assistant',{guard:assertLedger});
+}
+
+function studioAssistant(host){
+  const profiles=assistantEngineProfiles();
+  const state={question:'',answer:'',grounding:{ids:[],entries:[],system:''},model:''};
+  if(!profiles.length){
+    const settingsBtn=h('button',{class:'primary'},'Open Engine settings');
+    settingsBtn.onclick=()=>openEngineSettings();
+    host.replaceChildren(h('div',{class:'panel assistant-panel'},
+      h('h2',{},'Canon assistant'),
+      h('p',{class:'hint'},'Add an engine profile first. The assistant is read-only on promoted canon and only drafts suggestions when you choose.'),
+      settingsBtn
+    ));
+    return;
+  }
+
+  const defaultEngine=assistantDefaultEngine(profiles);
+  const apiEngine=assistantFirstApiEngine(profiles);
+  const engineSel=h('select',{},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' - '+p.type)));
+  if(defaultEngine) engineSel.value=defaultEngine.id;
+  const spend=h('span',{class:'assistant-spend'},assistantSpendLabel(defaultEngine));
+  const settingsBtn=h('button',{},'Engine settings');
+  settingsBtn.onclick=()=>openEngineSettings();
+  const escalateBtn=h('button',{class:'secondary'},'Escalate to API');
+  escalateBtn.disabled=!apiEngine;
+  escalateBtn.onclick=()=>{
+    if(apiEngine) engineSel.value=apiEngine.id;
+    refreshEngineNote();
+  };
+  const question=h('textarea',{class:'assistant-question',rows:'6',placeholder:'Ask a question about promoted canon...'});
+  const askBtn=h('button',{class:'primary'},'Ask');
+  const status=h('div',{class:'sync-status'});
+  const embedStatus=h('div',{class:'assistant-embed-status hint'});
+  const groundingLine=h('div',{class:'assistant-grounding hint'});
+  const answerHost=h('div',{class:'assistant-answer'},h('p',{class:'hint'},'Ask a question to retrieve promoted canon and get a grounded answer.'));
+  const draftBtn=h('button',{class:'primary'},'Draft a Canon Card');
+  const rebuildBtn=h('button',{class:'secondary'},'Rebuild canon index');
+  const campaignIn=h('input',{placeholder:'Campaign name'});
+  const ledgerBtn=h('button',{class:'secondary'},'Send to ledger');
+  draftBtn.disabled=true;
+  ledgerBtn.disabled=true;
+
+  function refreshEngineNote(){
+    const engine=assistantEngineById(profiles,engineSel.value);
+    spend.textContent=assistantSpendLabel(engine);
+    escalateBtn.disabled=!apiEngine||engine&&engine.id===apiEngine.id;
+  }
+
+  function setGroundingLine(ids){
+    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+assistantIdsText(ids)));
+  }
+
+  function setEmbedStatus(value, warning){
+    const text=value==='ready'?'Embeddings: ready'
+      : value&&String(value).startsWith('building')?'Embeddings: building '+String(value).replace(/^building\s*/,'')
+      : value==='checking'?'Embeddings: checking'
+      : value==='fallback'?'Embeddings: fallback to keyword'
+      : 'Embeddings: ready on demand';
+    embedStatus.replaceChildren(document.createTextNode(text+(warning?' - '+warning:'')));
+  }
+
+  async function runAsk(){
+    const q=question.value.trim();
+    if(!q){
+      status.textContent='Ask a question first.';
+      return;
+    }
+    const engine=assistantEngineById(profiles,engineSel.value);
+    if(!engine){
+      status.textContent='Choose an engine first.';
+      return;
+    }
+    draftBtn.disabled=true;
+    ledgerBtn.disabled=true;
+    answerHost.replaceChildren(h('p',{class:'hint'},'Retrieving promoted canon...'));
+    setGroundingLine([]);
+    setEmbedStatus('checking');
+    try{
+      const grounding=await assistantCanonGrounding(q,engine,{onStatus:setEmbedStatus});
+      status.textContent=assistantIsLocalEngine(engine)?'Asking local engine...':'Asking API engine. Metered usage will be recorded.';
+      const result=await assistantCallAi(engine,{
+        system:grounding.system,
+        messages:[{role:'user',content:q}],
+        model:engine.model,
+        maxTokens:ASSISTANT_MAX_TOKENS
+      });
+      state.question=q;
+      state.answer=result.text||'';
+      state.grounding=grounding;
+      state.model=result.model||engine.model||'';
+      answerHost.replaceChildren(h('pre',{class:'assistant-answer-text'},state.answer||'(No text returned.)'));
+      setGroundingLine(grounding.ids);
+      setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning);
+      status.textContent='Answer ready. Suggestions only; promote through the normal pipeline.';
+      draftBtn.disabled=false;
+      ledgerBtn.disabled=false;
+    }catch(e){
+      answerHost.replaceChildren(h('p',{class:'bad'},e&&e.message?e.message:String(e)));
+      status.textContent='The assistant could not complete the ask.';
+    }
+  }
+
+  askBtn.onclick=runAsk;
+  rebuildBtn.onclick=async()=>{
+    const engine=assistantEngineById(profiles,engineSel.value);
+    rebuildBtn.disabled=true;
+    setEmbedStatus('checking');
+    try{
+      const result=await assistantRebuildEmbeddingIndex(engine,setEmbedStatus);
+      setEmbedStatus('ready');
+      status.textContent='Canon embedding index rebuilt for '+(result&&result.total||0)+' entries.';
+    }catch(e){
+      setEmbedStatus('fallback',e&&e.message?e.message:String(e));
+      status.textContent='Could not rebuild embeddings; keyword retrieval is still available.';
+    }finally{
+      rebuildBtn.disabled=false;
+    }
+  };
+  draftBtn.onclick=()=>assistantDraftCanonCard(state);
+  ledgerBtn.onclick=async()=>{
+    ledgerBtn.disabled=true;
+    try{
+      await assistantSendAnswerToLedger(campaignIn.value,state);
+      status.textContent='Sent to the campaign ledger as CAMPAIGN-ONLY.';
+    }catch(e){
+      status.textContent=e&&e.message?e.message:String(e);
+    }finally{
+      ledgerBtn.disabled=false;
+    }
+  };
+  engineSel.onchange=refreshEngineNote;
+  refreshEngineNote();
+  setGroundingLine([]);
+  setEmbedStatus('');
+
+  host.replaceChildren(h('div',{class:'panel assistant-panel'},
+    h('div',{class:'assistant-head'},
+      h('div',{},
+        h('h2',{},'Canon assistant'),
+        h('p',{class:'hint'},'Read-only retrieval from promoted canon. Any output is a suggestion until you draft and promote it.')
+      ),
+      usageMeter()
+    ),
+    h('div',{class:'assistant-controls'},
+      h('label',{},'Engine',engineSel),
+      h('div',{class:'assistant-engine-actions'},spend,settingsBtn,escalateBtn)
+    ),
+    question,
+    h('div',{class:'assistant-actions'},askBtn,status),
+    h('div',{class:'assistant-actions assistant-embed-row'},embedStatus,rebuildBtn),
+    groundingLine,
+    answerHost,
+    h('div',{class:'assistant-outbound'},
+      h('p',{class:'hint'},'Outbound actions stay guarded: draft only, or CAMPAIGN-ONLY ledger note. Nothing writes promoted canon.'),
+      h('div',{class:'assistant-actions'},draftBtn,campaignIn,ledgerBtn)
+    )
+  ));
 }
 /* ============================ Promote a card to canon ======================= *
    The guarded hand-off (per 00_CANON_HOME.md → Promotion Rules / Queue Hygiene):
@@ -4713,6 +6270,119 @@ function addLedgerEntry(text, entry){
   return text.slice(0, blk.afterOpen) + inner + text.slice(blk.closeAbs);
 }
 
+// ---- cast (manual NPC / relationship tracker): named people beside the save ----
+const CAST_FIELDS=[
+  { key:'name', label:'Name', match:/^Name$/i },
+  { key:'what', label:'What they are', match:/^(?:What they are|Race\s*\/\s*role|Role)$/i },
+  { key:'status', label:'Status', match:/^Status$/i },
+  { key:'relationship', label:'Relationship to PC', match:/^(?:Relationship to PC|Relationship|Tie to PC)$/i },
+  { key:'note', label:'Last seen / note', match:/^(?:Last seen\s*\/\s*note|Last seen|Note)$/i },
+];
+function campaignCastTemplate(name){
+  const camp=String(name||'[Campaign Name]').trim()||'[Campaign Name]';
+  return [
+    '# Campaign Cast Template', '',
+    '## Purpose', '',
+    'Manual named-cast index for a campaign: who someone is, where they stand, and how they relate to the PC.', '',
+    'Do not auto-fill this from threads or the tracker. Add only deliberate named entries.', '',
+    '## Setup', '',
+    'Campaign: '+camp,
+    'Canon source of truth: the live domain files in `domains/` (find via `01_CANON_INDEX.md`). The `archive/` snapshot is a dated copy only.',
+    'Last reconciled with domain files: [YYYY-MM-DD]', '',
+    '---', '',
+    '## Entry Format', '',
+    '```text',
+    'Name: [NPC / cast name]',
+    'What they are: [race / role]',
+    'Status: [active / missing / ally / enemy / unknown]',
+    'Relationship to PC: [tie to the protagonist]',
+    'Last seen / note: [short note]',
+    '```', '',
+    '---', '',
+    '## Cast', '',
+    '```text',
+    '(No cast yet.)',
+    '```', '',
+  ].join('\n');
+}
+function castEntriesBlock(text){
+  const hi=String(text||'').search(/##\s+CAST\b/i); if(hi<0) return null;
+  const open=String(text).indexOf('```',hi); if(open<0) return null;
+  const afterOpen=String(text).indexOf('\n',open)+1;
+  const closeRel=String(text).slice(afterOpen).indexOf('```'); if(closeRel<0) return null;
+  return {afterOpen,closeAbs:afterOpen+closeRel,inner:String(text).slice(afterOpen,afterOpen+closeRel)};
+}
+function castFieldKey(label){
+  const clean=String(label||'').trim();
+  const def=CAST_FIELDS.find(f=>f.match.test(clean));
+  return def&&def.key;
+}
+function normalizeCastMember(member){
+  const src=member||{}, clean=v=>String(v==null?'':v).replace(/\r/g,'').trim();
+  return { name:clean(src.name), what:clean(src.what), status:clean(src.status), relationship:clean(src.relationship), note:clean(src.note) };
+}
+function castMemberKey(member){
+  const m=normalizeCastMember(member), norm=v=>String(v||'').toLowerCase().replace(/\s+/g,' ').trim();
+  return [m.name,m.what,m.status,m.relationship,m.note].map(norm).join('|');
+}
+function parseCast(text){
+  const blk=castEntriesBlock(text); const body=blk?blk.inner:'';
+  const out=[]; let cur=null, key='';
+  const hasAny=obj=>obj&&CAST_FIELDS.some(f=>String(obj[f.key]||'').trim());
+  const flush=()=>{ if(hasAny(cur)){ const m=normalizeCastMember(cur); if(m.name) out.push(m); } cur=null; key=''; };
+  for(const raw of body.split('\n')){
+    const ln=String(raw||'').replace(/\r$/,'');
+    const s=ln.trim();
+    if(!s || /^---+$/.test(s)){ flush(); continue; }
+    if(/^\((?:No cast|none)/i.test(s)) continue;
+    const m=/^([^:]+):\s*(.*)$/.exec(s);
+    const field=m&&castFieldKey(m[1]);
+    if(field){ cur=cur||{}; key=field; cur[field]=m[2]||''; continue; }
+    if(key){ cur=cur||{}; cur[key]=(cur[key]?cur[key]+'\n':'')+ln.replace(/^ {2}/,''); }
+  }
+  flush(); return out;
+}
+function formatCastField(label,value){
+  const lines=String(value==null?'':value).replace(/\r/g,'').split('\n');
+  const first=lines.shift()||'';
+  return [label+': '+first, ...lines.map(line=>'  '+line)].join('\n');
+}
+function formatCastMember(member){
+  const m=normalizeCastMember(member);
+  return CAST_FIELDS.map(f=>formatCastField(f.label,m[f.key])).join('\n');
+}
+function formatCastEntries(members){
+  const usable=(members||[]).map(normalizeCastMember).filter(m=>m.name);
+  if(!usable.length) return '(No cast yet.)\n';
+  return usable.map(formatCastMember).join('\n\n')+'\n';
+}
+function updateCastEntries(text,members){
+  const blk=castEntriesBlock(text); if(!blk) throw new Error('no Cast code block in the campaign cast file');
+  return String(text).slice(0,blk.afterOpen)+formatCastEntries(members)+String(text).slice(blk.closeAbs);
+}
+function castFindMemberIndex(members,match){
+  if(!match) return -1;
+  const key=castMemberKey(match);
+  let idx=(members||[]).findIndex(m=>castMemberKey(m)===key);
+  if(idx>=0) return idx;
+  const name=normalizeCastMember(match).name.toLowerCase();
+  if(!name) return -1;
+  return (members||[]).findIndex(m=>normalizeCastMember(m).name.toLowerCase()===name);
+}
+function upsertCastMember(text,member,match){
+  const next=normalizeCastMember(member); if(!next.name) throw new Error('cast member needs a name');
+  const members=parseCast(text);
+  const idx=castFindMemberIndex(members,match);
+  if(idx>=0) members[idx]=next; else members.push(next);
+  return updateCastEntries(text,members);
+}
+function removeCastMember(text,match){
+  const members=parseCast(text);
+  const idx=castFindMemberIndex(members,match);
+  if(idx>=0) members.splice(idx,1);
+  return updateCastEntries(text,members);
+}
+
 // ---- threads write: add a thread line under a status bucket ----
 function addThread(text, status, line){
   const lines=String(text).split('\n');
@@ -4731,6 +6401,7 @@ function scaffoldName(templateText, name){ return String(templateText).replace(/
 function assertTracker(text){ if(!/Campaign State Tracker/i.test(text) || !/Personal Mana/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign state tracker'); return text; }
 function assertLedger(text){ if(!/Campaign Ledger/i.test(text) || !/##\s+ENTRIES/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign ledger'); return text; }
 function assertThreads(text){ if(!/Campaign Threads/i.test(text)) throw new Error('refusing to write — that file isn’t the threads file'); return text; }
+function assertCast(text){ if(!/Campaign Cast/i.test(text) || !/##\s+CAST\b/i.test(text)) throw new Error('refusing to write — that file isn’t the campaign cast file'); return text; }
 
 // ---- bridge: a PENDING ledger entry -> a Canon Card prefill (reuses the Drafter) ----
 function ledgerToCard(entry){
@@ -5864,6 +7535,18 @@ const CAMP_TABS=[
   ['threads','Threads','Open storylines by heat: live, warming, distant, blocked, closed.'],
   ['character','Character','The protagonist sheet.'],
 ];
+// Tab content renderers keyed by tab id. The four built-ins are registered here; feature
+// layers (Region, Timeline, Cast, Scratch) self-register via registerCampaignTab so the
+// shared framing (back link, tabs row, GitHub guard, hint) lives only in viewCampaign.
+const CAMP_TAB_VIEWS={ resume:campResume, ledger:campLedger, threads:campThreads, character:campCharacter };
+// Add a campaign tab without touching viewCampaign. tabDef=['key','Label','hint'];
+// render=(host,name)=>{}; opts.before/after names an existing tab id to anchor next to.
+function registerCampaignTab(tabDef, render, opts){
+  CAMP_TAB_VIEWS[tabDef[0]]=render;
+  if(CAMP_TABS.some(t=>t[0]===tabDef[0])) return;
+  const o=opts||{}, anchor=o.before||o.after, i=anchor?CAMP_TABS.findIndex(t=>t[0]===anchor):-1;
+  if(i<0) CAMP_TABS.push(tabDef); else CAMP_TABS.splice(o.before?i:i+1,0,tabDef);
+}
 
 async function listCampaigns(cfg){ return (await ghList(cfg, CAMP_DIR)).filter(x=>x.type==='dir').map(x=>x.name).sort(); }
 async function campaignFiles(cfg, name){
@@ -5874,6 +7557,7 @@ async function campaignFiles(cfg, name){
     tracker: inDir(camp,'CAMPAIGN STATE TRACKER'),
     threads: inDir(camp,'CAMPAIGN THREADS'),
     ledger:  inDir(camp,'CAMPAIGN LEDGER'),
+    cast:    inDir(camp,'CAMPAIGN CAST'),
     character: inDir(chars,'CHARACTER SHEET'),
   };
 }
@@ -5883,7 +7567,9 @@ function viewCampaigns(){
   const body=f.querySelector('.framed-body');
   if(!ghReady()){
     body.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Connect your GitHub file first — the Game space reads and writes your campaign files.'),
-      h('div',{class:'toolrow', style:{justifyContent:'center'}}, h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub')));
+      h('div',{class:'toolrow', style:{justifyContent:'center'}},
+        h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub'),
+        h('button',{class:'navbtn', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
     return f;
   }
   const cfg=ghCfg(); const host=h('div',null); body.append(host); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading your campaigns…'));
@@ -5891,7 +7577,9 @@ function viewCampaigns(){
     const names=await listCampaigns(cfg); const rows=[];
     for(const name of names){ let status=''; try{ const files=await campaignFiles(cfg,name); if(files.tracker){ const r=await ghGetText(cfg, files.tracker); if(r) status=parseTracker(r.text).status; } }catch(e){} rows.push({name,status,archived:trackerIsArchived(status)}); }
     const wrap=h('div',null,
-      h('div',{class:'toolrow', style:{justifyContent:'center', marginBottom:'12px'}}, h('button',{class:'navbtn primary', onclick:()=>startCampaignModal()}, '+ Start a new campaign')));
+      h('div',{class:'toolrow', style:{justifyContent:'center', marginBottom:'12px'}},
+        h('button',{class:'navbtn primary', onclick:()=>startCampaignModal()}, '+ Start a new campaign'),
+        h('button',{class:'navbtn', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
     wrap.append(campaignGroup('Current', rows.filter(r=>!r.archived), 'No active campaigns yet — start one above.'));
     const arch=rows.filter(r=>r.archived); if(arch.length) wrap.append(campaignGroup('Archived', arch, ''));
     host.replaceChildren(wrap);
@@ -5919,10 +7607,7 @@ function viewCampaign(name, tab){
   body.append(tabs);
   body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
   const host=h('div',null); body.append(host);
-  if(tab==='resume') campResume(host, name);
-  else if(tab==='ledger') campLedger(host, name);
-  else if(tab==='threads') campThreads(host, name);
-  else if(tab==='character') campCharacter(host, name);
+  const render=CAMP_TAB_VIEWS[cur[0]]; if(render) render(host, name);
   return f;
 }
 
@@ -6035,18 +7720,373 @@ function startCampaignModal(){
       const base=`${CAMP_DIR}/${name}`, cbase=`${CHAR_DIR}/${name}`;
       if(await ghGetText(cfg, `${base}/CAMPAIGN STATE TRACKER ${name}.md`)) throw new Error('a campaign named "'+name+'" already exists');
       const ledger=await T('templates/CAMPAIGN LEDGER TEMPLATE.md'), tracker=await T('templates/CAMPAIGN STATE TRACKER TEMPLATE.md'),
-            threads=await T('templates/CAMPAIGN THREADS TEMPLATE.md'), sheet=await T('templates/CHARACTER SHEET TEMPLATE.md');
+            threads=await T('templates/CAMPAIGN THREADS TEMPLATE.md'), cast=await T('templates/CAMPAIGN CAST TEMPLATE.md'),
+            sheet=await T('templates/CHARACTER SHEET TEMPLATE.md');
       await ghUpdate(cfg, `${base}/CAMPAIGN LEDGER ${name}.md`,        ()=>scaffoldName(ledger,name),  'Start campaign '+name+' (ledger)',    {create:true});
       await ghUpdate(cfg, `${base}/CAMPAIGN STATE TRACKER ${name}.md`, ()=>scaffoldName(tracker,name), 'Start campaign '+name+' (tracker)',   {create:true});
       await ghUpdate(cfg, `${base}/CAMPAIGN THREADS ${name}.md`,       ()=>scaffoldName(threads,name), 'Start campaign '+name+' (threads)',   {create:true});
+      await ghUpdate(cfg, `${base}/CAMPAIGN CAST ${name}.md`,          ()=>scaffoldName(cast,name),    'Start campaign '+name+' (cast)',      {create:true});
       await ghUpdate(cfg, `${cbase}/CHARACTER SHEET ${name}.md`,       ()=>scaffoldName(sheet,name),   'Start campaign '+name+' (character)', {create:true});
       toast('Created '+name+'.'); close(); go('campaign',{camp:name});
     }catch(e){ status.textContent='Failed: '+e.message; create.disabled=false; }
   };
-  close=showModalNode('Start a new campaign', 'Scaffolds the ledger, state tracker, threads, and a character sheet from the templates.',
+  close=showModalNode('Start a new campaign', 'Scaffolds the ledger, state tracker, threads, cast, and a character sheet from the templates.',
     h('div',null, h('label',null,'Name'), nameIn,
       h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
 }
+/* ========================================================================== *
+   CAMPAIGN LEDGER TIMELINE — read-only browser over parseLedger() output.
+   The ledger remains append-only; this view never writes to campaign files.
+ * ========================================================================== */
+
+function ledgerTimelineSeq(entry){
+  const m=/^GL-(\d+)/i.exec(String(entry&&entry.id||'').trim());
+  return m?parseInt(m[1],10):Number.MAX_SAFE_INTEGER;
+}
+function ledgerTimelineLabel(entry){ return String(entry&&entry.label||'').trim(); }
+function ledgerTimelinePhase(entry){ return String(entry&&entry.phase||'').trim()||'session'; }
+function ledgerTimelineEntries(entries){
+  return (entries||[]).map((entry,index)=>{
+    const out=Object.assign({}, entry||{});
+    out._ledgerIndex=index; out._ledgerSeq=ledgerTimelineSeq(entry);
+    return out;
+  }).sort((a,b)=> (a._ledgerSeq-b._ledgerSeq) || (a._ledgerIndex-b._ledgerIndex));
+}
+function ledgerTimelineLabels(entries){
+  const seen=new Set(), labels=[];
+  ledgerTimelineEntries(entries).forEach(entry=>{
+    const label=ledgerTimelineLabel(entry);
+    if(label && !seen.has(label)){ seen.add(label); labels.push(label); }
+  });
+  return labels;
+}
+function ledgerTimelinePreview(body, max){
+  const limit=Math.max(24, max||118);
+  const text=String(body||'').replace(/\s+/g,' ').trim();
+  if(text.length<=limit) return text;
+  const clipped=text.slice(0, limit-1).replace(/\s+\S*$/,'').trim();
+  return (clipped||text.slice(0,limit-1))+'…';
+}
+
+function ledgerTimelineEntryNode(entry){
+  const label=ledgerTimelineLabel(entry)||'UNLABELED';
+  const body=String(entry&&entry.body||'').trim();
+  const preview=ledgerTimelinePreview(body)||'No body text captured.';
+  return h('details',{class:'ledger-timeline-entry'},
+    h('summary',{class:'ledger-timeline-summary'},
+      h('span',{class:'ledger-timeline-dot','aria-hidden':'true'}),
+      h('span',{class:'ledger-timeline-main'},
+        h('span',{class:'ledger-timeline-meta'},
+          h('b',null, entry.id||'GL-????'),
+          h('span',{class:'ledger-timeline-phase'}, ledgerTimelinePhase(entry)),
+          h('span',{class:'ledger-timeline-label'}, label),
+          entry.date?h('span',{class:'ledger-timeline-date'}, entry.date):null),
+        h('span',{class:'ledger-timeline-preview'}, preview))),
+    h('div',{class:'ledger-timeline-full'},
+      body?h('p',null,body):h('p',{class:'hint'},'No body text captured.'),
+      h('p',{class:'ledger-timeline-status'}, h('b',null,'Status: '), entry.status||'CAMPAIGN-ONLY')));
+}
+
+function ledgerTimelineView(entries){
+  const ordered=ledgerTimelineEntries(entries);
+  if(!ordered.length){
+    return h('div',{class:'ledger-timeline ledger-timeline-empty'},
+      h('h3',null,'Timeline'),
+      h('p',{class:'hint'},'No ledger entries yet — captured moments will appear here in GL sequence.'));
+  }
+
+  let filter='';
+  const labels=ledgerTimelineLabels(ordered);
+  const count=h('p',{class:'hint ledger-timeline-count'});
+  const list=h('div',{class:'ledger-timeline-list'});
+  const chipRow=h('div',{class:'ledger-timeline-filters toolrow'});
+  const chips=[];
+  function addChip(label, text){
+    const btn=h('button',{class:'navbtn', onclick:()=>{ filter=label; draw(); }}, text);
+    chips.push({label,btn}); chipRow.append(btn);
+  }
+  addChip('', 'All');
+  labels.forEach(label=>addChip(label, label));
+
+  function draw(){
+    chips.forEach(chip=>{
+      chip.btn.className='navbtn'+(chip.label===filter?' on':'');
+      chip.btn.setAttribute('aria-pressed', chip.label===filter?'true':'false');
+    });
+    const visible=filter?ordered.filter(entry=>ledgerTimelineLabel(entry)===filter):ordered;
+    count.textContent=visible.length+' entr'+(visible.length===1?'y':'ies')+(filter?' tagged '+filter:' in capture order');
+    if(!visible.length) list.replaceChildren(h('p',{class:'hint'},'No entries match this label.'));
+    else list.replaceChildren(...visible.map(ledgerTimelineEntryNode));
+  }
+  draw();
+
+  return h('div',{class:'ledger-timeline'},
+    h('div',{class:'ledger-timeline-head'},
+      h('div',null, h('h3',null,'Timeline'), h('p',{class:'hint'},'Read-only view of the campaign ledger in GL capture order.')),
+      h('span',{class:'ledger-timeline-total'}, ordered.length+' total')),
+    chipRow,
+    count,
+    list);
+}
+
+async function campTimeline(host,name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint',style:{textAlign:'center'}},'Loading the timeline…'));
+  let files;
+  try{ files=await campaignFiles(cfg,name); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+  if(!files.ledger){ host.replaceChildren(h('p',{class:'hint'},'No ledger found for '+name+' yet.')); return; }
+  try{
+    const r=await ghGetText(cfg, files.ledger);
+    const entries=r?parseLedger(r.text):[];
+    host.replaceChildren(ledgerTimelineView(entries));
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+
+// The original Ledger tab stays the write-capable capture form; Timeline is read-only and
+// reuses parseLedger(). Registered through the shared campaign-tab helper (framing lives in
+// viewCampaign), placed right after the Ledger tab.
+registerCampaignTab(['timeline','Timeline','Browse captured ledger entries as a read-only visual timeline, filterable by the labels actually present.'], campTimeline, {after:'ledger'});
+/* ========================================================================== *
+   CAMPAIGN CAST — manual NPC / relationship tracker beside the campaign save.
+   Writes only campaign/<name>/CAMPAIGN CAST <name>.md via ghUpdate.
+ * ========================================================================== */
+
+function campaignCastPath(name){ return `${CAMP_DIR}/${name}/CAMPAIGN CAST ${name}.md`; }
+function castWriteGuard(text){ if(text) assertCast(text); return text; }
+function updateCampaignCastText(current,campaignName,member,original){
+  const base=current?assertCast(current):campaignCastTemplate(campaignName);
+  return upsertCastMember(base,member,original);
+}
+function removeCampaignCastText(current,campaignName,member){
+  const base=current?assertCast(current):campaignCastTemplate(campaignName);
+  return removeCastMember(base,member);
+}
+
+// Map a freeform status word to a tone class for the chip colour (ally / enemy / unknown /
+// neutral). Shared by the real cast card and the demo preview.
+function castStatusTone(status){
+  const s=String(status||'').toLowerCase();
+  if(/all(?:y|ies)|friend|bond|trust|guid|loyal|\bkin\b/.test(s)) return 'ally';
+  if(/enem|hostile|threat|hunt|foe|rival|danger/.test(s)) return 'enemy';
+  if(/missing|unknown|lost|\bgone\b|vanish/.test(s)) return 'unknown';
+  return 'neutral';
+}
+function castField(label,node){ return h('div',{class:'cast-field'}, h('label',null,label), node); }
+function castMemberModal(title,member,onSave){
+  const src=normalizeCastMember(member);
+  const nameIn=h('input',{value:src.name,placeholder:'Name'});
+  const whatIn=h('input',{value:src.what,placeholder:'race / role / kind'});
+  const statusIn=h('input',{value:src.status,placeholder:'active / missing / ally / enemy / unknown'});
+  const relIn=h('input',{value:src.relationship,placeholder:'tie to the PC'});
+  const noteIn=h('textarea',{value:src.note,placeholder:'last seen / note',rows:4});
+  const st=h('div',{class:'hint cast-save-status'});
+  const saveBtn=h('button',{class:'navbtn primary'},'Save cast member');
+  let close;
+  saveBtn.onclick=async()=>{
+    const next=normalizeCastMember({name:nameIn.value,what:whatIn.value,status:statusIn.value,relationship:relIn.value,note:noteIn.value});
+    if(!next.name){ st.textContent='Give them a name first.'; return; }
+    saveBtn.disabled=true; st.textContent='Saving…';
+    try{ await onSave(next); close(); }
+    catch(e){ st.textContent='Failed: '+e.message; saveBtn.disabled=false; }
+  };
+  close=showModalNode(title,'Manual only — this does not scan threads or change the state tracker.',
+    h('div',{class:'cast-editor'},
+      castField('Name',nameIn),
+      castField('What they are',whatIn),
+      castField('Status',statusIn),
+      castField('Relationship to PC',relIn),
+      castField('Last seen / note',noteIn),
+      h('div',{class:'toolrow',style:{marginTop:'12px'}},saveBtn,h('button',{class:'navbtn',onclick:()=>close()},'Cancel')),
+      st));
+}
+
+function castMemberCard(member,onEdit,onRemove){
+  const m=normalizeCastMember(member);
+  const line=(label,value)=>value?h('p',null,h('b',null,label+': '),value):null;
+  return h('div',{class:'cast-card pcard'},
+    h('div',{class:'cast-card-head'},
+      h('div',null,
+        h('h4',null,m.name),
+        h('p',{class:'cast-card-meta'},m.what||'Cast member')),
+      m.status?h('span',{class:'cast-status tone-'+castStatusTone(m.status)},m.status):null),
+    line('Relationship',m.relationship),
+    line('Last seen / note',m.note),
+    h('div',{class:'toolrow cast-actions'},
+      h('button',{class:'navbtn',onclick:onEdit},'Edit'),
+      h('button',{class:'navbtn danger',onclick:onRemove},'Remove')));
+}
+
+async function campCast(host,name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint',style:{textAlign:'center'}},'Loading the cast…'));
+  let files;
+  try{ files=await campaignFiles(cfg,name); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+  const path=files.cast||campaignCastPath(name);
+
+  async function saveMember(member,original){
+    await ghUpdate(cfg,path,current=>updateCampaignCastText(current,name,member,original),'Update campaign cast via Game',{create:true,guard:castWriteGuard});
+    files.cast=path; toast('Cast updated.'); await draw();
+  }
+  async function removeMember(member){
+    if(typeof confirm==='function' && !confirm('Remove '+member.name+' from the campaign cast?')) return;
+    await ghUpdate(cfg,path,current=>removeCampaignCastText(current,name,member),'Update campaign cast via Game',{create:true,guard:castWriteGuard});
+    files.cast=path; toast('Cast updated.'); await draw();
+  }
+  async function draw(){
+    const r=await ghGetText(cfg, files.cast||path);
+    if(r) files.cast=path;
+    const text=r?r.text:campaignCastTemplate(name);
+    const members=parseCast(text);
+    const panel=h('div',{class:'cast-panel'},
+      h('div',{class:'cast-panel-head'},
+        h('div',null,h('h3',null,'Campaign cast'),h('p',{class:'hint'},'Manual NPC and relationship tracker beside the save.')),
+        h('button',{class:'navbtn primary',onclick:()=>castMemberModal('Add cast member',{},member=>saveMember(member,null))},'+ Add cast member')));
+    panel.append(h('p',{class:'hint cast-file-note'},r?'Saving to '+(files.cast||path):'No cast file exists yet — adding the first member creates CAMPAIGN CAST '+name+'.md.'));
+    if(!members.length){
+      panel.append(h('div',{class:'cast-empty'},h('h4',null,'No named cast yet'),h('p',{class:'hint'},'Add people deliberately here; the app will not auto-scrape NPCs from threads or tracker notes.')));
+    }else{
+      const grid=h('div',{class:'cast-grid'});
+      members.forEach(member=>grid.append(castMemberCard(member,
+        ()=>castMemberModal('Edit '+member.name,member,next=>saveMember(next,member)),
+        ()=>removeMember(member))));
+      panel.append(grid);
+    }
+    host.replaceChildren(panel);
+  }
+  try{ await draw(); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
+}
+
+// Registered through the shared campaign-tab helper (framing lives in viewCampaign), placed
+// just before the Character tab.
+registerCampaignTab(['cast','Cast','Named NPCs and relationships for this campaign — manual, editable, and stored beside the tracker.'], campCast, {before:'character'});
+/* ========================================================================== *
+   CAMPAIGN SCRATCH — device-local in-session notes, triaged to the ledger.
+   Scratch text is stored only on DB.campaignScratch and never repo-synced.
+ * ========================================================================== */
+
+function campaignScratchKey(name){ return String(name||'').trim()||'campaign'; }
+function campaignScratchStore(){ return DB.campaignScratch=DB.campaignScratch&&typeof DB.campaignScratch==='object'?DB.campaignScratch:{}; }
+function getCampaignScratch(name){ return String(campaignScratchStore()[campaignScratchKey(name)]||''); }
+function setCampaignScratch(name,text){
+  const store=campaignScratchStore(), key=campaignScratchKey(name), value=String(text||'');
+  if(value) store[key]=value; else delete store[key];
+  saveLocal({forceMirror:true});
+  return value;
+}
+function campaignScratchBulletText(line){ return String(line||'').replace(/^\s*(?:[-*•]|\[[ xX]\])\s+/,'').trim(); }
+function campaignScratchBlocks(text){
+  const src=String(text||'').replace(/\r/g,''), lines=src.split('\n'), blocks=[];
+  let records=[], pos=0, id=0;
+  const bullet=/^\s*(?:[-*•]|\[[ xX]\])\s+/;
+  const pushBlock=(body,start,end)=>{
+    const clean=String(body||'').trim();
+    if(clean) blocks.push({id:String(id++),text:clean,start,end});
+  };
+  const flush=()=>{
+    if(!records.length) return;
+    if(records.length>1 && records.every(r=>bullet.test(r.line))){
+      records.forEach(r=>pushBlock(campaignScratchBulletText(r.line),r.start,r.end));
+    }else{
+      pushBlock(src.slice(records[0].start,records[records.length-1].end),records[0].start,records[records.length-1].end);
+    }
+    records=[];
+  };
+  lines.forEach((line,i)=>{
+    const start=pos, end=start+line.length;
+    if(line.trim()) records.push({line,start,end});
+    else flush();
+    pos=end+(i<lines.length-1?1:0);
+  });
+  flush();
+  return blocks;
+}
+function campaignScratchRemoveBlocks(text,ids){
+  const want=new Set((ids||[]).map(String)), blocks=campaignScratchBlocks(text).filter(b=>want.has(String(b.id)));
+  let next=String(text||'').replace(/\r/g,'');
+  blocks.sort((a,b)=>b.start-a.start).forEach(block=>{ next=next.slice(0,block.start)+next.slice(block.end); });
+  return next.replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();
+}
+function appendScratchBlocksToLedger(text,blocks,opts){
+  let next=assertLedger(String(text||'')), entries=parseLedger(next);
+  const date=(opts&&opts.date)||new Date().toISOString().slice(0,10);
+  const phase=(opts&&opts.phase)||'session';
+  const label=(opts&&opts.label)||'MOMENT';
+  (blocks||[]).forEach(block=>{
+    const body=String(block&&block.text||block||'').trim();
+    if(!body) return;
+    next=addLedgerEntry(next,{id:ledgerNextId(entries),date,phase,label,body,status:'CAMPAIGN-ONLY'});
+    entries=parseLedger(next);
+  });
+  return next;
+}
+
+function scratchBlockPicker(blocks,onChange){
+  const wrap=h('div',{class:'scratch-picks'});
+  const boxes=[];
+  function chosen(){ return boxes.filter(box=>box.checked).map(box=>box.value); }
+  (blocks||[]).forEach(block=>{
+    const cb=h('input',{type:'checkbox',value:block.id,onchange:()=>onChange(chosen())});
+    boxes.push(cb);
+    wrap.append(h('label',{class:'scratch-pick'},cb,h('span',null,block.text)));
+  });
+  return {node:wrap,chosen,selectAll:on=>{ boxes.forEach(box=>box.checked=!!on); onChange(chosen()); }};
+}
+
+async function campScratch(host,name){
+  const cfg=ghCfg();
+  let files=null;
+  const scratch=h('textarea',{class:'scratch-pad',placeholder:'Jot freely during play. Nothing here leaves this device until you send selected notes to the ledger.'});
+  scratch.value=getCampaignScratch(name);
+  const phaseIn=h('input',{placeholder:'scene / phase',value:'session'});
+  const labelSel=h('select',null,...LEDGER_LABELS.map(x=>h('option',{value:x},x)));
+  const status=h('div',{class:'hint scratch-status'});
+  const pickHost=h('div');
+  const sendBtn=h('button',{class:'navbtn primary'},'Send selected to ledger');
+  const selectAllBtn=h('button',{class:'navbtn'},'Select all');
+  let picker=null, selected=[];
+  function renderPicks(){
+    const blocks=campaignScratchBlocks(scratch.value);
+    selected=[];
+    if(!blocks.length){
+      pickHost.replaceChildren(h('p',{class:'hint'},'No sendable lines or blocks yet.'));
+      sendBtn.disabled=true; return;
+    }
+    picker=scratchBlockPicker(blocks,ids=>{ selected=ids; sendBtn.disabled=!selected.length; status.textContent=ids.length?ids.length+' selected.':''; });
+    pickHost.replaceChildren(picker.node);
+    sendBtn.disabled=true;
+  }
+  scratch.oninput=()=>{ setCampaignScratch(name,scratch.value); renderPicks(); };
+  selectAllBtn.onclick=()=>{ if(picker) picker.selectAll(true); };
+  sendBtn.onclick=async()=>{
+    const before=scratch.value, allBlocks=campaignScratchBlocks(before), sendBlocks=allBlocks.filter(block=>selected.includes(block.id));
+    if(!sendBlocks.length){ status.textContent='Choose at least one note first.'; return; }
+    if(!files){ try{ files=await campaignFiles(cfg,name); }catch(e){ status.textContent='Could not find the ledger yet: '+e.message; return; } }
+    if(!files.ledger){ status.textContent='No ledger file found for '+name+'.'; return; }
+    sendBtn.disabled=true; scratch.disabled=true; status.textContent='Sending to ledger…';
+    try{
+      await ghUpdate(cfg,files.ledger,current=>appendScratchBlocksToLedger(current,sendBlocks,{date:new Date().toISOString().slice(0,10),phase:phaseIn.value.trim()||'session',label:labelSel.value}),'Scratch notes to ledger via Game',{guard:assertLedger});
+      scratch.value=campaignScratchRemoveBlocks(before,selected);
+      setCampaignScratch(name,scratch.value);
+      toast('Sent to ledger.'); status.textContent='Sent '+sendBlocks.length+' note'+(sendBlocks.length===1?'':'s')+' to the ledger.';
+      renderPicks();
+    }catch(e){ status.textContent='Failed: '+e.message; }
+    finally{ scratch.disabled=false; sendBtn.disabled=!selected.length; }
+  };
+  const panel=h('div',{class:'scratch-panel'},
+    h('div',{class:'scratch-head'},
+      h('div',null,h('h3',null,'Session scratch'),h('p',{class:'hint'},'Local-only notes for play. Send selected bits to the ledger when ready.'))),
+    scratch,
+    h('div',{class:'scratch-send'},
+      h('div',{class:'twocol'},h('div',null,h('label',null,'Ledger label'),labelSel),h('div',null,h('label',null,'Phase'),phaseIn)),
+      h('div',{class:'toolrow'},selectAllBtn,sendBtn),
+      status,
+      pickHost));
+  host.replaceChildren(panel); renderPicks();
+}
+
+// Registered through the shared campaign-tab helper (framing lives in viewCampaign), placed
+// right after the Ledger tab.
+registerCampaignTab(['scratch','Scratch','Fast device-local notes for the session. Send selected lines or blocks to the ledger when play pauses.'], campScratch, {after:'ledger'});
 /* ========================================================================== *
    TRACKER DETAILS — explicit editors for the Campaign State Tracker fields
    not owned by runtime-gauges.js or survival.js. No automatic consequences:
@@ -6229,23 +8269,9 @@ async function campRegion(host,name){
   }
 }
 
-// Extend the existing campaign screen after campaign.js loads. Existing tabs continue to
-// use the original view; only the new Region tab uses this focused read-only view.
-if(!CAMP_TABS.some(tab=>tab[0]==='region')){
-  CAMP_TABS.push(['region','Region','Saved regional geography, layers, connections, markers, and validation status.']);
-}
-const viewCampaignBeforeRegion=viewCampaign;
-viewCampaign=function(name,tab){
-  if(tab!=='region') return viewCampaignBeforeRegion(name,tab);
-  const f=framed(name,'idea → ledger → (audit) → canon','campaign-only until it’s audited into the queue');
-  const body=f.querySelector('.framed-body');
-  if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
-  body.append(h('div',{class:'toolrow',style:{marginBottom:'4px'}},h('button',{class:'navbtn',onclick:()=>go('campaigns')},'← All campaigns')));
-  const tabs=h('div',{class:'studio-tabs'});
-  CAMP_TABS.forEach(([key,label])=>tabs.append(h('button',{class:'tab'+(key==='region'?' on':''),'aria-pressed':key==='region'?'true':'false',onclick:()=>go('campaign',{camp:name,tab:key})},label)));
-  body.append(tabs,h('p',{class:'hint',style:{textAlign:'center',margin:'8px auto 16px',maxWidth:'52ch'}},CAMP_TABS.find(tab=>tab[0]==='region')[2]));
-  const host=h('div'); body.append(host); campRegion(host,name); return f;
-};
+// Register the Region tab through the shared campaign-tab helper; the framing (back link,
+// tabs row, GitHub guard, hint) lives in viewCampaign. This focused view stays read-only.
+registerCampaignTab(['region','Region','Saved regional geography, layers, connections, markers, and validation status.'], campRegion);
 /* ========================================================================== *
    REGION RENDER — Region Update 2: a deterministic, read-only layered map.
 
@@ -7559,6 +9585,85 @@ campRegion=async function(host,name){
     host.replaceChildren(h('p',{class:'hint'},'Region data unavailable: '+String(error&&error.message||error)));
   }
 };
+/* ========================================================================== *
+   CAMPAIGN DEMO — a read-only preview of the Game tools, populated with sample
+   content so you can see the atlas, the maps (with GM/player fog), and the cast
+   BEFORE starting a real campaign. The regions come from the real deterministic
+   Forge generator (fixed seeds → identical every load) and render through the
+   real atlas / map / cast components. Writes nothing; needs no GitHub connection.
+ * ========================================================================== */
+const DEMO_CAMPAIGN='Vael Crossing (demo)';
+const DEMO_CAST=[
+  {name:'Mara Tidecaller', what:'Vael storm-scout', status:'ally', relationship:'guided the protagonist across the first shelf', note:'Last seen at the north wind shelf, reading the cloudline.'},
+  {name:'Sef', what:'newborn Arkborne', status:'bonded mount', relationship:'the protagonist’s first friend and ride', note:'Still learning to ride the mana currents.'},
+  {name:'Orrin Brasskey', what:'wandering merchant', status:'neutral', relationship:'owes the protagonist a favor', note:'Carries a brass key he refuses to explain.'},
+  {name:'The Hollow Choirman', what:'unmaking echo', status:'enemy', relationship:'hunts the protagonist through the mist', note:'Heard singing below the bridge. Do not answer it.'},
+];
+
+// Two demo regions, generated once and cached. Fixed seeds keep them identical every load;
+// the initial-reveal pass gives them player fog so the GM/player toggle is meaningful.
+let demoRegionsCache=null;
+function demoRegions(){
+  if(demoRegionsCache) return demoRegionsCache;
+  const reveal=region=>regionForgeInitialReveal(region,{campaignName:DEMO_CAMPAIGN});
+  const first=regionForgeGenerateRegion({
+    role:'starter', id:'demo-first-shelf', title:'The First Shelf', campaign:DEMO_CAMPAIGN, cosmicLayer:'middle',
+    premise:'The first crossing opens under storm pressure.',
+    hooks:['find shelter','learn the crossing'], dangers:['ash wolves on the ridge'],
+    character:{race:'Vael', body:{adaptationTags:['wing','light frame']}, elements:['air','storm'],
+      expressions:['storm','ember'], abilities:['glide','spark shaping'], direction:'storm scout with fieldcraft'},
+  });
+  const outer=regionForgeGenerateRegion({
+    role:'outer', id:'demo-north-wind', title:'North Wind Shelf', campaign:DEMO_CAMPAIGN, cosmicLayer:'top',
+    seed:'demo-north-wind', neighbors:{from:'demo-first-shelf', edge:'north wind shelf'},
+  });
+  return demoRegionsCache=[reveal(first), reveal(outer)];
+}
+
+function demoOpenRegion(region){
+  openOverlay(close=>h('div',{class:'modal region-demo-modal'},
+    h('h2',{class:'display'},region.title),
+    h('p',{class:'hint'},'Demo region — toggle GM truth ⇄ player fog. Nothing here is saved.'),
+    regionMapPanel({region,errors:[]},{initialView:'gm',
+      footerText:'Example only. GM view shows the complete generated truth; Player view applies the discovery mask and hides fogged detail.'}),
+    h('div',{class:'toolrow',style:{marginTop:'12px'}},h('button',{class:'navbtn primary',onclick:close},'Close'))));
+}
+function demoRegionCard(region){
+  return h('button',{class:'region-atlas-card', type:'button', onclick:()=>demoOpenRegion(region)},
+    regionAtlasThumbnail(region),
+    h('span',{class:'region-atlas-title'},region.title),
+    h('span',{class:'hint'},'Cosmic '+region.cosmicLayer+' · '+region.localLayers.length+' local layer'+(region.localLayers.length===1?'':'s')),
+    h('span',{class:'hint'},regionAtlasDiscoveryLabel(region)));
+}
+function demoCastCard(member){
+  const m=normalizeCastMember(member);
+  const line=(label,value)=>value?h('p',null,h('b',null,label+': '),value):null;
+  return h('div',{class:'cast-card pcard'},
+    h('div',{class:'cast-card-head'},
+      h('div',null,h('h4',null,m.name),h('p',{class:'cast-card-meta'},m.what||'Cast member')),
+      m.status?h('span',{class:'cast-status tone-'+castStatusTone(m.status)},m.status):null),
+    line('Relationship',m.relationship),
+    line('Last seen / note',m.note));
+}
+
+function gameDemoView(){
+  const f=framed(DEMO_CAMPAIGN,'example campaign — see the tools before you start','a read-only preview; nothing here is saved, and no GitHub is needed');
+  const body=f.querySelector('.framed-body');
+  body.append(h('div',{class:'toolrow',style:{marginBottom:'4px'}},h('button',{class:'navbtn',onclick:()=>go('campaigns')},'← All campaigns')));
+  body.append(h('div',{class:'demo-banner'},h('b',null,'Example preview. '),
+    'These regions and cast are samples generated on your device — they are never saved to your repo. Start a campaign to make your own.'));
+  const regions=demoRegions();
+  body.append(h('div',{class:'demo-section'},
+    h('h3',null,'Region atlas'),
+    h('p',{class:'hint'},'Two pre-generated regions. Tap a map to explore it with the GM / player fog toggle.'),
+    h('div',{class:'region-atlas-grid'},...regions.map(demoRegionCard))));
+  body.append(h('div',{class:'demo-section'},
+    h('h3',null,'Campaign cast'),
+    h('p',{class:'hint'},'A few sample NPCs and how they tie to the protagonist.'),
+    h('div',{class:'cast-grid'},...DEMO_CAST.map(demoCastCard))));
+  return f;
+}
+registerView('gameDemo', ()=>gameDemoView());
 /* ========================================================================== *
    GAUGE CONTROLS — one small, shared meter+number+nudge control used by BOTH
    the Runtime gauges panel and the Mortal survival panel. Pure UI (uses h()),
