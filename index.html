@@ -352,6 +352,24 @@
   .assistant-head{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;flex-wrap:wrap}
   .assistant-head h2{margin:0 0 4px}
   .assistant-head .usage-meter{margin-left:auto}
+  .assistant-section-label{color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
+  .assistant-persona-section{display:grid;gap:9px;border:1px dashed var(--gold-soft);border-radius:8px;background:#fff8;padding:10px}
+  .assistant-persona-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}
+  .assistant-persona-card{display:grid;gap:4px;text-align:left;border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);padding:10px 11px;color:var(--ink-soft);font-family:inherit;white-space:normal}
+  .assistant-persona-card b{color:var(--ink);font-size:15px}
+  .assistant-persona-card small{color:var(--hint);font-size:12px;line-height:1.3}
+  .assistant-persona-card span{color:var(--green);font-size:11px;font-weight:700;letter-spacing:.03em;text-transform:uppercase}
+  .assistant-persona-card.on{border-color:var(--gold);background:#f3ecda;box-shadow:0 8px 18px -18px rgba(var(--shadow)/.55)}
+  .assistant-starters{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+  .assistant-starters .hint{font-size:13px}
+  .assistant-persona-editor{display:grid;gap:8px}
+  .assistant-persona-editor:empty{display:none}
+  .assistant-persona-editor-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px}
+  .assistant-persona-editor-grid label{display:grid;gap:4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+  .assistant-persona-editor-grid label.wide{grid-column:1/-1}
+  .assistant-persona-editor input,.assistant-persona-editor select,.assistant-persona-editor textarea{border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft);box-sizing:border-box;width:100%}
+  .assistant-persona-editor textarea{resize:vertical;line-height:1.45}
+  .assistant-danger:disabled{opacity:.45}
   .assistant-controls{display:grid;grid-template-columns:minmax(220px,1fr) auto;gap:12px;align-items:end}
   .assistant-controls label{display:grid;gap:5px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase}
   .assistant-engine-pick{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;min-width:0}
@@ -374,7 +392,7 @@
   .assistant-answer-text{margin:0;white-space:pre-wrap;overflow-wrap:anywhere;font-family:inherit;line-height:1.5;color:var(--ink-soft)}
   .assistant-outbound{display:grid;gap:8px;border-top:1px solid var(--gold-soft);padding-top:10px}
   .assistant-outbound input{min-width:180px}
-  @media(max-width:720px){.assistant-controls{grid-template-columns:1fr}.assistant-engine-actions{justify-content:flex-start}.assistant-head .usage-meter{margin-left:0;width:100%}.assistant-advanced{grid-template-columns:1fr}}
+  @media(max-width:720px){.assistant-controls{grid-template-columns:1fr}.assistant-engine-actions{justify-content:flex-start}.assistant-head .usage-meter{margin-left:0;width:100%}.assistant-advanced,.assistant-persona-editor-grid{grid-template-columns:1fr}}
   .query-panel{display:grid;gap:14px;max-width:980px;margin:0 auto}
   .query-head h2{margin:0 0 4px}
   .query-controls{display:grid;grid-template-columns:minmax(220px,1fr) minmax(240px,2fr);gap:12px;align-items:end}
@@ -630,14 +648,102 @@
   .region-demo-modal .region-map-svg{ height:min(56vh,440px); }
 
   /* ---------- in-app GM play (▶ Play tab) ---------- */
-  .play-log{ display:flex; flex-direction:column; gap:10px; margin:12px 0; }
-  .play-msg{ padding:9px 12px; border-radius:12px; border:1px solid var(--gold-soft); }
-  .play-msg.you{ background:#fff8; align-self:flex-end; max-width:88%; }
-  .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; }
-  .play-msg .who{ font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--hint); margin-bottom:3px; }
+  .play-shell{ display:grid; gap:12px; }
+  .play-command-card,.play-transcript-card,.play-input-card{
+    border:1.5px solid var(--gold-soft); border-radius:12px; background:#fffaf0;
+    box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .play-command-card{ padding:14px; }
+  .play-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
+  .play-head .usage-meter{ margin-left:auto; }
+  .play-control-row{ display:flex; align-items:flex-end; gap:10px; flex-wrap:wrap; min-width:0; }
+  .play-select-label{
+    display:grid; gap:4px; color:var(--gold); font-size:12px; font-style:normal;
+    font-weight:800; text-transform:uppercase;
+  }
+  .play-persona,.play-engine{
+    width:min(280px,72vw); border:1px solid var(--gold-soft); border-radius:8px;
+    background:var(--paper-card); color:var(--ink); font:inherit; padding:7px 9px;
+    min-height:38px;
+  }
+  .play-note{
+    margin:10px 0 0; max-width:78ch; color:var(--hint); font-size:14px;
+    font-style:italic; line-height:1.42;
+  }
+  .play-table-stage{ display:grid; grid-template-columns:minmax(230px,300px) minmax(0,1fr); gap:12px; align-items:start; }
+  .play-chat-stack{ display:grid; gap:8px; min-width:0; }
+  .play-tools-wrap{
+    position:sticky; top:10px; max-height:calc(100vh - 120px); overflow:auto;
+    border:1.5px solid var(--gold-soft); border-radius:12px; background:#fffaf0;
+    padding:10px; box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  .play-tools-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:0 0 8px; }
+  .play-tools-head b{ color:var(--ink); font-size:17px; }
+  .play-tools-head .hint{ font-size:12px; }
+  .play-mode-row{ display:flex; flex-wrap:wrap; gap:7px; margin:0; }
+  .play-mode-chip{
+    border:1px solid #dacda8; border-radius:999px; background:#fffdf7; color:var(--ink-soft);
+    font:inherit; font-size:13px; font-weight:800; padding:7px 12px; cursor:pointer;
+    min-height:44px; min-width:132px; max-width:184px; display:grid; gap:1px; align-content:center;
+    text-align:left; box-shadow:0 4px 12px -14px rgba(var(--shadow)/.35);
+  }
+  .play-mode-chip.on{ border-color:var(--green); background:#edf3e9; color:var(--green); }
+  .play-mode-chip:hover{ border-color:var(--gold); color:var(--ink); }
+  .play-mode-title{ line-height:1.1; }
+  .play-mode-chip small{ color:var(--hint); font-size:11px; font-weight:700; font-style:italic; line-height:1.1; }
+  .play-mode-chip.on small{ color:#587461; }
+  .play-mode-help{ color:var(--hint); font-size:13px; font-style:italic; margin:-1px 0 1px; }
+  .play-tools{ display:grid; grid-template-columns:1fr; gap:8px; }
+  .play-tool-card{
+    border:1px solid #e4d8bc; border-radius:10px; background:var(--paper-card);
+    padding:0 11px 11px; min-width:0; box-shadow:0 8px 18px -22px rgba(var(--shadow)/.45);
+  }
+  .play-tool-card summary{
+    cursor:pointer; color:var(--green); font-weight:800; padding:10px 0 8px; touch-action:manipulation;
+  }
+  .play-tool-card ul{ margin:0; padding-left:18px; color:var(--ink-soft); line-height:1.36; font-size:15px; }
+  .play-tool-card li{ margin:4px 0; }
+  .play-grounding{
+    border:1px solid #e7dcc4; border-radius:999px; background:#fffdf7; color:var(--hint);
+    padding:6px 11px; font-size:13px; font-style:italic;
+  }
+  .play-transcript-card{ padding:12px; background:linear-gradient(180deg,#fffaf0,#f8f1df); }
+  .play-log{ display:flex; flex-direction:column; gap:10px; min-height:220px; max-height:min(54vh,560px); overflow:auto; padding-right:2px; }
+  .play-empty{ margin:auto; color:var(--hint); font-style:italic; text-align:center; }
+  .play-msg{
+    padding:10px 12px; border-radius:12px; border:1px solid var(--gold-soft);
+    box-shadow:0 8px 18px -20px rgba(var(--shadow)/.5);
+  }
+  .play-msg.you{ background:#fffdf7; align-self:flex-end; max-width:86%; border-color:#dccba5; }
+  .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; border-left:4px solid var(--green); }
+  .play-msg .who{ font-size:11px; letter-spacing:0; text-transform:uppercase; color:var(--gold); margin-bottom:3px; font-weight:800; }
   .play-text{ white-space:pre-wrap; margin:0; font:inherit; line-height:1.5; }
-  .play-proposal{ margin-top:8px; border:1px dashed var(--gold); border-radius:8px; padding:8px 10px; background:#fff7e6; }
-  .play-input{ width:100%; box-sizing:border-box; border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-card); color:var(--ink-soft); font:inherit; padding:9px 11px; }
+  .play-proposal{ margin-top:9px; border:1px dashed var(--gold); border-radius:9px; padding:9px 10px; background:#fff7e6; }
+  .play-proposal-list{ display:grid; gap:6px; margin-top:7px; }
+  .play-proposal-pick{ display:flex; align-items:flex-start; gap:7px; color:var(--ink-soft); line-height:1.35; }
+  .play-proposal-pick input{ flex:0 0 auto; margin-top:2px; }
+  .play-input-card{ position:sticky; bottom:8px; z-index:4; padding:12px; display:grid; gap:8px; }
+  .play-input{
+    width:100%; box-sizing:border-box; border:1.5px solid var(--gold-soft); border-radius:9px;
+    background:var(--paper-card); color:var(--ink-soft); font:inherit; line-height:1.45; padding:10px 11px;
+    min-height:90px; resize:vertical;
+  }
+  .play-input:focus{ outline:2px solid rgba(62,107,79,.22); border-color:var(--green); }
+  .play-action-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .play-action-row .sync-status{ min-height:1.4em; }
+  @media (max-width:780px){
+    .play-table-stage{ grid-template-columns:1fr; }
+    .play-chat-stack{ order:1; }
+    .play-tools-wrap{ order:2; position:static; max-height:260px; }
+    .play-mode-chip{ flex:1 1 145px; max-width:none; }
+  }
+  @media (max-width:560px){
+    .play-command-card,.play-transcript-card,.play-input-card{ border-radius:10px; }
+    .play-head .usage-meter{ margin-left:0; width:100%; }
+    .play-control-row,.play-select-label,.play-persona,.play-engine{ width:100%; }
+    .play-tools-wrap{ max-height:240px; }
+    .play-log{ min-height:180px; max-height:48vh; }
+  }
   @media (max-width:480px){ .play-msg.you,.play-msg.gm{ max-width:100%; } }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
@@ -2146,21 +2252,133 @@ function pppDefaultIndex(){ return 1; }   // start at Ch 1 "Hello, World!", not 
 /* ========================================================================== *
    ASSISTANT PERSONAS
 
-   Per-"hat" system prompts (and an optional preferred model) for the in-app AI
-   assistant. Picking a persona only prepends its system prompt to the canon
-   grounding before the request — it never changes retrieval, and never touches
-   canon-write safety. Add or reword entries freely; `id` must stay stable.
+   Per-"hat" system prompts, defaults, and starter prompts for the in-app AI
+   assistant. Personas shape the request; canon retrieval stays read-only, and
+   outputs still move through the Draft/ledger governance paths only.
  * ========================================================================== */
+const ASSISTANT_GROUNDING_MODES=['strict','balanced','creative'];
+const ASSISTANT_DEFAULT_PERSONA_ID='worldbuilder';
 const ASSISTANT_PERSONAS=[
-  {id:'worldbuilder', label:'Worldbuilder', model:'',
-   system:"You are a worldbuilding assistant for the Godling Universe canon. Answer using the provided canon context. Be precise, cite canon IDs when relevant, and never invent canon — if something is not established, say so plainly. Everything you produce is a suggestion only; nothing is official until the keeper promotes it."},
-  {id:'gm', label:'Game Master', model:'',
-   system:"You are the Game Master for a Godling Universe campaign. Use the provided canon context. Narrate vividly but concisely. Honor the setting's felt-not-numbers magic and its survival stakes. End each turn with a clear situation and the player's options. Never decide the player's actions for them."},
-  {id:'tutor', label:'C++ Tutor', model:'qwen2.5-coder:latest',
-   system:"You are a C++ tutor following Stroustrup's \"Programming: Principles and Practice\". Do NOT write the solution for me. Point out the flaw in my logic, ask one guiding question, and explain the underlying concept. Prefer a small hint over a full answer."},
-  {id:'maker', label:'Maker', model:'',
-   system:"You are a gentle, encouraging creative companion for the Maker's space. Help brainstorm Vael folk, groves, creatures, seeds, and crochet colorways. Keep it warm, low-pressure, and imaginative. Offer a few gentle options; never make it feel like homework."},
+  {id:'worldbuilder', label:'Canon Librarian', description:'Precise promoted-canon answers with clear uncertainty and canon IDs.', model:'', temperature:0.35, groundingMode:'strict',
+   starterPrompts:['What does promoted canon say about this?','Which canon IDs support this idea?','What is not yet established?'],
+   system:"You are the canon librarian for the Godling Universe. Answer from promoted canon first. Be precise, cite canon IDs when relevant, and say plainly when something is not established. Keep speculation out of the answer unless the user asks for suggestions, and mark every suggestion as unofficial."},
+  {id:'gm', label:'Game Master', description:'Campaign-facing narration that honors canon and keeps player choice intact.', model:'', temperature:0.75, groundingMode:'balanced',
+   starterPrompts:['Frame the next scene from this situation.','Give me three player-facing options.','Summarize the current stakes for play.'],
+   system:"You are the Game Master for a Godling Universe campaign. Use promoted canon and campaign context as constraints. Narrate vividly but concisely, honor felt-not-numbers magic and survival stakes, and end with a clear situation plus player options. Never decide the player's actions, never overwrite canon, and label any invented table-facing detail as a suggestion."},
+  {id:'tutor', label:'C++ Tutor', description:'A patient PPP-aligned programming coach that gives hints, not full answers.', model:'qwen2.5-coder:latest', temperature:0.25, groundingMode:'balanced',
+   starterPrompts:['Give me a hint, not the solution.','Explain the bug in my code.','Ask me one guiding question.'],
+   system:"You are a C++ tutor following Stroustrup's \"Programming: Principles and Practice\". Do not write the full solution unless explicitly asked. Point out the flaw in my logic, ask one guiding question, and explain the underlying concept in beginner-friendly language. Prefer a small hint over a full answer."},
+  {id:'maker', label:'Maker Companion', description:'Gentle creative sparks for Vael folk, groves, creatures, seeds, and colorways.', model:'', temperature:0.9, groundingMode:'creative',
+   starterPrompts:['Give me a few soft ideas.','Help me name this gently.','Turn this into three cozy options.'],
+   system:"You are a gentle, encouraging creative companion for the Maker space. Help brainstorm Vael folk, groves, creatures, seeds, names, and crochet colorways. Keep it warm, low-pressure, and imaginative. Offer a few gentle options, never make it feel like homework, and separate established canon from playful suggestions."},
+  {id:'continuity', label:'Continuity Checker', description:'Finds canon support, gaps, contradictions, and review questions before drafting.', model:'', temperature:0.2, groundingMode:'strict',
+   starterPrompts:['Check this for contradictions.','What canon supports or blocks this?','List the review questions before I draft.'],
+   system:"You are a continuity checker for the Godling Universe. Compare the user's idea against promoted canon only. Surface support, gaps, contradictions, and review questions. Do not patch over missing canon; name the uncertainty and suggest what should be reviewed before anything is drafted."},
+  {id:'scribe', label:'Canon Scribe', description:'Turns grounded answers into clear draft-card language without promoting anything.', model:'', temperature:0.45, groundingMode:'balanced',
+   starterPrompts:['Shape this into draft-card wording.','Make this easier to promote later.','Extract the claim, means, limits, and notes.'],
+   system:"You are a canon scribe for draft preparation. Turn grounded material into clear, reviewable wording with a claim, supporting meaning, limits, and notes. Keep the tone useful and concise. Never present a draft as promoted canon, and preserve uncertainties as explicit review notes."},
 ];
+
+const ASSISTANT_GROUNDING_TEXT={
+  strict:'Use only promoted canon in the grounding. If the answer is not covered, say so directly and stop before inventing.',
+  balanced:'Use promoted canon as the authority. You may explain likely implications, but label any inference or gap clearly.',
+  creative:'Use promoted canon as the anchor. If brainstorming, separate "Canon facts" from "Suggestions" so unofficial material cannot be mistaken for canon.'
+};
+
+function assistantPersonaText(value,max){
+  const s=String(value||'').replace(/\s+/g,' ').trim();
+  return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim():s;
+}
+function assistantPersonaLongText(value,max){
+  const s=String(value||'').replace(/\r\n?/g,'\n').trim();
+  return max&&s.length>max?s.slice(0,max).trim():s;
+}
+function assistantPersonaNumber(value,min,max){
+  if(value==null||value==='') return '';
+  let n=Number(value);
+  if(!Number.isFinite(n)) return '';
+  if(Number.isFinite(min)&&n<min) n=min;
+  if(Number.isFinite(max)&&n>max) n=max;
+  return n;
+}
+function assistantPersonaId(value,fallback){
+  const raw=assistantPersonaText(value||fallback||'',80).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  return raw||'custom-persona';
+}
+function assistantGroundingMode(value){
+  const mode=String(value||'').trim();
+  return ASSISTANT_GROUNDING_MODES.includes(mode)?mode:'balanced';
+}
+function assistantNormalizeStarterPrompts(value){
+  const list=Array.isArray(value)?value:String(value||'').split(/\n+/);
+  const out=[], seen={};
+  list.forEach(item=>{
+    const text=assistantPersonaText(item,120);
+    if(text&&!seen[text]){ seen[text]=true; out.push(text); }
+  });
+  return out.slice(0,6);
+}
+function assistantNormalizePersona(value,opts){
+  const p=value&&typeof value==='object'?value:{}, options=opts||{}, builtIn=!!options.builtIn;
+  let id=assistantPersonaId(p.id,p.label);
+  if(!builtIn&&!/^custom-/.test(id)) id='custom-'+id;
+  return {
+    id,
+    label:assistantPersonaText(p.label,builtIn?60:48)||'Custom persona',
+    description:assistantPersonaText(p.description,180),
+    system:assistantPersonaLongText(p.system,5000),
+    model:assistantPersonaText(p.model,120),
+    temperature:assistantPersonaNumber(p.temperature,0,1.5),
+    groundingMode:assistantGroundingMode(p.groundingMode),
+    starterPrompts:assistantNormalizeStarterPrompts(p.starterPrompts),
+    builtIn
+  };
+}
+function assistantNormalizeCustomPersona(value){
+  const p=assistantNormalizePersona(value,{builtIn:false});
+  return p.system?p:null;
+}
+function assistantSettingsDefault(){
+  return {activePersonaId:ASSISTANT_DEFAULT_PERSONA_ID,customPersonas:[]};
+}
+function normalizeAssistantSettings(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  const seen={}, custom=[];
+  (Array.isArray(source.customPersonas)?source.customPersonas:[]).forEach(item=>{
+    const p=assistantNormalizeCustomPersona(item);
+    if(p&&!seen[p.id]){ seen[p.id]=true; custom.push(p); }
+  });
+  const ids={};
+  ASSISTANT_PERSONAS.forEach(p=>{ ids[p.id]=true; });
+  custom.forEach(p=>{ ids[p.id]=true; });
+  const active=typeof source.activePersonaId==='string'&&ids[source.activePersonaId]?source.activePersonaId:ASSISTANT_DEFAULT_PERSONA_ID;
+  return {activePersonaId:active,customPersonas:custom.slice(0,24)};
+}
+function assistantBuiltInPersonas(){
+  return ASSISTANT_PERSONAS.map(p=>assistantNormalizePersona(p,{builtIn:true})).filter(p=>p.id&&p.system);
+}
+function assistantCustomPersonas(settings){
+  return normalizeAssistantSettings(settings).customPersonas;
+}
+function assistantAllPersonas(settings){
+  return assistantBuiltInPersonas().concat(assistantCustomPersonas(settings));
+}
+function assistantResolvePersona(id,settings){
+  const list=assistantAllPersonas(settings);
+  return list.find(p=>p.id===id)||list.find(p=>p.id===ASSISTANT_DEFAULT_PERSONA_ID)||list[0]||assistantNormalizePersona({id:ASSISTANT_DEFAULT_PERSONA_ID,label:'Canon Librarian',system:''},{builtIn:true});
+}
+function assistantPersonaGovernance(mode){
+  const m=assistantGroundingMode(mode);
+  return [
+    'CANON GOVERNANCE:',
+    'Promoted canon is the authority. The assistant never writes canon directly; every output is a suggestion until reviewed through the normal Draft or campaign-ledger path.',
+    ASSISTANT_GROUNDING_TEXT[m]||ASSISTANT_GROUNDING_TEXT.balanced
+  ].join('\n');
+}
+function assistantBuildPersonaSystem(persona,groundingSystem){
+  const p=assistantNormalizePersona(persona&&persona.id&&persona.builtIn?persona:persona||{},{builtIn:!!(persona&&persona.builtIn)});
+  return [p.system,assistantPersonaGovernance(p.groundingMode),String(groundingSystem||'').trim()].filter(Boolean).join('\n\n');
+}
 /* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
 const IDB_NAME='vfj', IDB_STORE='kv', IDB_KEY='state';
@@ -2232,13 +2450,14 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
   merged.openTo=d.openTo==='frontdoor'?'frontdoor':'last';
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
+  merged.assistant=normalizeAssistantSettings(d.assistant);
   merged.naming=Object.assign(namingDefault(), d.naming||{});
   merged.practice=Object.assign(practiceDefault(), d.practice||{});
   merged.engines={
@@ -3738,7 +3957,7 @@ async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!met
   text=text.replace(/^﻿/,'');   // strip a UTF-8 BOM if present
   return { text, sha:meta.sha }; }
 // Only the *shareable* journal travels to the repo — never device-only flags
-// (token, engine profiles, mode, profile, seenIntro, the GitHub config). That way
+// (token, engine profiles, assistant personas, mode, profile, seenIntro, the GitHub config). That way
 // settings changes never enter a repo payload, and an unchanged journal produces
 // an identical payload we can skip.
 function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault() }; }
@@ -3766,6 +3985,7 @@ function stripForBackup(db){
   if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
   delete d.campaignScratch;
   delete d.usageLedger;
+  delete d.assistant;
   if(d.engines){
     const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
     d.engines={
@@ -3778,7 +3998,7 @@ function stripForBackup(db){
     };
   }
   return d;
-} // never write tokens, engine keys, engine endpoints, engine models, usage ledger, or session scratch into a backup
+} // never write tokens, engine keys, engine endpoints, engine models, usage ledger, assistant personas, or session scratch into a backup
 // merge an incoming journal (from the repo or a backup file) into DB. Additive for new
 // work (existing items win, new ones appended by id), but deletions are honored via
 // tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
@@ -3806,7 +4026,8 @@ function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).fo
 
 /* ---------- local backup file (a safety net against data eviction) --------- */
 // the journal travels with its images inline; device secrets (GitHub token,
-// engine key, engine endpoint, engine model, usage ledger) are never written into a backup.
+// engine key, engine endpoint, engine model, usage ledger, assistant personas)
+// are never written into a backup.
 function exportBackup(){
   const data=JSON.stringify(stripForBackup(DB), null, 1);
   const b=new Blob([data],{type:'application/json'});
@@ -6464,17 +6685,58 @@ function assistantIsLocalEngine(engine){
   return engine&&engine.type==='OpenAI-compatible local endpoint';
 }
 
-// Persona = a system-prompt "hat" (and optional preferred model) for the assistant.
+// Persona = a system-prompt "hat" with optional request defaults.
+function assistantPersonaSettings(){
+  DB.assistant=normalizeAssistantSettings(DB.assistant);
+  return DB.assistant;
+}
+function assistantSavePersonaSettings(settings){
+  DB.assistant=normalizeAssistantSettings(settings);
+  saveLocal({forceMirror:true});
+  return DB.assistant;
+}
 function assistantPersonaList(){
-  return (typeof ASSISTANT_PERSONAS!=='undefined'&&Array.isArray(ASSISTANT_PERSONAS))?ASSISTANT_PERSONAS:[];
+  return assistantAllPersonas(assistantPersonaSettings());
 }
 function assistantPersonaById(id){
-  const list=assistantPersonaList();
-  return list.find(p=>p.id===id)||list[0]||{id:'worldbuilder',label:'Worldbuilder',system:'',model:''};
+  return assistantResolvePersona(id,assistantPersonaSettings());
 }
 function assistantDefaultPersonaId(){
-  const list=assistantPersonaList();
-  return list[0]?list[0].id:'worldbuilder';
+  return assistantPersonaSettings().activePersonaId||ASSISTANT_DEFAULT_PERSONA_ID;
+}
+function assistantSetActivePersona(id){
+  const settings=assistantPersonaSettings(), persona=assistantResolvePersona(id,settings);
+  settings.activePersonaId=persona.id;
+  assistantSavePersonaSettings(settings);
+  return persona;
+}
+function assistantCustomPersonaId(label){
+  return 'custom-'+assistantPersonaId(label||'persona')+'-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+}
+function assistantSaveCustomPersona(persona){
+  const settings=assistantPersonaSettings();
+  const next=assistantNormalizeCustomPersona(Object.assign({},persona,{id:persona&&persona.id?persona.id:assistantCustomPersonaId(persona&&persona.label)}));
+  if(!next) throw new Error('A custom persona needs a prompt.');
+  const index=settings.customPersonas.findIndex(p=>p.id===next.id);
+  if(index>=0) settings.customPersonas[index]=next; else settings.customPersonas.push(next);
+  settings.activePersonaId=next.id;
+  assistantSavePersonaSettings(settings);
+  return next;
+}
+function assistantDuplicatePersona(persona){
+  persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
+  return assistantSaveCustomPersona(Object.assign({},persona,{
+    id:assistantCustomPersonaId(persona.label),
+    label:(persona.label||'Persona')+' custom'
+  }));
+}
+function assistantDeleteCustomPersona(id){
+  const settings=assistantPersonaSettings();
+  const before=settings.customPersonas.length;
+  settings.customPersonas=settings.customPersonas.filter(p=>p.id!==id);
+  if(settings.activePersonaId===id) settings.activePersonaId=ASSISTANT_DEFAULT_PERSONA_ID;
+  assistantSavePersonaSettings(settings);
+  return settings.customPersonas.length!==before;
 }
 
 function assistantEngineProfiles(){
@@ -6650,15 +6912,14 @@ function studioAssistant(host){
     h('option',{value:''},'Choose a task preset...'),
     ...ENGINE_TASK_PRESETS.map((preset,i)=>h('option',{value:String(i)},preset.label+' - '+preset.model))
   );
-  const personaSel=h('select',{class:'assistant-persona'},...assistantPersonaList().map(p=>h('option',{value:p.id},p.label)));
-  personaSel.value=state.personaId;
-  personaSel.onchange=()=>{
-    state.personaId=personaSel.value;
-    const persona=assistantPersonaById(state.personaId);
-    if(persona.model&&Array.from(modelSel.children||[]).some(o=>o.value===persona.model)){
-      modelSel.value=persona.model; state.model=persona.model; persistCurrentEngine({model:persona.model});
-    }
-  };
+  const personaGrid=h('div',{class:'assistant-persona-grid'});
+  const personaMeta=h('div',{class:'assistant-persona-meta hint'});
+  const starterRow=h('div',{class:'assistant-starters'});
+  const customizeBtn=h('button',{class:'secondary',type:'button'},'Customize');
+  const duplicateBtn=h('button',{class:'secondary',type:'button'},'Save as custom');
+  const deletePersonaBtn=h('button',{class:'secondary assistant-danger',type:'button'},'Delete custom');
+  const personaEditor=h('div',{class:'assistant-persona-editor'});
+  let personaEditorOpen=false;
   const tempUse=h('input',{type:'checkbox'});
   const temperatureIn=h('input',{type:'range',min:'0',max:'1.5',step:'0.05',value:'0.70'});
   const temperatureValue=h('span',{class:'assistant-temp-value'});
@@ -6690,6 +6951,107 @@ function studioAssistant(host){
   function persistCurrentEngine(patch){
     const engine=assistantEngineById(profiles,engineSel.value);
     return assistantSaveEnginePatch(profiles,engine,patch);
+  }
+  function modelChoiceExists(model){
+    const value=String(model||'').trim();
+    return !!value&&Array.from(modelSel.children||[]).some(option=>option.value===value);
+  }
+  function applyPersonaDefaults(persona){
+    persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
+    const engine=assistantEngineById(profiles,engineSel.value), patch={};
+    if(persona.model&&(assistantIsLocalEngine(engine)||modelChoiceExists(persona.model))){
+      ensureModelChoice(persona.model);
+      patch.model=persona.model;
+    }
+    if(persona.temperature!==''){
+      tempUse.checked=true;
+      temperatureIn.value=String(persona.temperature);
+      refreshTemperatureControl();
+      patch.temperature=persona.temperature;
+    }
+    if(Object.keys(patch).length) persistCurrentEngine(patch);
+  }
+  function renderStarterPrompts(persona){
+    const prompts=assistantNormalizeStarterPrompts(persona&&persona.starterPrompts);
+    starterRow.replaceChildren();
+    if(!prompts.length) return;
+    starterRow.append(h('span',{class:'hint'},'Starter prompts'));
+    prompts.forEach(promptText=>{
+      const btn=h('button',{class:'chip dash',type:'button'},promptText);
+      btn.onclick=()=>{ question.value=promptText; question.focus(); };
+      starterRow.append(btn);
+    });
+  }
+  function renderPersonaEditor(persona){
+    persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
+    if(!personaEditorOpen){ personaEditor.replaceChildren(); return; }
+    const labelIn=h('input',{value:persona.builtIn?persona.label+' custom':persona.label,placeholder:'Persona name',maxlength:'48'});
+    const descIn=h('input',{value:persona.description,placeholder:'What this hat is for',maxlength:'180'});
+    const modelIn=h('input',{value:persona.model,placeholder:'optional preferred model',spellcheck:'false'});
+    const tempIn=h('input',{type:'number',min:'0',max:'1.5',step:'0.05',value:persona.temperature,placeholder:'default'});
+    const modeIn=h('select',null,...ASSISTANT_GROUNDING_MODES.map(mode=>h('option',{value:mode},mode)));
+    modeIn.value=persona.groundingMode;
+    const systemIn=h('textarea',{rows:'7',placeholder:'System prompt'},persona.system);
+    const startersIn=h('textarea',{rows:'3',placeholder:'One starter prompt per line'},(persona.starterPrompts||[]).join('\n'));
+    const saveBtn=h('button',{class:'primary',type:'button'},'Save custom persona');
+    const cancelBtn=h('button',{class:'secondary',type:'button'},'Cancel');
+    saveBtn.onclick=()=>{
+      try{
+        const saved=assistantSaveCustomPersona({
+          id:persona.builtIn?'':persona.id,
+          label:labelIn.value,
+          description:descIn.value,
+          system:systemIn.value,
+          model:modelIn.value,
+          temperature:tempIn.value,
+          groundingMode:modeIn.value,
+          starterPrompts:startersIn.value
+        });
+        state.personaId=saved.id;
+        personaEditorOpen=false;
+        applyPersonaDefaults(saved);
+        renderPersonaPicker();
+        status.textContent='Custom persona saved on this device.';
+      }catch(e){
+        status.textContent='Could not save custom persona.';
+      }
+    };
+    cancelBtn.onclick=()=>{ personaEditorOpen=false; renderPersonaPicker(); };
+    personaEditor.replaceChildren(
+      h('div',{class:'assistant-persona-editor-grid'},
+        h('label',null,'Name',labelIn),
+        h('label',null,'Model',modelIn),
+        h('label',null,'Temperature',tempIn),
+        h('label',null,'Grounding',modeIn),
+        h('label',{class:'wide'},'Description',descIn),
+        h('label',{class:'wide'},'System prompt',systemIn),
+        h('label',{class:'wide'},'Starter prompts',startersIn)
+      ),
+      h('div',{class:'assistant-actions'},saveBtn,cancelBtn)
+    );
+  }
+  function selectPersona(id,opts){
+    const persona=assistantSetActivePersona(id);
+    state.personaId=persona.id;
+    if(!opts||!opts.skipDefaults) applyPersonaDefaults(persona);
+    renderPersonaPicker();
+  }
+  function renderPersonaPicker(){
+    const personas=assistantPersonaList(), current=assistantPersonaById(state.personaId);
+    personaGrid.replaceChildren(...personas.map(persona=>{
+      const btn=h('button',{class:'assistant-persona-card'+(persona.id===current.id?' on':''),type:'button'},
+        h('b',null,persona.label),
+        h('small',null,persona.description||'Custom assistant hat'),
+        h('span',null,(persona.model||'engine model')+' · temp '+(persona.temperature===''?'default':Number(persona.temperature).toFixed(2))+' · '+persona.groundingMode)
+      );
+      btn.onclick=()=>selectPersona(persona.id);
+      return btn;
+    }));
+    personaMeta.replaceChildren(document.createTextNode((current.builtIn?'Built-in':'Custom')+' persona. '+(current.description||'')+' Grounding: '+current.groundingMode+'.'));
+    customizeBtn.textContent=current.builtIn?'Customize a copy':'Edit custom';
+    deletePersonaBtn.disabled=!!current.builtIn;
+    renderStarterPrompts(current);
+    renderPersonaEditor(current);
   }
   modelSel.onchange=()=>{
     state.model=modelSel.value;
@@ -6756,6 +7118,30 @@ function studioAssistant(host){
   const ledgerBtn=h('button',{class:'secondary'},'Send to ledger');
   draftBtn.disabled=true;
   ledgerBtn.disabled=true;
+  customizeBtn.onclick=()=>{ personaEditorOpen=!personaEditorOpen; renderPersonaPicker(); };
+  duplicateBtn.onclick=()=>{
+    try{
+      const saved=assistantDuplicatePersona(assistantPersonaById(state.personaId));
+      state.personaId=saved.id;
+      personaEditorOpen=true;
+      applyPersonaDefaults(saved);
+      renderPersonaPicker();
+      status.textContent='Saved a custom copy on this device.';
+    }catch(e){
+      status.textContent='Could not save custom persona.';
+    }
+  };
+  deletePersonaBtn.onclick=()=>{
+    const current=assistantPersonaById(state.personaId);
+    if(current.builtIn) return;
+    if(confirm('Delete custom persona '+current.label+' from this device?')){
+      assistantDeleteCustomPersona(current.id);
+      state.personaId=assistantDefaultPersonaId();
+      personaEditorOpen=false;
+      renderPersonaPicker();
+      status.textContent='Custom persona deleted.';
+    }
+  };
 
   function refreshEngineNote(){
     const engine=assistantEngineById(profiles,engineSel.value);
@@ -6808,7 +7194,7 @@ function studioAssistant(host){
         answerHost.scrollTop=answerHost.scrollHeight;
       };
       const chat=Object.assign({
-        system:[assistantPersonaById(state.personaId).system,grounding.system].filter(Boolean).join('\n\n'),
+        system:assistantBuildPersonaSystem(assistantPersonaById(state.personaId),grounding.system),
         messages:[{role:'user',content:q}],
         model:assistantModelFor(state,engine),
         maxTokens:ASSISTANT_MAX_TOKENS
@@ -6863,6 +7249,7 @@ function studioAssistant(host){
   refreshEngineNote();
   setGroundingLine([]);
   setEmbedStatus('');
+  renderPersonaPicker();
 
   host.replaceChildren(h('div',{class:'panel assistant-panel'},
     h('div',{class:'assistant-head'},
@@ -6872,9 +7259,16 @@ function studioAssistant(host){
       ),
       usageMeter()
     ),
+    h('div',{class:'assistant-persona-section'},
+      h('div',{class:'assistant-section-label'},'Persona'),
+      personaGrid,
+      personaMeta,
+      h('div',{class:'assistant-actions'},customizeBtn,duplicateBtn,deletePersonaBtn),
+      starterRow,
+      personaEditor
+    ),
     h('div',{class:'assistant-controls'},
       h('div',{class:'assistant-engine-pick'},
-        h('label',{},'Persona',personaSel),
         h('label',{},'Engine',engineSel),
         h('label',{},'Model',modelSel),
         h('label',{},'Preset',presetSel)
@@ -10896,6 +11290,30 @@ campResume=async function(host,name){
  * ========================================================================== */
 const CAMP_PLAY_LOG_PREFIX='CAMPAIGN PLAY LOG';
 const CAMP_PLAY_MAX_TOKENS=1024;
+const CAMP_PLAY_DEFAULT_PERSONA_ID='gm';
+const CAMP_PLAY_PERSONA_ORDER=['gm','worldbuilder','continuity','scribe'];
+const CAMP_PLAY_MODES=[
+  {id:'act', label:'Player action', hint:'Resolve what I do', prompt:'The user is declaring a player action. Resolve uncertainty with consequences, opportunity, pressure, and a clear next situation. Do not decide the player character\'s intent or next action.'},
+  {id:'ask', label:'Table question', hint:'Plain answer', prompt:'The user is asking an out-of-fiction table question. Answer clearly, separate canon facts from table suggestions, then offer a practical next step.'},
+  {id:'scene', label:'Frame scene', hint:'Set stakes', prompt:'Frame the current scene with sensory detail, immediate stakes, visible choices, and one or two quiet world pressures. End with a grounded prompt for the player.'},
+  {id:'oracle', label:'Oracle options', hint:'2-3 possibilities', prompt:'Act as an oracle for uncertain table direction. Offer 2-3 plausible answers, mark which are canon-grounded and which are table suggestions, and do not force one answer.'},
+  {id:'consequence', label:'Cost / pressure', hint:'Complicate fallout', prompt:'Focus on consequences that follow from the fiction. Prefer success-at-cost, pressure clocks, changed NPC posture, resource strain, or revealed complications over binary pass/fail.'},
+  {id:'recap', label:'Scene recap', hint:'Where things stand', prompt:'Summarize the recent situation for play: what is happening, what matters, open threads, current pressure, and the next playable choice.'},
+  {id:'continuity', label:'Continuity check', hint:'Find gaps', prompt:'Check continuity against promoted canon and the live campaign state. Name contradictions, uncertainty, and missing support instead of smoothing them over.'},
+  {id:'scribe', label:'Ledger note', hint:'Capture cleanly', prompt:'Shape the material into ledger-ready campaign notes. Keep it CAMPAIGN-ONLY unless the user later promotes it through the canon pipeline.'},
+  {id:'npc', label:'NPC voice', hint:'Dialogue / posture', prompt:'Write NPC-facing dialogue or posture only where the campaign state supports it. Keep NPCs motivated by the scene, never omniscient, and avoid deciding the player character\'s response.'},
+  {id:'ooc', label:'Out of character', hint:'Table talk', prompt:'Stay out of character. Explain the table situation, options, risks, and likely consequences plainly.'},
+  {id:'resolve3d6', label:'Draft 3d6 roll', hint:'Unpromoted playtest', draftResolution:true, prompt:'Use the draft 3d6 resolution lens only if the user wants a risky action resolved. Keep the mechanic backstage and render the outcome as fiction.'},
+];
+const CAMP_PLAY_DRAFT_3D6_CONTEXT=[
+  'DRAFT RESOLUTION LENS - SYS-002:',
+  'SYS-002 is Draft / campaign-only, in the promotion queue, and not promoted canon.',
+  'Use it only as an optional playtest aid for this ask; do not present it as established setting canon.',
+  'Lean resolution: one keyed stat, difficulty, and one relevant skill if the player supplies them.',
+  'Outcome bands: clean/critical, success, success-at-cost, miss, fumble.',
+  'The success-at-cost band is always on for a near miss; costs may be pressure, strain, hunger, lost position, rumor spread, spirit attention, or a harder choice.',
+  'Panels-as-punctuation: keep rulebook language backstage and render the result as in-world fiction.',
+].join('\n');
 const CAMP_PLAY_STATE_PROTOCOL=[
   'STATE UPDATES: when the story changes a tracked value, append ONE fenced block',
   'at the very end of your reply, nothing after it:',
@@ -10910,6 +11328,13 @@ const CAMP_PLAY_STATE_PROTOCOL=[
   '```',
   'Include ONLY the lines that changed. Keep all narration before the block, and',
   'never mention the block in your prose. If nothing changed, omit it entirely.',
+].join('\n');
+const CAMP_PLAY_TABLE_PROTOCOL=[
+  'TABLE STYLE:',
+  'Use the campaign templates as the table spine: Where We Are, Runtime State, People / Bonds, Knowledge Boundary, Capabilities, Clocks / Pressures, Threads, Cast, Ledger beats, and Session Notes start/end state.',
+  'Prefer TTRPG-style pressure over binary answers: opportunity, cost, delay, danger, faction movement, spirit attention, rumor spread, and unresolved canon tension.',
+  'Clocks and table tools are suggestions until the user records them in the ledger or applies a reviewed state update.',
+  'Canon remains read-only. Promoted canon can ground play, but campaign-only inventions must be labeled as table suggestions.',
 ].join('\n');
 
 function campPlayLogPath(name){ return `${CAMP_DIR}/${name}/${CAMP_PLAY_LOG_PREFIX} ${name}.md`; }
@@ -10926,6 +11351,81 @@ function campPlayStateBlock(name, parsed, threads){
     'Runtime — Personal Mana: '+(rt.personalMana||'?')+' · Divine Mana: '+(rt.divineMana||'?')+' · Divine Hunger: '+(rt.divineHunger||'?')+' · Strain: '+(rt.strain||'?'),
     live.length&&('Live threads: '+live.join(' | ')),
   ].filter(Boolean).join('\n');
+}
+
+function campPlayModeById(id){
+  return CAMP_PLAY_MODES.find(m=>m.id===id)||CAMP_PLAY_MODES[0];
+}
+
+function campPlayPersonaOptions(personas){
+  const list=Array.isArray(personas)?personas:[], out=[], seen={};
+  CAMP_PLAY_PERSONA_ORDER.forEach(id=>{
+    const p=list.find(x=>x&&x.id===id);
+    if(p&&!seen[p.id]){ seen[p.id]=true; out.push(p); }
+  });
+  list.forEach(p=>{
+    if(!p||seen[p.id]) return;
+    if(p.builtIn && !CAMP_PLAY_PERSONA_ORDER.includes(p.id)) return;
+    seen[p.id]=true; out.push(p);
+  });
+  return out;
+}
+
+function campPlayBuildSystem(opts){
+  opts=opts||{};
+  const mode=campPlayModeById(opts.modeId);
+  const persona=opts.persona||{};
+  const personaSystem=typeof assistantBuildPersonaSystem==='function'
+    ? assistantBuildPersonaSystem(persona, opts.groundingSystem)
+    : [persona.system, String(opts.groundingSystem||'').trim()].filter(Boolean).join('\n\n');
+  return [
+    personaSystem,
+    'CAMPAIGN PLAY MODE:\n'+mode.label+'\n'+mode.prompt,
+    (opts.draftResolution||mode.draftResolution)?CAMP_PLAY_DRAFT_3D6_CONTEXT:'',
+    'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(opts.campaignName||'', opts.parsed||{}, opts.threads||{}),
+    CAMP_PLAY_TABLE_PROTOCOL,
+    CAMP_PLAY_STATE_PROTOCOL,
+  ].filter(Boolean).join('\n\n');
+}
+
+function campPlayCleanList(text){
+  const lines=String(text||'').replace(/\r/g,'').split('\n').map(x=>x.trim().replace(/^[-*]\s+/,'')).filter(Boolean);
+  return lines.filter(x=>!/^-?\s*$/.test(x)&&!/^none$/i.test(x)&&!/^-\s*none$/i.test(x));
+}
+
+function campPlayShortText(text, max){
+  const s=String(text||'').replace(/\s+/g,' ').trim();
+  return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
+}
+
+function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal){
+  const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
+  const clocks=campPlayCleanList(sections.clocks);
+  const people=campPlayCleanList(sections.people);
+  const knowledge=campPlayCleanList(sections.knowledge);
+  const capabilities=campPlayCleanList(sections.capabilities);
+  const carries=campPlayCleanList(sections.carries);
+  const castList=(Array.isArray(cast)?cast:[]).map(c=>[c.name,c.status,c.relationship].filter(Boolean).join(' - ')).filter(Boolean);
+  const ids=(Array.isArray(groundingIds)?groundingIds:[]).filter(Boolean);
+  return [
+    {id:'scene', label:'Scene', items:[
+      t.scene&&('Scene: '+t.scene),
+      t.location&&('Location: '+t.location),
+      t.day&&('Day: '+t.day),
+      t.summary&&('Now: '+campPlayShortText(t.summary,160)),
+      rt.personalMana&&('Personal Mana: '+rt.personalMana),
+      rt.divineMana&&('Divine Mana: '+rt.divineMana),
+      rt.divineHunger&&('Divine Hunger: '+rt.divineHunger),
+      rt.strain&&('Strain: '+rt.strain),
+    ].filter(Boolean), empty:'No scene state recorded yet.'},
+    {id:'threads', label:'Threads & Clocks', items:live.map(x=>'LIVE: '+x).concat(warming.map(x=>'WARMING: '+x), waiting.map(x=>'WAITING: '+x), blocked.map(x=>'BLOCKED: '+x), clocks.map(x=>'Clock: '+x)), empty:'No live threads or clocks yet.'},
+    {id:'grounding', label:'Canon Grounding', items:ids.length?ids.map(x=>'Grounded on: '+x):['Retrieved from promoted canon each turn.'], empty:''},
+    {id:'secrets', label:'Secrets / Clues', items:knowledge.slice(0,5).concat(carries.slice(0,3), capabilities.slice(0,3)), empty:'Use Knowledge Boundary, carries, and capabilities as the clue surface.'},
+    {id:'npcs', label:'NPCs', items:castList.slice(0,6).concat(people.slice(0,4)), empty:'No cast or bond notes yet.'},
+    {id:'ledger', label:'Ledger Beats', items:['Capture moments, lore ideas, mechanics, character details, questions, and retcon candidates as CAMPAIGN-ONLY.'], empty:''},
+    {id:'state', label:'State Review', items:pendingProposal?[campPlayProposalSummary(pendingProposal)]:['No pending state proposal.'], empty:''},
+    {id:'draft3d6', label:'Draft 3d6', items:['Optional SYS-002 playtest lens. Draft / campaign-only, not promoted canon. Render mechanics as in-world fiction.'], empty:''},
+  ];
 }
 
 // Remove the trailing ```state``` block from a reply, leaving the narration.
@@ -10954,11 +11454,31 @@ function campPlayParseProposal(text){
   return {fields,gauges};
 }
 
+function campPlayProposalItems(proposal){
+  const p=proposal||{}, labels={scene:'Scene',location:'Location',day:'In-world day',summary:'Current summary',personalMana:'Personal Mana',divineMana:'Divine Mana',divineHunger:'Divine Hunger',strain:'Strain'}, items=[];
+  Object.keys(p.fields||{}).forEach(k=>items.push({id:'fields.'+k, group:'fields', key:k, label:labels[k]||k, value:p.fields[k]}));
+  Object.keys(p.gauges||{}).forEach(k=>items.push({id:'gauges.'+k, group:'gauges', key:k, label:labels[k]||k, value:p.gauges[k]}));
+  Object.keys(p.sections||{}).forEach(k=>items.push({id:'sections.'+k, group:'sections', key:k, label:labels[k]||k, value:p.sections[k]}));
+  return items;
+}
+
+function campPlayFilterProposal(proposal, selectedIds){
+  const selected={};
+  (selectedIds||[]).forEach(id=>{ selected[id]=true; });
+  const out={fields:{},gauges:{},sections:{}};
+  campPlayProposalItems(proposal).forEach(item=>{
+    if(!selected[item.id]) return;
+    out[item.group][item.key]=item.value;
+  });
+  if(!Object.keys(out.fields).length) delete out.fields;
+  if(!Object.keys(out.gauges).length) delete out.gauges;
+  if(!Object.keys(out.sections).length) delete out.sections;
+  return Object.keys(out).length?out:null;
+}
+
 // Human-readable one-liner of what a proposal would change.
 function campPlayProposalSummary(proposal){
-  const bits=[];
-  Object.keys(proposal.fields||{}).forEach(k=>bits.push(k+' → '+proposal.fields[k]));
-  Object.keys(proposal.gauges||{}).forEach(k=>bits.push(k+' → '+proposal.gauges[k]));
+  const bits=campPlayProposalItems(proposal).map(item=>item.label+': '+item.value);
   return bits.join(' · ');
 }
 
@@ -10978,8 +11498,8 @@ function campPlayParseLog(text){
 
 // Apply a GM proposal through the existing guarded tracker writers only.
 async function campPlayApplyProposal(cfg, files, proposal, currentRuntime){
-  if(proposal.fields && Object.keys(proposal.fields).length){
-    await ghUpdate(cfg, files.tracker, text=>updateTrackerDetails(text,{fields:proposal.fields}), 'GM state update via Play', {guard:assertTracker});
+  if((proposal.fields && Object.keys(proposal.fields).length) || (proposal.sections && Object.keys(proposal.sections).length)){
+    await ghUpdate(cfg, files.tracker, text=>updateTrackerDetails(text,{fields:proposal.fields||{},sections:proposal.sections||{}}), 'GM state update via Play', {guard:assertTracker});
   }
   const gkeys=Object.keys(proposal.gauges||{});
   if(gkeys.length){
@@ -11011,24 +11531,33 @@ async function campPlay(host, name){
   host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
 
   let files, parsed={}, runtime={}, threads={}, messages=[];
+  let cast=[], groundingIds=[], pendingProposal=null;
   try{
     files=await campaignFiles(cfg,name);
     if(!files.tracker){ host.replaceChildren(h('p',{class:'hint'},'No state tracker for '+name+' yet — start play once the campaign is scaffolded.')); return; }
-    const tr=await ghGetText(cfg, files.tracker); const th=files.threads?await ghGetText(cfg, files.threads):null;
+    const tr=await ghGetText(cfg, files.tracker); const th=files.threads?await ghGetText(cfg, files.threads):null; const ca=files.cast?await ghGetText(cfg, files.cast):null;
     if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); }
     if(th) threads=parseThreads(th.text);
+    if(ca&&typeof parseCast==='function') cast=parseCast(ca.text);
     messages=await campPlayLoadLog(cfg, name);
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
 
   const defaultEngine=assistantDefaultEngine(profiles);
   const engineSel=h('select',{class:'play-engine'},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' · '+p.type)));
   if(defaultEngine) engineSel.value=defaultEngine.id;
+  const personaOptions=campPlayPersonaOptions(typeof assistantPersonaList==='function'?assistantPersonaList():[]);
+  const personaSel=h('select',{class:'play-persona'},...personaOptions.map(p=>h('option',{value:p.id},p.label)));
+  personaSel.value=personaOptions.some(p=>p.id===CAMP_PLAY_DEFAULT_PERSONA_ID)?CAMP_PLAY_DEFAULT_PERSONA_ID:(personaOptions[0]&&personaOptions[0].id)||CAMP_PLAY_DEFAULT_PERSONA_ID;
+  const modeRow=h('div',{class:'play-mode-row'});
+  const modeHelp=h('div',{class:'play-mode-help'});
+  const tablePanel=h('div',{class:'play-tools'});
+  const groundingLine=h('div',{class:'play-grounding hint'},'Grounded on: (none yet)');
   const transcript=h('div',{class:'play-log'});
   const input=h('textarea',{class:'play-input', rows:'3', placeholder:'What do you do? (the GM sees your live state + canon)'});
   const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
   const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
   const status=h('div',{class:'sync-status'});
-  let busy=false, streamNode=null, saveTimer=null;
+  let busy=false, streamNode=null, saveTimer=null, activeMode='act';
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -11038,7 +11567,7 @@ async function campPlay(host, name){
     saveTimer=setTimeout(()=>{ campPlaySaveLog(cfg, name, messages).catch(()=>{}); }, 2500);
   }
   function bubble(m){
-    const who=m.role==='assistant'?'GM':'You';
+    const who=m.role==='assistant'?'GM':(m.modeLabel?'You · '+m.modeLabel:'You');
     const textNode=h('pre',{class:'play-text'}, String(m.content||''));
     const node=h('div',{class:'play-msg '+(m.role==='assistant'?'gm':'you')}, h('div',{class:'who'}, who), textNode);
     if(m.role==='assistant'){
@@ -11048,60 +11577,122 @@ async function campPlay(host, name){
       acts.append(ledgerBtn);
       node.append(acts);
       if(m.proposal){
-        const apply=h('button',{class:'navbtn primary', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'Apply to tracker');
+        const items=campPlayProposalItems(m.proposal), checks=[];
+        const apply=h('button',{class:'navbtn primary', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'Apply selected');
         const pstat=h('span',{class:'hint'});
-        apply.onclick=async()=>{ apply.disabled=true; pstat.textContent='Applying…'; try{ await campPlayApplyProposal(cfg, files, m.proposal, runtime); await reloadState(); pstat.textContent='Applied.'; toast('Tracker updated.'); }catch(e){ pstat.textContent='Failed: '+e.message; apply.disabled=false; } };
-        node.append(h('div',{class:'play-proposal'}, h('div',{class:'hint'},'GM proposes: '+campPlayProposalSummary(m.proposal)), h('div',{class:'toolrow', style:{marginTop:'6px'}}, apply, pstat)));
+        const picks=items.map(item=>{
+          const cb=h('input',{type:'checkbox'}); cb.checked=true; checks.push({cb,item});
+          return h('label',{class:'play-proposal-pick'},cb,h('span',null,item.label+': '+item.value));
+        });
+        apply.onclick=async()=>{
+          const selected=checks.filter(x=>x.cb.checked).map(x=>x.item.id), filtered=campPlayFilterProposal(m.proposal,selected);
+          if(!filtered){ pstat.textContent='Choose at least one change.'; return; }
+          apply.disabled=true; pstat.textContent='Applying selected...';
+          try{ await campPlayApplyProposal(cfg, files, filtered, runtime); await reloadState(); pendingProposal=null; drawTools(); pstat.textContent='Applied.'; toast('Tracker updated.'); }
+          catch(e){ pstat.textContent='Failed: '+e.message; apply.disabled=false; }
+        };
+        node.append(h('div',{class:'play-proposal'}, h('div',{class:'hint'},'GM proposes reviewed campaign-state changes:'), h('div',{class:'play-proposal-list'},picks), h('div',{class:'toolrow', style:{marginTop:'6px'}}, apply, pstat)));
       }
     }
     return {node, textNode};
   }
   function drawTranscript(){
     transcript.replaceChildren();
-    if(!messages.length){ transcript.append(h('p',{class:'hint', style:{textAlign:'center'}},'No turns yet. Set the scene to begin, or type what you do.')); return; }
+    if(!messages.length){ transcript.append(h('p',{class:'play-empty'},'No turns yet. Set the scene to begin, or type what you do.')); return; }
     messages.forEach((m,i)=>{ const b=bubble(m); transcript.append(b.node); if(i===messages.length-1 && m.role==='assistant') streamNode=b.textNode; });
+    transcript.scrollTop=transcript.scrollHeight;
+  }
+  function drawModeRow(){
+    const current=campPlayModeById(activeMode);
+    modeRow.replaceChildren(...CAMP_PLAY_MODES.map(mode=>{
+      const btn=h('button',{class:'play-mode-chip'+(mode.id===activeMode?' on':''),type:'button', title:mode.prompt, 'aria-pressed':mode.id===activeMode?'true':'false'},
+        h('span',{class:'play-mode-title'},mode.label),
+        h('small',null,mode.hint)
+      );
+      btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); };
+      return btn;
+    }));
+    input.placeholder=current.id==='act'?'What do you do?':current.hint+'. Add the details here.';
+    modeHelp.replaceChildren(document.createTextNode('Next send: '+current.label+' - '+current.hint+'.'));
+  }
+  function drawTools(){
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal);
+    tablePanel.replaceChildren(...cards.map(card=>{
+      const list=(card.items||[]).filter(Boolean);
+      return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'?true:null},
+        h('summary',null,card.label),
+        list.length?h('ul',null,...list.slice(0,8).map(item=>h('li',null,item))):h('p',{class:'hint'},card.empty||'No notes yet.')
+      );
+    }));
+    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')));
   }
 
   async function runTurn(userText){
     if(busy) return;
     const engine=assistantEngineById(profiles, engineSel.value)||defaultEngine;
     if(!engine){ status.textContent='Choose an engine first.'; return; }
+    const mode=campPlayModeById(activeMode);
     busy=true; sendBtn.disabled=true; sceneBtn.disabled=true;
-    messages.push({role:'user', content:userText});
+    messages.push({role:'user', content:userText, modeLabel:mode.label});
     const gm={role:'assistant', content:'', proposal:null};
     messages.push(gm); drawTranscript();
-    status.textContent='The GM is thinking…';
+    status.textContent='The table is thinking...';
     let groundingSystem='';
-    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; }catch(e){}
-    const system=[
-      assistantPersonaById('gm').system,
-      'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(name, parsed, threads),
-      CAMP_PLAY_STATE_PROTOCOL,
-      groundingSystem,
-    ].filter(Boolean).join('\n\n');
+    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; drawTools(); }catch(e){}
+    const system=campPlayBuildSystem({
+      persona:assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID),
+      modeId:mode.id,
+      draftResolution:!!mode.draftResolution,
+      campaignName:name,
+      parsed,
+      threads,
+      groundingSystem
+    });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
     const chat=Object.assign({ system, messages:history, model:assistantModelFor({}, engine), maxTokens:CAMP_PLAY_MAX_TOKENS }, assistantChatOptions(engine));
     let raw='';
     try{
-      await assistantStreamAi(engine, chat, piece=>{ raw+=piece; gm.content=campPlayStripState(raw); if(streamNode) streamNode.textContent=gm.content; });
+      await assistantStreamAi(engine, chat, piece=>{ raw+=piece; gm.content=campPlayStripState(raw); if(streamNode) streamNode.textContent=gm.content; transcript.scrollTop=transcript.scrollHeight; });
     }catch(e){ raw=''; gm.content='(The GM could not answer: '+(e&&e.message?e.message:String(e))+')'; }
     if(raw){ gm.content=campPlayStripState(raw)||'(no narration)'; gm.proposal=campPlayParseProposal(raw); }
+    pendingProposal=gm.proposal||null;
     busy=false; sendBtn.disabled=false; sceneBtn.disabled=false;
     status.textContent='Your move.';
-    drawTranscript();
+    drawTranscript(); drawTools();
     scheduleSave();
   }
 
   sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; runTurn(v); };
-  sceneBtn.onclick=()=>runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.');
+  sceneBtn.onclick=()=>{ activeMode='scene'; drawModeRow(); runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.'); };
 
-  drawTranscript();
+  drawModeRow(); drawTools(); drawTranscript();
   host.replaceChildren(
-    h('div',{class:'toolrow', style:{alignItems:'center', marginBottom:'4px'}}, h('label',{class:'hint'},'Engine'), engineSel),
-    h('p',{class:'hint', style:{margin:'0 0 8px'}},'The GM sees this campaign’s live state and relevant canon. State changes are suggested only — you tap Apply. Nothing here writes canon.'),
-    transcript,
-    input,
-    h('div',{class:'toolrow', style:{marginTop:'6px'}}, sendBtn, sceneBtn, status)
+    h('div',{class:'play-shell'},
+      h('div',{class:'play-command-card'},
+        h('div',{class:'play-head'},
+          h('div',{class:'play-control-row'},
+            h('label',{class:'play-select-label'},'Engine',engineSel),
+            h('label',{class:'play-select-label'},'Persona',personaSel)
+          ),
+          usageMeter()
+        ),
+        h('p',{class:'play-note'},'The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
+      ),
+      h('div',{class:'play-table-stage'},
+        h('aside',{class:'play-tools-wrap'},
+          h('div',{class:'play-tools-head'},
+            h('b',null,'Table tools'),
+            h('span',{class:'hint'},'template-backed')
+          ),
+          tablePanel
+        ),
+        h('section',{class:'play-chat-stack'},
+          groundingLine,
+          h('div',{class:'play-transcript-card'}, transcript),
+          h('div',{class:'play-input-card'}, modeRow, modeHelp, input, h('div',{class:'play-action-row'}, sendBtn, sceneBtn, status))
+        )
+      )
+    )
   );
 }
 
