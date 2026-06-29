@@ -69,6 +69,13 @@
   .navmid{ display:flex; flex-wrap:nowrap; align-items:center; gap:10px; flex:1 1 auto; min-width:0; overflow-x:auto; scrollbar-width:none; }
   .navmid::-webkit-scrollbar{ display:none; }
   .navmid .navbtn{ flex:0 0 auto; }
+  .content-subnav,.bottom-nav{ display:none; }
+  .space-subnav{ flex-wrap:wrap; gap:8px; justify-content:center; }
+  .space-subnav .tab{
+    border:1.5px solid var(--gold-soft); background:#fff8; color:var(--ink-soft);
+    border-radius:999px; padding:8px 16px; font-size:15px; min-width:0;
+  }
+  .space-subnav .tab.on{ background:#efe7d3; border-color:var(--gold); color:var(--ink); font-weight:600; }
   /* utility cluster: mode toggle + the ⋯ More sheet — fixed on the right, always visible */
   .navutil{ display:flex; align-items:center; gap:10px; flex:0 0 auto; }
   .moremenu{ display:flex; flex-direction:column; gap:8px; }
@@ -84,6 +91,24 @@
   }
   .navbtn:hover{ border-color:var(--gold); }
   .navbtn.primary{ background:#eef0e4; border-color:#cdd4b9; color:#4d5a36; }
+  /* Button tier: ghost is a quiet secondary action that can lift toward normal on hover. */
+  .navbtn.ghost{
+    background:rgba(255,255,255,.24); border-color:rgba(205,191,154,.58);
+    color:var(--ink-soft); font-weight:400;
+  }
+  .navbtn.ghost:hover{ background:#fff8; border-color:var(--gold-soft); }
+  /* Button tier: icon keeps an icon/symbol and text label aligned as one compact action. */
+  .navbtn.icon{ display:inline-flex; align-items:center; justify-content:center; gap:7px; padding:7px 11px; }
+  .navbtn.icon svg{ width:1em; height:1em; flex:0 0 auto; }
+  .navbtn.icon .navbtn-symbol{ line-height:1; font-weight:800; flex:0 0 auto; }
+  .navbtn.icon .navbtn-label{ min-width:0; overflow-wrap:anywhere; }
+  /* Button tier: bare hides the visible label only on roomy pointer devices; touch keeps text. */
+  @media (min-width:700px) and (hover:hover) and (pointer:fine){
+    .navbtn.icon.bare .navbtn-label{
+      position:absolute; width:1px; height:1px; overflow:hidden;
+      clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
+    }
+  }
 
   /* ---------- decorative page frame ---------- */
   .framed{
@@ -105,8 +130,12 @@
   .divider .o{ width:7px; height:7px; border:1.4px solid var(--gold); border-radius:50%; }
   .divider .dot{ width:5px; height:5px; background:var(--gold); border-radius:50%; }
   .subtitle{ text-align:center; color:var(--hint); font-style:italic; margin:2px 0 22px; }
+  /* View header: shared title, divider, and italic subtitle for later composed views. */
+  .view-header{ text-align:center; margin:0 auto 22px; max-width:760px; }
+  .view-header h1,.view-header h2{ font-size:38px; }
+  .view-header .divider{ margin:10px 0 4px; }
+  .view-header .subtitle{ margin:2px 0 0; }
   .pagefoot{ text-align:center; color:var(--green); font-style:italic; font-size:14px; margin-top:26px; opacity:.85; }
-
   /* ---------- home ---------- */
   .cover{ text-align:center; padding:30px 10px 24px; }
   .cover .emblem{ width:150px; height:150px; color:var(--green); margin:14px auto 18px; }
@@ -1055,6 +1084,15 @@
     --glass-border:rgba(255,255,255,.72);
     --glass-blur:14px;
     --glow:#7fb0ff;           /* aether cyan-blue glow                        */
+    /* Accent tokens: muted placeholders for spaces and gauges, wired later. */
+    --accent-maker:#6fae9d;
+    --accent-worldbuilder:#8a8fcf;
+    --accent-game:#b88f6e;
+    --accent-apprentice:#7b9fc9;
+    --accent-mana:#6aa9c5;
+    --accent-divinemana:#8e85c8;
+    --accent-hunger:#b9808a;
+    --accent-strain:#c09a62;
   }
 
   /* ---- Vael surfaces: restore the printed-kit parchment palette ---------- */
@@ -1189,6 +1227,40 @@
        full-width (e.g. .engine-form .toolrow) keep doing so — higher specificity. */
     .toolrow{ gap:8px; }
     .toolrow .navbtn{ flex:1 1 auto; min-height:42px; }
+  }
+
+  @media (max-width:560px){
+    #app{ padding-bottom:116px; padding-bottom:calc(116px + env(safe-area-inset-bottom)); }
+    .navmid{ display:none; }
+    .spaces-nav{ display:none; }
+    .content-subnav{
+      display:grid; grid-template-columns:repeat(auto-fit,minmax(86px,1fr));
+      position:sticky; top:56px; z-index:29; gap:6px;
+      margin:0 0 12px; padding:6px; border-radius:999px;
+      background:var(--glass-strong); border:1px solid var(--glass-border);
+      -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
+      backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
+    }
+    .content-subnav .tab{
+      min-height:40px; padding:7px 10px; white-space:normal; overflow-wrap:anywhere;
+    }
+    .bottom-nav{
+      display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:4px;
+      position:fixed; z-index:60; left:50%; bottom:8px;
+      bottom:max(8px, env(safe-area-inset-bottom)); transform:translateX(-50%);
+      width:min(520px, calc(100vw - 20px)); padding:6px; border-radius:20px;
+      box-shadow:0 18px 42px -24px var(--glow), 0 0 0 1px var(--glass-border);
+    }
+    .bottom-nav-tab{
+      display:grid; justify-items:center; align-content:center; gap:2px;
+      min-width:0; min-height:54px; border:0; border-radius:15px;
+      background:transparent; color:var(--ink-soft); font:inherit; font-size:12px;
+    }
+    .bottom-nav-tab.current{
+      background:rgba(255,255,255,.58); color:var(--ink); box-shadow:inset 0 0 0 1px var(--glass-border);
+    }
+    .bottom-nav-icon{ font-size:18px; line-height:1; }
+    .bottom-nav-label{ max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   }
 </style>
 </head>
@@ -2565,9 +2637,11 @@ registerView('campaign', (v) => viewCampaign(v.camp, v.tab));   // campaign name
 
 function render(){
   $app.replaceChildren(topbar());
+  $app.append(spaceSubNav('content'));
   // error boundary: a single view crash shows a gentle recover card, never a blank app.
   try{ $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW)); }
   catch(e){ $app.append(errorCard(e)); }
+  $app.append(bottomNav());
 }
 function errorCard(e){
   return h('div',{style:{maxWidth:'560px', margin:'48px auto', padding:'24px 26px', border:'1.5px solid var(--gold-soft)', borderRadius:'12px', background:'#fffdf7', textAlign:'center'}},
@@ -2581,26 +2655,9 @@ function errorCard(e){
 
 function topbar(){
   const full = DB.mode==='full', world = DB.profile==='worldbuilder', game = DB.profile==='game', learn = DB.profile==='learner';
-  const n=DB.creations.length, count=n?` (${n})`:'';
-  // each profile sees only its own actions — the Maker never meets the canon machinery,
-  // the Worldbuilder leads with the Studio, the Game leads with Campaigns. Only the primary
-  // nav scrolls; the utility cluster (mode / ⋯) is fixed on the right so nothing gets clipped.
-  const nav = learn
-    ? h('div',{class:'navmid'},
-        h('button',{class:'navbtn primary', onclick:()=>go('practice')}, '✶ Code Practice'))
-    : game
-    ? h('div',{class:'navmid'},
-        h('button',{class:'navbtn primary', onclick:()=>go('campaigns')}, '♟ Campaigns'),
-        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count))
-    : world
-    ? h('div',{class:'navmid'},
-        h('button',{class:'navbtn primary', onclick:()=>go('studio')}, '⚒ Canon Studio'),
-        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Journal'+count),
-        h('button',{class:'navbtn', onclick:()=>go('home')}, 'Make something'))
-    : h('div',{class:'navmid'},
-        h('button',{class:'navbtn', onclick:()=>go('tour')}, 'Welcome to the World'),
-        h('button',{class:'navbtn', onclick:()=>go('gallery')}, 'My Field Journal'+count),
-        h('button',{class:'navbtn primary', onclick:()=>go('home')}, 'Make something'));
+  // each profile sees only its own actions; the same item source feeds desktop and phone nav.
+  const nav = h('div',{class:'navmid top-subnav'}, ...spaceNavItems().map(item=>
+    h('button',{class:'navbtn'+(item.primary?' primary':''), onclick:()=>go(item.view,item.params)}, item.label)));
   // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
   // no clip). The Cozy/Full toggle stays out (it's how you toggle). More remains available
   // in Cozy so device preferences and the deliberate space switch are always reachable.
@@ -2614,6 +2671,53 @@ function topbar(){
     h('div',{class:'brand', onclick:()=>go(world?'studio':game?'campaigns':learn?'practice':'home')}, svgUse('ic-seedling','mark'), h('b',null, learn?'Code Practice':'The Vael Field Journal')),
     nav, util,
   );
+}
+function spaceNavItems(){
+  const count=(DB.creations&&DB.creations.length)?` (${DB.creations.length})`:'';
+  if(DB.profile==='learner') return [
+    {view:'practice', label:'✶ Code Practice', short:'Practice', primary:true, active:['practice']},
+  ];
+  if(DB.profile==='game') return [
+    {view:'campaigns', label:'♟ Campaigns', short:'Campaigns', primary:true, active:['campaigns','campaign','regionForge','gameDemo']},
+    {view:'gallery', label:'My Journal'+count, short:'Journal', active:['gallery']},
+  ];
+  if(DB.profile==='worldbuilder') return [
+    {view:'studio', label:'⚒ Canon Studio', short:'Studio', primary:true, active:['studio']},
+    {view:'gallery', label:'My Journal'+count, short:'Journal', active:['gallery']},
+    {view:'home', label:'Make something', short:'Make', active:['home','worksheet','naming']},
+  ];
+  return [
+    {view:'tour', label:'Welcome to the World', short:'Welcome', active:['tour']},
+    {view:'gallery', label:'My Field Journal'+count, short:'Journal', active:['gallery']},
+    {view:'home', label:'Make something', short:'Make', primary:true, active:['home','worksheet','naming']},
+  ];
+}
+function spaceNavActive(item){ return (item.active||[item.view]).includes(VIEW.name); }
+function spaceSubNav(place){
+  const cls='space-subnav '+(place==='content'?'content-subnav':'');
+  return h('nav',{class:cls, 'aria-label':'Section navigation'}, ...spaceNavItems().map(item=>
+    h('button',{
+      class:'tab'+(spaceNavActive(item)?' on':''),
+      type:'button',
+      'aria-pressed':spaceNavActive(item)?'true':'false',
+      title:item.label,
+      onclick:()=>go(item.view,item.params),
+    }, item.short||item.label)));
+}
+function bottomNav(){
+  const spaces=(typeof SPACES!=='undefined'&&SPACES)||[];
+  return h('nav',{class:'bottom-nav glass no-print', 'aria-label':'Spaces'},
+    ...spaces.map(space=>{
+      const current=DB.profile===space.profile;
+      return h('button',{
+        class:'bottom-nav-tab'+(current?' current':''),
+        type:'button',
+        'aria-current':current?'page':null,
+        onclick:()=>setProfile(space.profile),
+      },
+        h('span',{class:'bottom-nav-icon', 'aria-hidden':'true'}, space.icon),
+        h('span',{class:'bottom-nav-label'}, space.title));
+    }));
 }
 function moreMenu(){
   let close;
@@ -3351,6 +3455,22 @@ function showModal(title, note, text){
 }
 function showModalNode(title, note, node){
   return openOverlay(close=> h('div',{class:'modal'}, h('h2',{class:'display'},title), note?h('p',{class:'hint'},note):null, node));
+}
+// Overflow menu: shared icon button for rare actions, opened in the existing modal sheet.
+function overflowMenu(items){
+  const btn=h('button',{class:'navbtn icon', type:'button', 'aria-haspopup':'dialog', title:'More actions'},
+    h('span',{class:'navbtn-symbol', 'aria-hidden':'true'},'⋯'),
+    h('span',{class:'navbtn-label'},'More'));
+  btn.onclick=()=>{
+    let close;
+    const menu=h('div',{class:'moremenu overflow-menu'});
+    (items||[]).forEach(item=>{
+      if(!item) return;
+      menu.append(h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ if(close) close(); if(typeof item.onclick==='function') item.onclick(); }}, item.label||'Action'));
+    });
+    close=showModalNode('More actions', null, menu);
+  };
+  return btn;
 }
 
 /* ---------- toast ---------------------------------------------------------- */
