@@ -109,6 +109,17 @@
       clip:rect(0 0 0 0); clip-path:inset(50%); white-space:nowrap;
     }
   }
+  .card-actions{ display:flex; flex-wrap:wrap; justify-content:flex-end; gap:8px; margin-top:8px; }
+  .card-actions .navbtn{ font-size:12px; padding:5px 10px; }
+  .has-card-actions{ outline:none; }
+  .has-card-actions .card-actions{
+    max-height:0; opacity:0; overflow:hidden; pointer-events:none; transform:translateY(-2px);
+    transition:max-height .18s ease, opacity .18s ease, transform .18s ease;
+  }
+  .has-card-actions:hover .card-actions,
+  .has-card-actions:focus-within .card-actions{
+    max-height:84px; opacity:1; pointer-events:auto; transform:none;
+  }
 
   /* ---------- decorative page frame ---------- */
   .framed{
@@ -3465,8 +3476,8 @@ function showModal(title, note, text){
     ta,
     h('div',{class:'toolrow'},
       h('button',{class:'navbtn primary', onclick:()=>{ ta.select(); try{ document.execCommand('copy'); }catch(e){} navigator.clipboard&&navigator.clipboard.writeText(text); toast('Copied.'); }}, 'Copy'),
-      h('button',{class:'navbtn', onclick:()=>{ const b=new Blob([text],{type:'text/markdown'}); const a=h('a',{href:URL.createObjectURL(b), download:'field-journal-card.md'}); document.body.append(a); a.click(); a.remove(); }}, 'Download .md'),
-      h('button',{class:'navbtn', onclick:()=>close()}, 'Close'),
+      h('button',{class:'navbtn ghost', onclick:()=>{ const b=new Blob([text],{type:'text/markdown'}); const a=h('a',{href:URL.createObjectURL(b), download:'field-journal-card.md'}); document.body.append(a); a.click(); a.remove(); }}, 'Download .md'),
+      h('button',{class:'navbtn ghost', onclick:()=>close()}, 'Close'),
     )));
 }
 function showModalNode(title, note, node){
@@ -3482,7 +3493,13 @@ function overflowMenu(items){
     const menu=h('div',{class:'moremenu overflow-menu'});
     (items||[]).forEach(item=>{
       if(!item) return;
-      menu.append(h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ if(close) close(); if(typeof item.onclick==='function') item.onclick(); }}, item.label||'Action'));
+      const disabled=!!item.disabled;
+      menu.append(h('button',{
+        class:'navbtn ghost'+(item.danger?' danger':''),
+        type:'button',
+        disabled:disabled?'true':null,
+        onclick:()=>{ if(disabled) return; if(close) close(); if(typeof item.onclick==='function') item.onclick(); },
+      }, item.label||'Action'));
     });
     close=showModalNode('More actions', null, menu);
   };
@@ -5837,12 +5854,12 @@ function studioBrowse(host){
         Format/parse helpers (findOpenThreads, parseQueueCards, checkConsistency,
         canonCardMarkdown, …) live in canon-parse.js. ---- */
 function threadRow(t){
-  return h('div',{class:'spark-row', style:{flexDirection:'column', alignItems:'stretch', gap:'8px'}},
+  return h('div',{class:'spark-row has-card-actions', tabindex:'0', style:{flexDirection:'column', alignItems:'stretch', gap:'8px'}},
     h('div',null, h('b',null,'['+t.type+'] '), h('span',null, t.text||'(see the file section)')),
     h('small',{class:'hint', style:{margin:'0'}}, t.file.replace('domains/','')+(t.heading? ' · '+t.heading:'')+' · line '+t.line),
-    h('div',{class:'toolrow'},
+    h('div',{class:'card-actions'},
       h('button',{class:'navbtn primary', onclick:()=>{ const md=openThreadHandoff(t); if(navigator.clipboard) navigator.clipboard.writeText(md); toast('Copied an AI handoff — paste it into a chat.'); }}, 'Copy AI handoff'),
-      h('button',{class:'navbtn', onclick:()=>go('studio',{tab:'drafter', params:{prefill:threadToCard(t)}})}, 'Draft a Canon Card →')));
+      h('button',{class:'navbtn ghost', onclick:()=>go('studio',{tab:'drafter', params:{prefill:threadToCard(t)}})}, 'Draft a Canon Card →')));
 }
 function studioThreads(host){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Scanning the domains for open threads…'));
@@ -5859,7 +5876,7 @@ function studioInbox(host){
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=cfg.makerStem||'field-journal';
   const raw=h('textarea',{placeholder:'a quick raw idea for the queue…', style:{width:'100%', minHeight:'70px', border:'1.5px solid var(--gold-soft)', borderRadius:'8px', padding:'10px', fontFamily:'inherit', fontSize:'15px', background:'#fffdf7', color:'var(--ink-soft)'}});
   host.append(h('div',{class:'drafter'}, h('label',null,'Raw dump → the queue'), raw,
-    h('div',{class:'toolrow'}, h('button',{class:'navbtn', onclick:async()=>{ const t=raw.value.trim(); if(!t) return; try{ await appendRawDump(t); raw.value=''; toast('Added to the Raw Dump Inbox.'); }catch(e){ toast('Failed: '+e.message); } }}, 'Add raw idea'))));
+    h('div',{class:'toolrow'}, h('button',{class:'navbtn primary', onclick:async()=>{ const t=raw.value.trim(); if(!t) return; try{ await appendRawDump(t); raw.value=''; toast('Added to the Raw Dump Inbox.'); }catch(e){ toast('Failed: '+e.message); } }}, 'Add raw idea'))));
   const listHost=h('div',{style:{marginTop:'18px'}}); host.append(listHost); listHost.append(h('p',{class:'hint'},'Loading her journal…'));
   (async()=>{ try{ const r=await ghGetText(cfg, `${base}/${stem}.json`);
     if(!r){ listHost.replaceChildren(h('p',{class:'hint'}, `No journal found at ${base}/${stem}.json yet (set "Her journal file name" in ☁ My file).`)); return; }
@@ -5874,8 +5891,8 @@ function studioInbox(host){
   }catch(e){ listHost.replaceChildren(h('p',{class:'hint'},'Could not read her journal: '+e.message)); } })();
 }
 function sparkInboxRow(s){
-  return h('div',{class:'spark-row'}, h('div',{class:'spark-text'}, s.text),
-    h('button',{class:'navbtn', style:{flex:'0 0 auto'}, onclick:()=>go('studio',{tab:'drafter', params:{prefill:sparkToCard(s)}})}, 'Draft a Canon Card →'));
+  return h('div',{class:'spark-row has-card-actions', tabindex:'0'}, h('div',{class:'spark-text'}, s.text),
+    h('div',{class:'card-actions'}, h('button',{class:'navbtn primary', onclick:()=>go('studio',{tab:'drafter', params:{prefill:sparkToCard(s)}})}, 'Draft a Canon Card →')));
 }
 function sparkToCard(s){ return { tag:'PEO', title:(s.text||'').slice(0,60), category:'', source:'A spark from '+((DB.github&&DB.github.makerStem)||'the maker')+'’s journal', claim:(s.text||'').trim(), means:'', donot:'', notes:'From her sparks.' }; }
 function inboxCard(c){
@@ -5920,8 +5937,8 @@ function studioDrafter(host, prefill){
     h('label',null,'Preview — Canon Card'), preview, status,
     h('div',{class:'toolrow'},
       h('button',{class:'navbtn primary', onclick:()=>appendCard()}, 'Append to Promotion Queue'),
-      h('button',{class:'navbtn', onclick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(curCard()); toast('Copied card markdown.'); }}, 'Copy markdown'),
-      h('button',{class:'navbtn', onclick:()=>go('studio',{tab:'inbox'})}, 'Back to Inbox'),
+      h('button',{class:'navbtn ghost', onclick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(curCard()); toast('Copied card markdown.'); }}, 'Copy markdown'),
+      h('button',{class:'navbtn ghost', onclick:()=>go('studio',{tab:'inbox'})}, 'Back to Inbox'),
     )));
   (async()=>{ try{ const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t)); }catch(e){} refresh(); })();
   async function appendCard(){ status.textContent='Saving…';
@@ -5986,8 +6003,10 @@ function studioBoardCard(card, queueText){
       h('b',null,card.title),card.status?h('small',null,card.status):null,h('span',{class:'pcard-open-hint'},'Read full card')));
   }else tile.append(h('b',null,card.title),card.status?h('small',null,card.status):null);
   if(cid && card.col!=='Promoted' && card.col!=='Raw'){
-    tile.append(h('button',{class:'navbtn',style:{marginTop:'7px',fontSize:'12px',padding:'4px 9px'},
-      onclick:e=>{ e.stopPropagation(); promoteCardModal(cid.id); }},'Promote →'));
+    tile.className+=' has-card-actions';
+    tile.setAttribute('tabindex','0');
+    tile.append(h('div',{class:'card-actions'},h('button',{class:'navbtn primary',
+      onclick:e=>{ e.stopPropagation(); promoteCardModal(cid.id); }},'Promote →')));
   }
   return tile;
 }
@@ -9227,7 +9246,7 @@ function viewCampaigns(){
     body.append(h('p',{class:'hint', style:{textAlign:'center'}}, 'Connect your GitHub file first — the Game space reads and writes your campaign files.'),
       h('div',{class:'toolrow', style:{justifyContent:'center'}},
         h('button',{class:'navbtn primary', onclick:()=>openGitHubPanel()}, 'Connect GitHub'),
-        h('button',{class:'navbtn', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
+        h('button',{class:'navbtn ghost', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
     return f;
   }
   const cfg=ghCfg(); const host=h('div',null); body.append(host); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading your campaigns…'));
@@ -9237,7 +9256,7 @@ function viewCampaigns(){
     const wrap=h('div',null,
       h('div',{class:'toolrow', style:{justifyContent:'center', marginBottom:'12px'}},
         h('button',{class:'navbtn primary', onclick:()=>startCampaignModal()}, '+ Start a new campaign'),
-        h('button',{class:'navbtn', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
+        h('button',{class:'navbtn ghost', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
     wrap.append(campaignGroup('Current', rows.filter(r=>!r.archived), 'No active campaigns yet — start one above.'));
     const arch=rows.filter(r=>r.archived); if(arch.length) wrap.append(campaignGroup('Archived', arch, ''));
     host.replaceChildren(wrap);
@@ -9258,7 +9277,7 @@ function viewCampaign(name, tab){
   const f=framed(name, 'idea → ledger → (audit) → canon', 'campaign-only until it’s audited into the queue');
   const body=f.querySelector('.framed-body');
   if(!ghReady()){ body.append(h('p',{class:'hint', style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
-  body.append(h('div',{class:'toolrow', style:{marginBottom:'4px'}}, h('button',{class:'navbtn', onclick:()=>go('campaigns')}, '← All campaigns')));
+  body.append(h('div',{class:'toolrow', style:{marginBottom:'4px'}}, h('button',{class:'navbtn ghost', onclick:()=>go('campaigns')}, '← All campaigns')));
   const cur=CAMP_TABS.find(x=>x[0]===tab)||CAMP_TABS[0];
   const tabs=h('div',{class:'studio-tabs'});
   CAMP_TABS.forEach(([k,label])=> tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('campaign',{camp:name,tab:k})}, label)));
@@ -9287,7 +9306,7 @@ async function campResume(host, name){
       live.length? h('ul',null, ...live.map(x=>h('li',null,x))) : h('p',{class:'hint'},'No live threads.'));
     const acts=h('div',{class:'toolrow', style:{marginBottom:'12px'}},
       h('button',{class:'navbtn primary', onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(resumeHandoff(name, tr.text, th?th.text:'')); toast('Copied a resume prompt — paste it to the GM.'); }}, 'Copy resume prompt'),
-      h('button',{class:'navbtn', onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(sessionZeroHandoff(name)); toast('Copied a Session Zero prompt.'); }}, 'Copy Session Zero prompt'));
+      h('button',{class:'navbtn ghost', onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(sessionZeroHandoff(name)); toast('Copied a Session Zero prompt.'); }}, 'Copy Session Zero prompt'));
     host.replaceChildren(acts, card);
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
 }
@@ -9316,10 +9335,10 @@ async function campLedger(host, name){
       h('label',null,'What to capture'), bodyIn, h('div',{class:'toolrow'}, addBtn), st);
     const list=h('div',{style:{marginTop:'16px'}}, h('p',{class:'hint', style:{textAlign:'center'}}, entries.length+' entr'+(entries.length===1?'y':'ies')));
     if(!entries.length) list.append(h('p',{class:'hint', style:{textAlign:'center'}},'Nothing captured yet — "mark that" during play lands here.'));
-    entries.slice().reverse().forEach(e=> list.append(h('div',{class:'pcard', style:{marginBottom:'8px'}},
+    entries.slice().reverse().forEach(e=> list.append(h('div',{class:'pcard has-card-actions', tabindex:'0', style:{marginBottom:'8px'}},
       h('b',null, e.id+'  '), h('small',null, '['+e.label+'] · '+(e.status||'CAMPAIGN-ONLY')),
       h('div',{style:{margin:'4px 0'}}, e.body),
-      h('div',{class:'toolrow'}, h('button',{class:'navbtn', style:{fontSize:'12px', padding:'4px 9px'}, onclick:()=>bridgeToCanon(e)}, 'Draft a Canon Card →')))));
+      h('div',{class:'card-actions'}, h('button',{class:'navbtn ghost', onclick:()=>bridgeToCanon(e)}, 'Draft a Canon Card →')))));
     host.replaceChildren(form, list);
   }
   try{ await draw(); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
@@ -9390,7 +9409,7 @@ function startCampaignModal(){
   };
   close=showModalNode('Start a new campaign', 'Scaffolds the ledger, state tracker, threads, cast, and a character sheet from the templates.',
     h('div',null, h('label',null,'Name'), nameIn,
-      h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn', onclick:()=>close()}, 'Cancel')), status));
+      h('div',{class:'toolrow', style:{marginTop:'12px'}}, create, h('button',{class:'navbtn ghost', onclick:()=>close()}, 'Cancel')), status));
 }
 /* ========================================================================== *
    CAMPAIGN LEDGER TIMELINE — read-only browser over parseLedger() output.
@@ -9554,14 +9573,14 @@ function castMemberModal(title,member,onSave){
       castField('Status',statusIn),
       castField('Relationship to PC',relIn),
       castField('Last seen / note',noteIn),
-      h('div',{class:'toolrow',style:{marginTop:'12px'}},saveBtn,h('button',{class:'navbtn',onclick:()=>close()},'Cancel')),
+      h('div',{class:'toolrow',style:{marginTop:'12px'}},saveBtn,h('button',{class:'navbtn ghost',onclick:()=>close()},'Cancel')),
       st));
 }
 
 function castMemberCard(member,onEdit,onRemove){
   const m=normalizeCastMember(member);
   const line=(label,value)=>value?h('p',null,h('b',null,label+': '),value):null;
-  return h('div',{class:'cast-card pcard'},
+  return h('div',{class:'cast-card pcard has-card-actions', tabindex:'0'},
     h('div',{class:'cast-card-head'},
       h('div',null,
         h('h4',null,m.name),
@@ -9569,9 +9588,9 @@ function castMemberCard(member,onEdit,onRemove){
       m.status?h('span',{class:'cast-status tone-'+castStatusTone(m.status)},m.status):null),
     line('Relationship',m.relationship),
     line('Last seen / note',m.note),
-    h('div',{class:'toolrow cast-actions'},
-      h('button',{class:'navbtn',onclick:onEdit},'Edit'),
-      h('button',{class:'navbtn danger',onclick:onRemove},'Remove')));
+    h('div',{class:'card-actions cast-actions'},
+      h('button',{class:'navbtn primary',onclick:onEdit},'Edit'),
+      overflowMenu([{label:'Remove',danger:true,onclick:onRemove}])));
 }
 
 async function campCast(host,name){
@@ -10298,7 +10317,7 @@ function regionMapPanel(entry, options){
   const zoom = f => { state.viewport.scale = regionClampScale(state.viewport.scale * f); draw(); };
   const fit = () => { state.viewport = { scale:1, panX:0, panY:0 }; draw(); };
   const viewToggle = h('button', {
-    class:'navbtn region-view-toggle',
+    class:'navbtn primary region-view-toggle',
     type:'button',
     onclick:() => {
       state.view = state.view === 'gm' ? 'player' : 'gm';
@@ -10309,14 +10328,14 @@ function regionMapPanel(entry, options){
     },
   });
   const toolbar = h('div', { class:'region-map-toolbar' },
-    h('button', { class:'navbtn', type:'button', title:'Zoom out', 'aria-label':'Zoom out', onclick:() => zoom(1 / 1.5) }, '−'),
-    h('button', { class:'navbtn', type:'button', title:'Zoom in', 'aria-label':'Zoom in', onclick:() => zoom(1.5) }, '+'),
-    h('button', { class:'navbtn', type:'button', onclick:fit }, 'Fit'),
-    h('button', { class:'navbtn', type:'button', onclick:() => {
+    h('button', { class:'navbtn icon bare', type:'button', title:'Zoom out', 'aria-label':'Zoom out', onclick:() => zoom(1 / 1.5) }, '−'),
+    h('button', { class:'navbtn icon bare', type:'button', title:'Zoom in', 'aria-label':'Zoom in', onclick:() => zoom(1.5) }, '+'),
+    h('button', { class:'navbtn ghost', type:'button', onclick:fit }, 'Fit'),
+    h('button', { class:'navbtn ghost', type:'button', onclick:() => {
       const layers = regionMapLayers(region, state.view);
       state.layerId = layers[0] ? layers[0].id : ''; fit();
     } }, 'Reset'),
-    h('button', { class:'navbtn', type:'button', 'aria-pressed':'false', onclick(){ state.showText = !state.showText; this.setAttribute('aria-pressed', state.showText ? 'true' : 'false'); draw(); } }, 'Text summary'),
+    h('button', { class:'navbtn ghost', type:'button', 'aria-pressed':'false', onclick(){ state.showText = !state.showText; this.setAttribute('aria-pressed', state.showText ? 'true' : 'false'); draw(); } }, 'Text summary'),
     viewToggle);
 
   const stage = h('div', { class:'region-map-stage' });
@@ -10646,7 +10665,7 @@ function regionEditableMapPanel(entry, cfg, campaignName){
       h('label', null, 'Add', kind), label, characterId, place);
 
     const activeGrid = regionTerrainGrid(entry.region, state.activeLayerId);
-    const fogToggle = h('button', { class:'navbtn', type:'button', onclick:() => {
+    const fogToggle = h('button', { class:'navbtn primary', type:'button', onclick:() => {
       state.mode = state.mode === 'fog' ? null : 'fog';
       state.selected = null;
       state.status = state.mode === 'fog'
@@ -10654,9 +10673,9 @@ function regionEditableMapPanel(entry, cfg, campaignName){
         : 'Reveal/fog tool closed.';
       draw();
     } }, state.mode === 'fog' ? 'Done toggling' : 'Toggle cells');
-    const revealAll = h('button', { class:'navbtn', type:'button', onclick:() =>
+    const revealAll = h('button', { class:'navbtn ghost', type:'button', onclick:() =>
       saveReveal({ action:'reveal-all', layerId:state.activeLayerId }, 'Layer fully revealed.') }, 'Reveal all');
-    const fogAll = h('button', { class:'navbtn', type:'button', onclick:() =>
+    const fogAll = h('button', { class:'navbtn ghost', type:'button', onclick:() =>
       saveReveal({ action:'fog-all', layerId:state.activeLayerId }, 'Layer fully fogged.') }, 'Fog all');
     [fogToggle, revealAll, fogAll].forEach(button => { button.disabled = state.saving || !activeGrid; });
     const fogControls = h('div', { class:'region-fog-controls' },
@@ -10671,9 +10690,9 @@ function regionEditableMapPanel(entry, cfg, campaignName){
       inspector.append(h('span', { class:'hint' }, 'Select a visible pin or marker on the map to move, relabel, or delete it.'));
     }else{
       const editLabel = h('input', { type:'text', maxlength:'120', value:item.label, 'aria-label':'Selected item label' });
-      const saveLabel = h('button', { class:'navbtn', type:'button', onclick:() =>
+      const saveLabel = h('button', { class:'navbtn primary', type:'button', onclick:() =>
         save({ action:'label', kind:state.selected.kind, id:state.selected.id, label:editLabel.value }, 'Label saved.') }, 'Save label');
-      const move = h('button', { class:'navbtn', type:'button', onclick:() => {
+      const move = h('button', { class:'navbtn ghost', type:'button', onclick:() => {
         state.mode = 'move'; state.status = 'Click a revealed map position to move ' + item.label + '.'; draw();
       } }, state.mode === 'move' ? 'Choose a map position…' : 'Move');
       const remove = h('button', { class:'navbtn region-delete', type:'button', onclick:() => {
@@ -10681,7 +10700,8 @@ function regionEditableMapPanel(entry, cfg, campaignName){
       } }, 'Delete');
       [saveLabel, move, remove].forEach(button => { button.disabled = state.saving; });
       inspector.append(h('b', null, state.selected.kind === 'pin' ? 'Selected pin' : 'Selected marker'),
-        editLabel, saveLabel, move, remove);
+        editLabel, h('div', { class:'card-actions region-inspector-actions' }, saveLabel, move,
+          overflowMenu([{ label:'Delete', danger:true, disabled:state.saving, onclick:remove.onclick }])));
     }
 
     const map = regionMapPanel(entry, {
@@ -11176,9 +11196,9 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
       h('div',{class:'region-forge-grid'},
         regionForgeField('Seed',regionForgeInput(seedText,v=>update('seed',v),{disabled:state.role==='starter'?'true':null}),'Starter seed is stable from the normalized campaign snapshot; outer seed is copy/edit/reroll.'),
         h('div',{class:'toolrow region-forge-seed-actions'},
-          h('button',{class:'navbtn',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRerollSeed(state.seed,++state.rerollStep); draw(); }},'Reroll'),
-          h('button',{class:'navbtn',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRandomizeSeed({campaign:campaignName,entropy:(typeof crypto!=='undefined'&&crypto.getRandomValues)?Array.from(crypto.getRandomValues(new Uint32Array(2))).join('-'):String(new Date().getTime())}); draw(); }},'Randomize'),
-          h('button',{class:'navbtn',type:'button',onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(seedText||''); toast('Seed copied.'); }},'Copy seed'))),
+          h('button',{class:'navbtn primary',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRerollSeed(state.seed,++state.rerollStep); draw(); }},'Reroll'),
+          h('button',{class:'navbtn ghost',type:'button',disabled:state.role==='starter'?'true':null,onclick:()=>{ state.seed=regionForgeRandomizeSeed({campaign:campaignName,entropy:(typeof crypto!=='undefined'&&crypto.getRandomValues)?Array.from(crypto.getRandomValues(new Uint32Array(2))).join('-'):String(new Date().getTime())}); draw(); }},'Randomize'),
+          h('button',{class:'navbtn ghost',type:'button',onclick:()=>{ if(navigator.clipboard) navigator.clipboard.writeText(seedText||''); toast('Seed copied.'); }},'Copy seed'))),
       preview?h('p',{class:'hint'},'Provenance: '+preview.metadata.generator+' '+preview.metadata.generatorVersion+' · '+preview.metadata.regionRole+' · source hash stored, raw hidden text not shown.'):null);
     const previewStage=regionForgeStage('Preview','GM truth ⇄ player fog',
       errors.length?h('div',{class:'region-invalid'},h('b',null,'Validation'),h('ul',null,...errors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},'Valid generated region save'),
@@ -11188,7 +11208,7 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
         h('p',null,preview.title+' · '+regionCosmicLabel(preview)+' · '+preview.localLayers.length+' local layers · '+regionAtlasDiscoveryLabel(preview)),
         h('p',{class:'hint'},'Player reveal starts layered: arrival area and silhouettes are visible; exact routes, interiors, hazards, resources, and secrets remain fogged.')):null);
     const acceptRow=h('div',{class:'toolrow region-forge-accept'},
-      h('button',{class:'navbtn',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Back to atlas'),
+      h('button',{class:'navbtn ghost',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Back to atlas'),
       h('button',{class:'navbtn primary',type:'button',disabled:(saving||!preview||errors.length)?'true':null,onclick:accept},saving?'Saving…':'Accept into campaign atlas'),
       h('span',{class:'hint',role:'status'},status));
     host.replaceChildren(h('div',{class:'region-forge'},sourceStage,shapeStage,forcesStage,directionStage,seedStage,previewStage,acceptRow));
@@ -11200,7 +11220,7 @@ function regionForgeView(campaignName,source){
   const body=f.querySelector('.framed-body');
   if(!campaignName){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Choose a campaign first.')); return f; }
   if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
-  body.append(h('div',{class:'toolrow',style:{marginBottom:'10px'}},h('button',{class:'navbtn',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Region atlas')));
+  body.append(h('div',{class:'toolrow',style:{marginBottom:'10px'}},h('button',{class:'navbtn ghost',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Region atlas')));
   const host=h('div'); body.append(host); regionForgeWorkspace(host,ghCfg(),campaignName,source); return f;
 }
 
@@ -11219,7 +11239,7 @@ campRegion=async function(host,name){
         h('span',null,'Browse saved regions, open one for edits, or forge a complete generated candidate.')),
       h('div',{class:'toolrow region-atlas-actions'},
         h('button',{class:'navbtn primary',onclick:()=>go('regionForge',{camp:name,source:'outer'})},'Create Region'),
-        h('button',{class:'navbtn',onclick:()=>go('regionForge',{camp:name,source:'starter'})},'Generate Starter Region')));
+        h('button',{class:'navbtn ghost',onclick:()=>go('regionForge',{camp:name,source:'starter'})},'Generate Starter Region')));
     if(!result.regions.length){
       wrap.append(h('div',{class:'region-empty'},h('h3',null,'No saved regions yet'),
         h('p',{class:'hint'},'Use Create Region for a neutral outer candidate, or Generate Starter Region for a campaign/character-bound first map.')));
