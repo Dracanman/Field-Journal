@@ -377,7 +377,7 @@
   .search-row input{ flex:1; min-width:0; border:1.5px solid var(--gold-soft); border-radius:999px; background:var(--paper-card); padding:9px 16px; font-family:inherit; font-size:16px; color:var(--ink-soft); }
   .search-hit{ background:var(--paper-card); border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; margin-bottom:8px; max-width:820px; margin-inline:auto; box-sizing:border-box; overflow-wrap:anywhere; }
   .search-hit b{ color:var(--green); } .search-hit .ln{ color:var(--ink-soft); font-size:14px; overflow-wrap:anywhere; word-break:break-word; }
-  .board{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .board{ display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; }
   .board .col{ background:var(--paper); border:1px solid var(--gold-soft); border-radius:10px; padding:10px; }
   .board .col h4{ font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin-bottom:8px; text-align:center; }
   .board .pcard{ background:#fff8; border:1px solid #e6dcc4; border-radius:7px; padding:8px 10px; margin-bottom:7px; font-size:14px; }
@@ -402,6 +402,14 @@
   .card-reader-promoted b{color:var(--green);font-size:18px}
   .card-reader-promoted p{margin:6px 0 0;color:var(--ink-soft)}
   .card-reader-actions{margin-top:20px}
+  .contradiction-panel{display:grid;gap:12px;max-width:920px;margin:0 auto}
+  .contradiction-card{border:1px solid var(--glass-border,var(--gold-soft));border-radius:10px;background:var(--glass-strong,var(--paper-card));padding:14px}
+  .contradiction-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:10px}
+  .contradiction-head b{color:var(--ink);display:block}
+  .contradiction-head small{display:block;margin-top:2px}
+  .contradiction-status{border:1px solid var(--glass-border,var(--gold-soft));border-radius:999px;background:var(--glass-bg,var(--paper-slot));color:var(--ink);padding:3px 10px;font-size:12px;font-weight:700}
+  .contradiction-meta{margin-bottom:12px}
+  .contradiction-empty{text-align:center}
   .canon-graph{display:grid;gap:12px}
   .canon-graph-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 14px;border:1.5px solid var(--gold-soft);border-radius:10px;background:#fff8}
   .canon-graph-summary span{color:var(--hint);font-style:italic}
@@ -736,8 +744,13 @@
     box-sizing:border-box; min-width:0; max-width:100%;
   }
   .play-command-card,.play-transcript-card,.play-input-card{
-    border:1.5px solid var(--gold-soft); border-radius:12px; background:#fffaf0;
+    border:1px solid var(--glass-border); border-radius:12px; background:var(--glass-strong);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
+    backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
     box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .play-command-card,.play-transcript-card,.play-input-card{ background:rgba(255,255,255,.9); }
   }
   .play-command-card{ padding:14px; }
   .play-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
@@ -760,32 +773,38 @@
   .play-chat-stack{ display:grid; gap:8px; min-width:0; }
   .play-tools-wrap{
     position:sticky; top:10px; max-height:calc(100vh - 120px); overflow:auto;
-    border:1.5px solid var(--gold-soft); border-radius:12px; background:#fffaf0;
+    border:1px solid var(--glass-border); border-radius:12px; background:var(--glass-strong);
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
+    backdrop-filter:blur(var(--glass-blur)) saturate(1.2);
     padding:10px; box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
+  }
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .play-tools-wrap{ background:rgba(255,255,255,.9); }
   }
   .play-tools-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:0 0 8px; }
   .play-tools-head b{ color:var(--ink); font-size:17px; }
   .play-tools-head .hint{ font-size:12px; }
   .play-mode-row{ display:flex; flex-wrap:wrap; gap:7px; margin:0; }
   .play-mode-chip{
-    border:1px solid #dacda8; border-radius:999px; background:#fffdf7; color:var(--ink-soft);
+    border:1px solid var(--glass-border); border-radius:999px; background:var(--glass-bg); color:var(--ink-soft);
     font:inherit; font-size:13px; font-weight:800; padding:7px 12px; cursor:pointer;
     min-height:44px; min-width:132px; max-width:184px; display:grid; gap:1px; align-content:center;
     text-align:left; box-shadow:0 4px 12px -14px rgba(var(--shadow)/.35);
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease, color .16s ease;
   }
-  .play-mode-chip.on{ border-color:var(--green); background:#edf3e9; color:var(--green); }
-  .play-mode-chip.pinned{ box-shadow:inset 0 0 0 2px rgba(62,107,79,.16), 0 4px 12px -14px rgba(var(--shadow)/.35); }
-  .play-mode-chip:hover{ border-color:var(--gold); color:var(--ink); }
+  .play-mode-chip.on{ border-color:var(--accent); background:var(--glass-strong); color:var(--ink); box-shadow:0 10px 22px -22px var(--accent); }
+  .play-mode-chip.pinned{ box-shadow:inset 0 0 0 2px var(--accent), 0 4px 12px -14px rgba(var(--shadow)/.35); }
+  .play-mode-chip:hover{ border-color:var(--accent); color:var(--ink); }
   .play-mode-title{ line-height:1.1; }
   .play-mode-chip small{ color:var(--hint); font-size:11px; font-weight:700; font-style:italic; line-height:1.1; }
-  .play-mode-chip.on small{ color:#587461; }
+  .play-mode-chip.on small{ color:var(--ink-soft); }
   .play-mode-more{ min-width:132px; }
   .play-mode-more summary{
-    min-height:44px; box-sizing:border-box; border:1px solid #dacda8; border-radius:999px;
-    background:#fffdf7; color:var(--ink-soft); cursor:pointer; display:flex; align-items:center;
+    min-height:44px; box-sizing:border-box; border:1px solid var(--glass-border); border-radius:999px;
+    background:var(--glass-bg); color:var(--ink-soft); cursor:pointer; display:flex; align-items:center;
     padding:7px 12px; font-size:13px; font-weight:800; touch-action:manipulation;
   }
-  .play-mode-more summary:hover{ border-color:var(--gold); color:var(--ink); }
+  .play-mode-more summary:hover{ border-color:var(--accent); color:var(--ink); }
   .play-mode-more-list{ display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
   .play-mode-help{ color:var(--hint); font-size:13px; font-style:italic; margin:-1px 0 1px; }
   .play-lens-toggle{ display:none; }
@@ -796,7 +815,7 @@
   .play-starters .hint{ font-size:13px; }
   .play-tools{ display:grid; grid-template-columns:1fr; gap:8px; }
   .play-tool-card{
-    border:1px solid #e4d8bc; border-radius:10px; background:var(--paper-card);
+    border:1px solid var(--glass-border); border-radius:10px; background:var(--paper-card);
     padding:0 11px 11px; min-width:0; box-shadow:0 8px 18px -22px rgba(var(--shadow)/.45);
   }
   .play-tool-card summary{
@@ -805,21 +824,21 @@
   .play-tool-card ul{ margin:0; padding-left:18px; color:var(--ink-soft); line-height:1.36; font-size:15px; }
   .play-tool-card li{ margin:4px 0; }
   .play-grounding{
-    border:1px solid #e7dcc4; border-radius:999px; background:#fffdf7; color:var(--hint);
+    border:1px solid var(--glass-border); border-radius:999px; background:var(--glass-bg); color:var(--hint);
     padding:6px 11px; font-size:13px; font-style:italic;
   }
-  .play-transcript-card{ padding:12px; background:linear-gradient(180deg,#fffaf0,#f8f1df); }
+  .play-transcript-card{ padding:12px; }
   .play-log{ display:flex; flex-direction:column; gap:10px; min-height:220px; max-height:min(54vh,560px); overflow:auto; padding-right:2px; }
   .play-empty{ margin:auto; color:var(--hint); font-style:italic; text-align:center; }
   .play-msg{
-    padding:10px 12px; border-radius:12px; border:1px solid var(--gold-soft);
+    padding:10px 12px; border-radius:12px; border:1px solid var(--glass-border);
     box-shadow:0 8px 18px -20px rgba(var(--shadow)/.5);
   }
-  .play-msg.you{ background:#fffdf7; align-self:flex-end; max-width:86%; border-color:#dccba5; }
-  .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; border-left:4px solid var(--green); }
+  .play-msg.you{ background:var(--glass-bg); align-self:flex-end; max-width:86%; border-color:var(--glass-border); }
+  .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; border-left:4px solid var(--accent); }
   .play-msg .who{ font-size:11px; letter-spacing:0; text-transform:uppercase; color:var(--gold); margin-bottom:3px; font-weight:800; }
   .play-text{ white-space:pre-wrap; margin:0; font:inherit; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
-  .play-proposal{ margin-top:9px; border:1px dashed var(--gold); border-radius:9px; padding:9px 10px; background:#fff7e6; }
+  .play-proposal{ margin-top:9px; border:1px dashed var(--accent); border-radius:9px; padding:9px 10px; background:var(--glass-bg); }
   .play-proposal-list{ display:grid; gap:6px; margin-top:7px; }
   .play-proposal-pick{ display:flex; align-items:flex-start; gap:7px; color:var(--ink-soft); line-height:1.35; }
   .play-proposal-pick input{ flex:0 0 auto; margin-top:2px; }
@@ -829,7 +848,7 @@
     background:var(--paper-card); color:var(--ink-soft); font:inherit; line-height:1.45; padding:10px 11px;
     min-height:90px; resize:vertical;
   }
-  .play-input:focus{ outline:2px solid rgba(62,107,79,.22); border-color:var(--green); }
+  .play-input:focus{ outline:2px solid var(--accent); border-color:var(--accent); }
   .play-action-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
   .play-action-row .sync-status{ min-height:1.4em; }
   @media (max-width:780px){
@@ -1124,6 +1143,7 @@
 
   /* ---- cloud palette: cool aetherial surfaces (was warm parchment) -------- */
   :root{
+    --maxw:1280px;            /* cloud shell width; parchment tokens stay in tokens.css */
     --paper:#e9f1fb;          /* page / framed surface — cool sky-white       */
     --paper-card:#f3f8fe;     /* card & input body — luminous cool white      */
     --paper-slot:#e2ecf8;     /* field / slot fill                            */
@@ -1177,6 +1197,7 @@
     animation:aether-drift 52s ease-in-out infinite alternate;
     min-height:100dvh;
   }
+  #app{ position:relative; z-index:1; }
   @keyframes aether-drift{
     0%{ background-position:0% 0%, 100% 0%, 0 0; }
     100%{ background-position:28% 22%, 62% 30%, 0 0; }
@@ -1229,20 +1250,24 @@
   }
 
   /* ---- opt-in "generous atmospherics" (body.fx-rich, off by default) ------ */
-  /* one extra ambient layer: slow-drifting light motes, behind all content */
+  /* one extra ambient layer: slow-drifting light bokeh, behind app content */
   body.fx-rich::after{
-    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.55;
+    content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.82;
+    mix-blend-mode:screen;
     background:
-      radial-gradient(2px 2px at 18% 28%, rgba(255,255,255,.75), transparent 60%),
-      radial-gradient(2px 2px at 72% 62%, rgba(150,190,255,.55), transparent 60%),
-      radial-gradient(1.5px 1.5px at 46% 82%, rgba(255,255,255,.55), transparent 60%),
-      radial-gradient(1.5px 1.5px at 88% 22%, rgba(150,190,255,.5), transparent 60%);
+      radial-gradient(88px 88px at 18% 28%, rgba(255,255,255,.34), transparent 68%),
+      radial-gradient(72px 72px at 72% 62%, rgba(185,216,255,.28), transparent 70%),
+      radial-gradient(58px 58px at 46% 82%, rgba(255,255,255,.25), transparent 68%),
+      radial-gradient(86px 86px at 88% 22%, rgba(155,198,255,.24), transparent 70%);
     background-repeat:no-repeat;
     animation:fx-motes 19s ease-in-out infinite alternate;
   }
-  @keyframes fx-motes{ from{ transform:translate3d(0,0,0); } to{ transform:translate3d(6px,-14px,0); } }
+  @keyframes fx-motes{ from{ transform:translate3d(0,0,0); } to{ transform:translate3d(38px,-52px,0); } }
   /* live/active accents breathe a little — glow stays on meaningful elements only */
-  body.fx-rich .glow-accent{ animation:fx-glow-pulse 4.6s ease-in-out infinite; }
+  body.fx-rich .glow-accent,
+  body.fx-rich .navbtn.primary,
+  body.fx-rich .studio-tabs .tab.on,
+  body.fx-rich .bottom-nav-tab.current{ animation:fx-glow-pulse 4.6s ease-in-out infinite; }
   @keyframes fx-glow-pulse{
     0%,100%{ box-shadow:0 0 18px -8px var(--accent,var(--glow)); }
     50%{ box-shadow:0 0 26px -3px var(--accent,var(--glow)); }
@@ -1274,7 +1299,10 @@
     /* OS reduce-motion overrides the .fx-rich ceiling and all interaction motion —
        meaning never depends on motion; everything holds still. */
     body.fx-rich::after{ animation:none; }
-    body.fx-rich .glow-accent{ animation:none; }
+    body.fx-rich .glow-accent,
+    body.fx-rich .navbtn.primary,
+    body.fx-rich .studio-tabs .tab.on,
+    body.fx-rich .bottom-nav-tab.current{ animation:none; }
     .stream-text .chunk{ animation:none; }
     .stream-text .cursor{ animation:none; }
     *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
@@ -2892,11 +2920,14 @@ function viewHome(){
 function homeRail(){
   const n=DB.creations.length, favs=(DB.favorites||[]).length, colls=(DB.collections||[]).length;
   const recent=DB.creations.slice(-6).reverse();
+  const favorites=(DB.favorites||[]).map(shelfItem).filter(Boolean);
   return [
     railCard('At a glance', h('div',{class:'rail-stats'},
       railStat(n, n===1?'piece':'pieces'),
       railStat(favs, 'favorites'),
       railStat(colls, colls===1?'collection':'collections'))),
+    railCard('Favorites', railLinks(favorites.map(w=>({label:w.title, onclick:w.open || (()=>go('worksheet',{id:w.id}))})),
+      'Pin cards with ★ to see them here.')),
     railCard('Lately', railLinks(recent.map(c=>({label:creationTitle(c), onclick:()=>openCreation(c)})),
       'Nothing in your journal yet — pick a card to begin.')),
   ];
@@ -5717,6 +5748,32 @@ function statusToCol(status, section){ const s=(status||'').toLowerCase();
   if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
   if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
 
+/* ---- contradiction log --------------------------------------------------- */
+function parseContradictionLog(text){
+  const lines=String(text||'').split('\n'), out=[]; let cur=null, field='', inNotes=false;
+  const map={status:'status',source:'source','conflicting idea':'conflictingIdea','existing canon it may violate':'existingCanon','conflict type':'conflictType',decision:'decision'};
+  const clean=x=>String(x||'').replace(/^[-*]\s*/,'').trim();
+  const flush=()=>{ if(!cur) return;
+    const hasBody=cur.status||cur.source||cur.conflictingIdea||cur.existingCanon||cur.conflictType||cur.decision||cur.notes.length;
+    if(cur.id!=='CON-000' && !/^template$/i.test(cur.title) && hasBody) out.push(cur);
+    cur=null; field=''; inNotes=false; };
+  for(let i=0;i<lines.length;i++){
+    const ln=lines[i], head=/^##\s+(CON-\d{3})\s*(?:[—-]\s*)?(.*)$/.exec(ln);
+    if(head){ flush(); cur={id:head[1],title:head[2].trim()||head[1],line:i+1,status:'',source:'',conflictingIdea:'',existingCanon:'',conflictType:'',decision:'',notes:[]}; continue; }
+    if(!cur) continue;
+    const section=/^###\s+(.*)/.exec(ln);
+    if(section){ inNotes=/^notes$/i.test(section[1].trim()); field=''; continue; }
+    const meta=/^\*\*([^:*]+):\*\*\s*(.*)$/.exec(ln);
+    if(meta){ field=map[meta[1].trim().toLowerCase()]||''; inNotes=false; if(field) cur[field]=meta[2].trim(); continue; }
+    if(/^-{3,}\s*$/.test(ln)) continue;
+    const value=clean(ln);
+    if(!value) continue;
+    if(inNotes) cur.notes.push(value);
+    else if(field) cur[field]=(cur[field]?cur[field]+' ':'')+value;
+  }
+  flush(); return out;
+}
+
 /* ---- open threads in the domains ---- */
 function findOpenThreads(text, file){
   const lines=text.split('\n'); const out=[]; let heading='';
@@ -5944,6 +6001,7 @@ function buildCanonGraph(indexText,domainDocs){
 const STUDIO_TABS=[
   ['board','The board','Where every card stands, by stage. Promote a finished card into its domain file from here.'],
   ['threads','Open questions','Unaudited [OPEN] threads in your canon — copy one as an AI handoff, or draft it into a card. A good place to start.'],
+  ['contradictions','Contradictions','Read the contradiction log. Reference only — conflicts are revised, retired, or retcon-candidate work until resolved.'],
   ['inbox','In-tray','Raw ideas and the maker’s creations, waiting to be turned into Canon Cards.'],
   ['drafter','Draft a card','Turn an idea into a Canon Card (Draft) — it lands in the queue with its own reserved ID.'],
   ['browse','Look up','Read and search your promoted canon. Reference only — nothing here changes canon.'],
@@ -5967,9 +6025,12 @@ function viewStudio(tab, params){
   body.append(tabs);
   body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
   const host=h('div',null);
-  body.append(viewStage(host, studioRail()));
+  const queueStats=h('div',{class:'rail-stats'});
+  body.append(viewStage(host, studioRail(queueStats)));
+  loadStudioQueueCounts(queueStats);
   if(tab==='browse') studioBrowse(host);
   else if(tab==='threads') studioThreads(host);
+  else if(tab==='contradictions') studioContradictions(host);
   else if(tab==='inbox') studioInbox(host);
   else if(tab==='drafter') studioDrafter(host, params&&params.prefill);
   else if(tab==='assistant') studioAssistant(host);
@@ -5980,14 +6041,30 @@ function viewStudio(tab, params){
 }
 // Static context rail for the Studio (wide screens): the governance discipline at a glance,
 // plus the device tools a worldbuilder reaches for often. Synchronous; no motion.
-function studioRail(){
+function studioRail(stageEl){
   return [
     railCard('Canon Studio', h('p',{class:'rail-empty'}, 'Idea → Canon Card → triage → promoted into a domain. Nothing becomes canon until it is carded, checked, and deliberately promoted.')),
+    railCard('Queue', stageEl),
     railCard('Tools', railLinks([
       {label:'☁ My file', onclick:()=>openGitHubPanel()},
       {label:'⚙ Engine & AI', onclick:()=>openEngineSettings()},
     ])),
   ];
+}
+async function loadStudioQueueCounts(stageEl){
+  const stages=['Raw','Draft','Candidate','Ready','Promoted'];
+  const paint=counts=>stageEl.replaceChildren(...stages.map(label=>railStat(counts[label]||0, label)));
+  stageEl.replaceChildren(h('p',{class:'rail-empty'}, 'Loading queue…'));
+  try{
+    const r=await ghGetText(ghCfg(), '02_PROMOTION_QUEUE.md');
+    if(!r){ stageEl.replaceChildren(h('p',{class:'rail-empty'}, 'Queue not found.')); return; }
+    const cards=parseQueueCards(r.text).concat(parseRawIdeas(r.text));
+    const counts={Raw:0,Draft:0,Candidate:0,Ready:0,Promoted:0};
+    cards.forEach(card=>{ if(card && card.col in counts) counts[card.col]++; });
+    paint(counts);
+  }catch(e){
+    stageEl.replaceChildren(h('p',{class:'rail-empty'}, 'Queue unavailable.'));
+  }
 }
 function studioBrowse(host){
   const cfg=ghCfg();
@@ -6009,6 +6086,42 @@ function studioBrowse(host){
       results.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}}, hits.length+' match'+(hits.length===1?'':'es')));
       hits.slice(0,250).forEach(ht=> results.append(h('div',{class:'search-hit'}, h('b',null, ht.file.replace('domains/','')+' :'+ht.n+'  '), h('span',{class:'ln'}, ht.ln))));
     }catch(e){ results.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } }
+}
+function contradictionField(label, value){
+  return value ? h('div',null,h('dt',null,label),h('dd',null,value)) : null;
+}
+function contradictionCard(entry){
+  return h('section',{class:'contradiction-card'},
+    h('div',{class:'contradiction-head'},
+      h('div',null,h('b',null,entry.id+' — '+entry.title),h('small',{class:'hint'},'line '+entry.line)),
+      h('span',{class:'contradiction-status'},entry.status||'Logged')),
+    h('dl',{class:'card-reader-meta contradiction-meta'},
+      contradictionField('Source',entry.source),
+      contradictionField('Conflicting idea',entry.conflictingIdea),
+      contradictionField('Existing canon',entry.existingCanon),
+      contradictionField('Conflict type',entry.conflictType),
+      contradictionField('Decision',entry.decision)),
+    h('section',{class:'card-reader-section'},
+      h('h3',null,'Notes'),
+      entry.notes.length ? h('ul',null,...entry.notes.map(note=>h('li',null,note))) : h('p',{class:'hint'},'None recorded.')));
+}
+function studioContradictions(host){
+  const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the contradiction log…'));
+  (async()=>{ try{
+    const r=await ghGetText(cfg, '03_CONTRADICTION_LOG.md');
+    if(!r){ host.replaceChildren(h('p',{class:'hint'},'Contradiction log not found.')); return; }
+    const entries=parseContradictionLog(r.text);
+    if(!entries.length){
+      host.replaceChildren(h('div',{class:'canon-doc contradiction-empty'},
+        h('h3',null,'No conflicts logged'),
+        h('p',{class:'hint'},'The live contradiction log is intentionally empty. CON-000 is only a template.')));
+      return;
+    }
+    const wrap=h('div',{class:'contradiction-panel'},
+      h('p',{class:'hint', style:{textAlign:'center'}},entries.length+' logged contradiction'+(entries.length===1?'':'s')+' to resolve.'));
+    entries.forEach(entry=>wrap.append(contradictionCard(entry)));
+    host.replaceChildren(wrap);
+  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
 }
 /* ---- Open Threads, Inbox, Drafter, Board — the Studio's working tabs (DOM).
         Format/parse helpers (findOpenThreads, parseQueueCards, checkConsistency,
@@ -12068,7 +12181,7 @@ async function campPlay(host, name){
   const transcript=h('div',{class:'play-log'});
   const input=h('textarea',{class:'play-input', rows:'3', placeholder:'What do you do? (the GM sees your live state + canon)'});
   const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
-  const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
+  const sceneBtn=h('button',{class:'navbtn ghost', type:'button'},'Set the scene');
   const status=h('div',{class:'sync-status'});
   const lensToggle=h('button',{class:'navbtn play-lens-toggle', type:'button', 'aria-expanded':'true'},'Lens');
   const lensPanel=h('div',{class:'play-lens-panel'}, modeRow, modeHelp, starterRow);
@@ -12092,7 +12205,7 @@ async function campPlay(host, name){
     const node=h('div',{class:'play-msg '+(m.role==='assistant'?'gm':'you')}, h('div',{class:'who'}, who), textNode);
     if(m.role==='assistant'){
       const acts=h('div',{class:'toolrow', style:{marginTop:'6px'}});
-      const ledgerBtn=h('button',{class:'navbtn', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'▸ ledger');
+      const ledgerBtn=h('button',{class:'navbtn ghost', style:{fontSize:'12px', padding:'4px 9px'}, type:'button'},'▸ ledger');
       ledgerBtn.onclick=async()=>{ ledgerBtn.disabled=true; try{ await campPlayCaptureBeat(cfg, files, m.content); toast('Marked that beat in the ledger.'); }catch(e){ toast('Could not save: '+e.message); ledgerBtn.disabled=false; } };
       acts.append(ledgerBtn);
       node.append(acts);
