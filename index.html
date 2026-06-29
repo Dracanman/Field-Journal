@@ -6308,11 +6308,11 @@ async function canonGroundingForQuestion(cfg, engine, question, opts){
 const PRIVATE_QUERY_CANNED=[
   {
     label:'Vael folk bonded to Water',
-    sql:"SELECT id, title, domain, file FROM canon WHERE body ILIKE '%Vael%' AND body ILIKE '%Water%' ORDER BY id LIMIT 50",
+    sql:"SELECT id, title, domain, file FROM canon WHERE body LIKE '%Vael%' AND body LIKE '%Water%' ORDER BY id LIMIT 50",
   },
   {
     label:'Canon citing COS-001',
-    sql:"SELECT id, title, domain, file FROM canon WHERE body ILIKE '%COS-001%' ORDER BY id LIMIT 50",
+    sql:"SELECT id, title, domain, file FROM canon WHERE body LIKE '%COS-001%' ORDER BY id LIMIT 50",
   },
   {
     label:'Recent campaign ledger',
