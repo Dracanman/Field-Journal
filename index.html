@@ -649,6 +649,11 @@
 
   /* ---------- in-app GM play (▶ Play tab) ---------- */
   .play-shell{ display:grid; gap:12px; }
+  .play-shell,.play-command-card,.play-table-stage,.play-chat-stack,.play-tools-wrap,
+  .play-transcript-card,.play-input-card,.play-log,.play-msg,.play-lens-panel,
+  .play-grounding,.play-tool-card,.play-proposal{
+    box-sizing:border-box; min-width:0; max-width:100%;
+  }
   .play-command-card,.play-transcript-card,.play-input-card{
     border:1.5px solid var(--gold-soft); border-radius:12px; background:#fffaf0;
     box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45);
@@ -702,6 +707,9 @@
   .play-mode-more summary:hover{ border-color:var(--gold); color:var(--ink); }
   .play-mode-more-list{ display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
   .play-mode-help{ color:var(--hint); font-size:13px; font-style:italic; margin:-1px 0 1px; }
+  .play-lens-toggle{ display:none; }
+  .play-lens-panel{ display:grid; gap:8px; }
+  .play-lens-panel.lens-collapsed{ display:none; }
   .play-starters{ display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
   .play-starters:empty{ display:none; }
   .play-starters .hint{ font-size:13px; }
@@ -729,7 +737,7 @@
   .play-msg.you{ background:#fffdf7; align-self:flex-end; max-width:86%; border-color:#dccba5; }
   .play-msg.gm{ background:var(--paper-card); align-self:flex-start; max-width:96%; border-left:4px solid var(--green); }
   .play-msg .who{ font-size:11px; letter-spacing:0; text-transform:uppercase; color:var(--gold); margin-bottom:3px; font-weight:800; }
-  .play-text{ white-space:pre-wrap; margin:0; font:inherit; line-height:1.5; }
+  .play-text{ white-space:pre-wrap; margin:0; font:inherit; line-height:1.5; overflow-wrap:anywhere; word-break:break-word; }
   .play-proposal{ margin-top:9px; border:1px dashed var(--gold); border-radius:9px; padding:9px 10px; background:#fff7e6; }
   .play-proposal-list{ display:grid; gap:6px; margin-top:7px; }
   .play-proposal-pick{ display:flex; align-items:flex-start; gap:7px; color:var(--ink-soft); line-height:1.35; }
@@ -754,7 +762,21 @@
     .play-head .usage-meter{ margin-left:0; width:100%; }
     .play-control-row,.play-select-label,.play-persona,.play-engine,.play-grounding-mode{ width:100%; }
     .play-tools-wrap{ max-height:240px; }
-    .play-log{ min-height:180px; max-height:48vh; }
+    .play-chat-stack{ display:flex; flex-direction:column; min-height:62vh; }
+    .play-chat-stack.lens-collapsed{ min-height:74vh; }
+    .play-transcript-card{ display:flex; flex-direction:column; flex:1 1 auto; min-height:0; }
+    .play-log{ flex:1 1 auto; min-height:180px; max-height:48vh; }
+    .play-chat-stack.lens-collapsed .play-log{ max-height:64vh; }
+    .play-input-card{ padding:10px; gap:7px; }
+    .play-lens-toggle{
+      display:flex; align-items:center; justify-content:center; width:100%;
+      min-height:38px; padding:7px 11px; font-size:13px; line-height:1.25;
+      white-space:normal; overflow-wrap:anywhere; text-align:center;
+    }
+    .play-lens-panel:not(.lens-collapsed){
+      max-height:38vh; overflow:auto; -webkit-overflow-scrolling:touch; padding-right:2px;
+    }
+    .play-input{ min-height:76px; }
   }
   @media (max-width:480px){ .play-msg.you,.play-msg.gm{ max-width:100%; } }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
@@ -11721,7 +11743,14 @@ async function campPlay(host, name){
   const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
   const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
   const status=h('div',{class:'sync-status'});
-  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID;
+  const lensToggle=h('button',{class:'navbtn play-lens-toggle', type:'button', 'aria-expanded':'true'},'Lens');
+  const lensPanel=h('div',{class:'play-lens-panel'}, modeRow, modeHelp, starterRow);
+  const actionRow=h('div',{class:'play-action-row'}, sendBtn, sceneBtn, status);
+  const inputCard=h('div',{class:'play-input-card'}, lensToggle, lensPanel, input, actionRow);
+  const transcriptCard=h('div',{class:'play-transcript-card'}, transcript);
+  const chatStack=h('section',{class:'play-chat-stack'}, groundingLine, transcriptCard, inputCard);
+  const lensMedia=(typeof window!=='undefined'&&typeof window.matchMedia==='function')?window.matchMedia('(max-width:560px)'):null;
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=!!(lensMedia&&lensMedia.matches);
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -11766,6 +11795,24 @@ async function campPlay(host, name){
     messages.forEach((m,i)=>{ const b=bubble(m); transcript.append(b.node); if(i===messages.length-1 && m.role==='assistant') streamNode=b.textNode; });
     transcript.scrollTop=transcript.scrollHeight;
   }
+  function setNodeClass(node, token, on){
+    const parts=String(node&&node.className||'').split(/\s+/).filter(Boolean).filter(x=>x!==token);
+    if(on) parts.push(token);
+    if(node) node.className=parts.join(' ');
+  }
+  function applyLensCollapse(){
+    setNodeClass(lensPanel,'lens-collapsed',lensCollapsed);
+    setNodeClass(inputCard,'lens-collapsed',lensCollapsed);
+    setNodeClass(chatStack,'lens-collapsed',lensCollapsed);
+    lensToggle.setAttribute('aria-expanded',lensCollapsed?'false':'true');
+  }
+  function setLensCollapsed(next){
+    lensCollapsed=!!next;
+    applyLensCollapse();
+  }
+  function lensStatusLabel(current,pinned){
+    return (pinned?'Pinned: '+current.label:'Auto -> '+current.label);
+  }
   function drawModeRow(){
     const commonIds={auto:true,act:true,ask:true,scene:true,oracle:true,recap:true,fate:true,interrupt:true,reaction:true,discover:true};
     const renderChip=(mode,isAuto)=>{
@@ -11775,7 +11822,7 @@ async function campPlay(host, name){
         h('span',{class:'play-mode-title'},mode.label),
         h('small',null,mode.hint)
       );
-      btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); };
+      btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); if(lensMedia&&lensMedia.matches) setLensCollapsed(true); };
       return btn;
     };
     const chips=[CAMP_PLAY_AUTO_MODE].concat(CAMP_PLAY_MODES);
@@ -11803,15 +11850,18 @@ async function campPlay(host, name){
     starterRow.append(h('span',{class:'hint'},'Quick prompts'));
     prompts.forEach(promptText=>{
       const btn=h('button',{class:'chip dash',type:'button'},promptText);
-      btn.onclick=()=>{ input.value=promptText; input.focus(); updateModeHelp(); };
+      btn.onclick=()=>{ input.value=promptText; input.focus(); updateModeHelp(); if(lensMedia&&lensMedia.matches) setLensCollapsed(true); };
       starterRow.append(btn);
     });
   }
   function updateModeHelp(){
     const pinned=activeMode!=='auto';
     const current=currentTurnMode();
+    const label=lensStatusLabel(current,pinned);
     input.placeholder=current.id==='act'?'What do you do?':'Add details for '+current.label.toLowerCase()+'.';
-    modeHelp.replaceChildren(document.createTextNode((pinned?'Pinned: '+current.label:'Auto -> '+current.label)+' - '+current.hint+'.'));
+    modeHelp.replaceChildren(document.createTextNode(label+' - '+current.hint+'.'));
+    lensToggle.textContent='Lens: '+label;
+    lensToggle.setAttribute('aria-expanded',lensCollapsed?'false':'true');
     drawStarters(current);
   }
   function queueModeHelp(){
@@ -11876,9 +11926,16 @@ async function campPlay(host, name){
   input.addEventListener('input', queueModeHelp);
   personaSel.onchange=()=>{ drawTools(); drawStarters(); };
   groundingSel.onchange=drawTools;
+  lensToggle.onclick=()=>setLensCollapsed(!lensCollapsed);
+  if(lensMedia){
+    const syncLensMedia=e=>setLensCollapsed(!!e.matches);
+    if(typeof lensMedia.addEventListener==='function') lensMedia.addEventListener('change',syncLensMedia);
+    else if(typeof lensMedia.addListener==='function') lensMedia.addListener(syncLensMedia);
+  }
   sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; updateModeHelp(); runTurn(v); };
   sceneBtn.onclick=()=>{ runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.','scene'); };
 
+  applyLensCollapse();
   drawModeRow(); drawTools(); drawTranscript();
   host.replaceChildren(
     h('div',{class:'play-shell'},
@@ -11902,11 +11959,7 @@ async function campPlay(host, name){
           ),
           tablePanel
         ),
-        h('section',{class:'play-chat-stack'},
-          groundingLine,
-          h('div',{class:'play-transcript-card'}, transcript),
-          h('div',{class:'play-input-card'}, modeRow, modeHelp, starterRow, input, h('div',{class:'play-action-row'}, sendBtn, sceneBtn, status))
-        )
+        chatStack
       )
     )
   );
