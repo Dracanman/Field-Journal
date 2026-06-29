@@ -155,7 +155,9 @@
      (the calm budget lives elsewhere; nothing here animates or transitions). */
   .view-stage{ display:grid; grid-template-columns:minmax(0,1fr) minmax(238px,300px); gap:18px; align-items:start; }
   .view-main{ min-width:0; }
-  .view-rail{ display:grid; gap:12px; align-content:start; position:sticky; top:14px; }
+  /* stick the rail BELOW the sticky top bar (position:sticky;top:0; ~64px tall) so it
+     never scrolls up under the bar. */
+  .view-rail{ display:grid; gap:12px; align-content:start; position:sticky; top:72px; }
   .rail-card{
     background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:12px; padding:13px 14px;
     -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
