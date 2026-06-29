@@ -1,7 +1,7 @@
 /* The Vael Field Journal — service worker (cache-first app shell, offline-capable).
    Canon/GitHub requests are never cached; they must stay live. */
 <<<<<<< HEAD
-const CACHE = 'vfj-a45022f0';
+const CACHE = 'vfj-0791065d';
 =======
 const CACHE = 'vfj-479a2d74';
 >>>>>>> f701ff3 (feat-slice-13-button-grammar)

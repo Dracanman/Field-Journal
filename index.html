@@ -1181,9 +1181,34 @@
     border-color:var(--accent); box-shadow:0 10px 22px -22px var(--accent);
   }
 
-  /* cards & tiles: lift on the sky, glow softly on hover */
+  /* cards & tiles: lift on the sky, glow softly on hover. Motion is interaction-only
+     (calm budget) — the surfaces only move when you touch them. */
+  .pick, .space-tile, .navbtn, .studio-tabs .tab{
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
   .pick:hover, .space-tile:hover{
+    transform:translateY(-2px);
     box-shadow:0 16px 34px -18px var(--glow), 0 0 0 1px var(--glass-border);
+  }
+
+  /* ---- opt-in "generous atmospherics" (body.fx-rich, off by default) ------ */
+  /* one extra ambient layer: slow-drifting light motes, behind all content */
+  body.fx-rich::after{
+    content:""; position:fixed; inset:0; z-index:-1; pointer-events:none; opacity:.55;
+    background:
+      radial-gradient(2px 2px at 18% 28%, rgba(255,255,255,.75), transparent 60%),
+      radial-gradient(2px 2px at 72% 62%, rgba(150,190,255,.55), transparent 60%),
+      radial-gradient(1.5px 1.5px at 46% 82%, rgba(255,255,255,.55), transparent 60%),
+      radial-gradient(1.5px 1.5px at 88% 22%, rgba(150,190,255,.5), transparent 60%);
+    background-repeat:no-repeat;
+    animation:fx-motes 19s ease-in-out infinite alternate;
+  }
+  @keyframes fx-motes{ from{ transform:translate3d(0,0,0); } to{ transform:translate3d(6px,-14px,0); } }
+  /* live/active accents breathe a little — glow stays on meaningful elements only */
+  body.fx-rich .glow-accent{ animation:fx-glow-pulse 4.6s ease-in-out infinite; }
+  @keyframes fx-glow-pulse{
+    0%,100%{ box-shadow:0 0 18px -8px var(--accent,var(--glow)); }
+    50%{ box-shadow:0 0 26px -3px var(--accent,var(--glow)); }
   }
 
   /* the AI answer reads as a pane of sky-glass — pairs with streaming text */
@@ -1209,9 +1234,13 @@
   /* ---- respect reduced-motion: hold everything still --------------------- */
   @media (prefers-reduced-motion:reduce){
     body{ animation:none; }
+    /* OS reduce-motion overrides the .fx-rich ceiling and all interaction motion —
+       meaning never depends on motion; everything holds still. */
+    body.fx-rich::after{ animation:none; }
+    body.fx-rich .glow-accent{ animation:none; }
     .stream-text .chunk{ animation:none; }
     .stream-text .cursor{ animation:none; }
-    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; }
+    *{ animation-duration:.001ms !important; animation-iteration-count:1 !important; transition-duration:.001ms !important; }
   }
   /* ---------- print ---------- */
   .book-stage{ display:none; }
@@ -2612,11 +2641,12 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'last', syncOnOpen:false, fxRich:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
   merged.openTo=d.openTo==='frontdoor'?'frontdoor':'last';
+  merged.fxRich=!!d.fxRich;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -2783,6 +2813,7 @@ function moreMenu(){
     advanced?item('☁ My file', ()=>openGitHubPanel()):null,
     advanced?item('⚙ Engine', ()=>openEngineSettings()):null,
     item('⌂ On open', ()=>openOpenToSettings()),
+    item((DB.fxRich?'✦ Atmospherics: on':'✧ Atmospherics: off'), ()=>setAtmospherics(!DB.fxRich)),
     item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
     item('⇄ Switch space', ()=>switchProfileSheet()),
@@ -3552,7 +3583,13 @@ function applyMode(){ const b=document.body; b.classList.remove('mode-simple','m
   b.classList.add(cls);
   const advanced = DB.profile!=='maker';   // worldbuilder + game + apprentice always see the full toolset
   b.classList.add((advanced || DB.mode==='full')?'mode-full':'mode-simple');
+  // Aliveness ceiling: .fx-rich opts into extra ambient motion (drifting motes, glow
+  // pulse). OS reduce-motion still overrides it in CSS — meaning never depends on motion.
+  b.classList.toggle('fx-rich', !!DB.fxRich);
 }
+// Opt-in "generous atmospherics" — a device-local visual preference (not synced, like mode).
+function setAtmospherics(on){ DB.fxRich=!!on; save(); applyMode();
+  toast(DB.fxRich? 'Atmospherics on — the sky breathes a little.' : 'Atmospherics calm — motion only when you act.'); }
 // Gating is pure CSS on the body class, so a mode switch only needs to flip the class
 // and refresh the top bar's label — no view re-render, so in-progress edits are kept.
 function setMode(m){ DB.mode=m; save(); applyMode(); if($app.firstChild) $app.replaceChild(topbar(), $app.firstChild); toast(m==='full'? 'Full kit — everything’s here.' : 'Cozy mode — just the essentials.'); }
