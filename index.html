@@ -702,6 +702,9 @@
   .play-mode-more summary:hover{ border-color:var(--gold); color:var(--ink); }
   .play-mode-more-list{ display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
   .play-mode-help{ color:var(--hint); font-size:13px; font-style:italic; margin:-1px 0 1px; }
+  .play-starters{ display:flex; align-items:center; flex-wrap:wrap; gap:7px; }
+  .play-starters:empty{ display:none; }
+  .play-starters .hint{ font-size:13px; }
   .play-tools{ display:grid; grid-template-columns:1fr; gap:8px; }
   .play-tool-card{
     border:1px solid #e4d8bc; border-radius:10px; background:var(--paper-card);
@@ -3967,10 +3970,14 @@ async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!met
   text=text.replace(/^﻿/,'');   // strip a UTF-8 BOM if present
   return { text, sha:meta.sha }; }
 // Only the *shareable* journal travels to the repo — never device-only flags
-// (token, engine profiles, assistant personas, mode, profile, seenIntro, the GitHub config). That way
-// settings changes never enter a repo payload, and an unchanged journal produces
-// an identical payload we can skip.
-function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault() }; }
+// (token, engine profiles, mode, profile, seenIntro, the GitHub config). Custom
+// assistant personas are shareable so the same table hats can follow a backup or
+// another device.
+function assistantSyncSettings(value){
+  const fallbackId=typeof ASSISTANT_DEFAULT_PERSONA_ID==='string'?ASSISTANT_DEFAULT_PERSONA_ID:'worldbuilder';
+  return typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(value):(value&&typeof value==='object'?value:{activePersonaId:fallbackId,customPersonas:[]});
+}
+function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault(), assistant:assistantSyncSettings(DB.assistant) }; }
 let syncTimer=null, syncing=false, _lastSyncedJSON=null;
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
 async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return;
@@ -3995,7 +4002,7 @@ function stripForBackup(db){
   if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
   delete d.campaignScratch;
   delete d.usageLedger;
-  delete d.assistant;
+  d.assistant=assistantSyncSettings(d.assistant);
   if(d.engines){
     const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
     d.engines={
@@ -4008,7 +4015,7 @@ function stripForBackup(db){
     };
   }
   return d;
-} // never write tokens, engine keys, engine endpoints, engine models, usage ledger, assistant personas, or session scratch into a backup
+} // never write tokens, engine keys, engine endpoints, engine models, usage ledger, or session scratch into a backup
 // merge an incoming journal (from the repo or a backup file) into DB. Additive for new
 // work (existing items win, new ones appended by id), but deletions are honored via
 // tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
@@ -4024,6 +4031,14 @@ function mergeIncoming(inc){
   DB.elements=mergeBy(DB.elements, inc.elements, 'key');
   DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
   DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id').filter(s=>!(s && tomb[s.id]));
+  if('assistant' in inc){
+    const local=assistantSyncSettings(DB.assistant), incoming=assistantSyncSettings(inc.assistant);
+    const seen={}, custom=[];
+    (local.customPersonas||[]).concat(incoming.customPersonas||[]).forEach(p=>{
+      if(p&&p.id&&!seen[p.id]){ seen[p.id]=true; custom.push(p); }
+    });
+    DB.assistant=assistantSyncSettings({activePersonaId:incoming.activePersonaId||local.activePersonaId, customPersonas:custom});
+  }
 }
 async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
@@ -4036,8 +4051,8 @@ function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).fo
 
 /* ---------- local backup file (a safety net against data eviction) --------- */
 // the journal travels with its images inline; device secrets (GitHub token,
-// engine key, engine endpoint, engine model, usage ledger, assistant personas)
-// are never written into a backup.
+// engine key, engine endpoint, engine model, usage ledger) are never written
+// into a backup.
 function exportBackup(){
   const data=JSON.stringify(stripForBackup(DB), null, 1);
   const b=new Blob([data],{type:'application/json'});
@@ -11329,6 +11344,7 @@ campResume=async function(host,name){
 const CAMP_PLAY_LOG_PREFIX='CAMPAIGN PLAY LOG';
 const CAMP_PLAY_MAX_TOKENS=1024;
 const CAMP_PLAY_DEFAULT_PERSONA_ID='gm';
+const CAMP_PLAY_DEFAULT_MODE_ID='auto';
 const CAMP_PLAY_PERSONA_ORDER=['gm','worldbuilder','continuity','scribe'];
 const CAMP_PLAY_AUTO_MODE={id:'auto', label:'Auto lens', hint:'Detect per send'};
 const CAMP_PLAY_MODES=[
@@ -11336,7 +11352,15 @@ const CAMP_PLAY_MODES=[
   {id:'ask', label:'Table question', hint:'Plain answer', temperature:0.25, prompt:'The user is asking an out-of-fiction table question. Answer clearly, separate canon facts from table suggestions, then offer a practical next step.'},
   {id:'scene', label:'Frame scene', hint:'Set stakes', temperature:0.8, prompt:'Frame the current scene with sensory detail, immediate stakes, visible choices, and one or two quiet world pressures. End with a grounded prompt for the player.'},
   {id:'oracle', label:'Oracle options', hint:'2-3 possibilities', temperature:0.85, prompt:'Act as an oracle for uncertain table direction. Offer 2-3 plausible answers, mark which are canon-grounded and which are table suggestions, and do not force one answer.'},
+  {id:'fate', label:'Yes / No oracle', hint:'Lean + twist', prompt:'Answer one uncertain yes/no table question as an oracle. Open with a clear Yes or No that leans on how likely it felt, then add one unexpected twist or detail that complicates it. Keep it felt, not numeric — no dice or percentages in the prose. Mark canon-grounded parts versus table suggestion.'},
+  {id:'interrupt', label:'Something intrudes', hint:'The world acts', prompt:'Introduce an unprompted complication from the living world: a faction move, a spirit\'s attention, a thread escalating, weather, hunger, or a rumor spreading. Tie it to an existing live thread or canon tension when you can, render it as fiction, and end with the pressure it puts on the player. Do not resolve the player\'s response.'},
+  {id:'reaction', label:'NPC reaction', hint:'How they take it', prompt:'Gauge how a present NPC responds, weighing their bonds, status, and what just happened from the campaign cast and live state. Give a disposition (warmer, guarded, wavering, hostile) and one line of in-character posture or words. Never decide the player character\'s reply.'},
+  {id:'discover', label:'What do I find', hint:'Grounded reveal', prompt:'Reveal what the player discovers here, drawn from promoted canon, the Knowledge Boundary, and live threads. Offer one solid grounded detail plus one open hook. Mark canon facts versus table suggestion, and never invent promoted canon — name the uncertainty instead.'},
   {id:'consequence', label:'Cost / pressure', hint:'Complicate fallout', temperature:0.75, prompt:'Focus on consequences that follow from the fiction. Prefer success-at-cost, pressure clocks, changed NPC posture, resource strain, or revealed complications over binary pass/fail.'},
+  {id:'spark', label:'Spark', hint:'Evocative seed', prompt:'Offer one or two evocative word-pairs or images (an action and a subject) as raw inspiration, then a one-line read of what each could mean in this scene. Keep it open and suggestive, not a decision — this is a creative seed for the player to interpret.'},
+  {id:'twist', label:'Raise the stakes', hint:'Tighten a clock', prompt:'Escalate the tension: advance a pressure clock, deepen a complication, or reveal that something is worse or closer than it seemed. Prefer pressure over damage. End with the harder choice the player now faces.'},
+  {id:'montage', label:'Montage / downtime', hint:'Compress time', prompt:'Compress quieter time into a short montage: what passes, what is gained or spent, what shifts in bonds, resources, and the world. Surface one small consequence or seed from the downtime, then return us to a live moment with a choice.'},
+  {id:'omen', label:'Foreshadow', hint:'Plant a seed', prompt:'Plant a quiet omen tied to a live thread or an unresolved canon tension. Keep it subtle and sensory — something the player will recognize later. Do not pay it off now; just seed it.'},
   {id:'recap', label:'Scene recap', hint:'Where things stand', temperature:0.3, prompt:'Summarize the recent situation for play: what is happening, what matters, open threads, current pressure, and the next playable choice.'},
   {id:'continuity', label:'Continuity check', hint:'Find gaps', temperature:0.2, prompt:'Check continuity against promoted canon and the live campaign state. Name contradictions, uncertainty, and missing support instead of smoothing them over.'},
   {id:'scribe', label:'Ledger note', hint:'Capture cleanly', temperature:0.35, prompt:'Shape the material into ledger-ready campaign notes. Keep it CAMPAIGN-ONLY unless the user later promotes it through the canon pipeline.'},
@@ -11408,12 +11432,24 @@ function campPlayDetectMode(text){
   if(/\b(?:recap|where were we|remind me|catch me up)\b/.test(s)) return 'recap';
   if(/\b(?:set the scene|begin|start the session)\b/.test(s)) return 'scene';
   if(/\b(?:continuity|contradict|contradiction|conflict|canon check|does this break canon)\b/.test(s)) return 'continuity';
+  if(/\b(?:montage|downtime|compress time|pass some time|time passes)\b/.test(s)) return 'montage';
+  if(/\b(?:foreshadow|omen|plant a seed|quiet sign)\b/.test(s)) return 'omen';
+  if(/\b(?:raise the stakes|pay the price|tighten|escalate|worse than it seemed)\b/.test(s)) return 'twist';
+  if(/\b(?:something intrudes|interrupt|intrusion|the world acts|random event|complication arrives)\b/.test(s)) return 'interrupt';
+  if(/\b(?:spark|meaning spark|evocative seed|inspiration seed)\b/.test(s)) return 'spark';
+  if(/\b(?:how (?:does|do|would|will) .+ react|how (?:does|do|would|will) .+ take it|npc reaction|their reaction|her reaction|his reaction|warmer|guarded|wavering|hostile)\b/.test(s)) return 'reaction';
 
   // A named roll plus danger/action language opts into the draft resolution lens.
   if(/\broll\b/.test(s) && /\b(?:attack|fight|strike|shoot|dodge|escape|sneak|hide|climb|jump|force|break|pick|steal|persuade|deceive|resist|risk)\b/.test(s)) return 'resolve3d6';
 
   // Rules and permission questions are table questions, not oracle uncertainty.
   if(/\b(?:what'?s the rule|what is the rule|how does .+ work|can i\b|rules?)\b/.test(s)) return 'ask';
+
+  // Search and reveal requests want one grounded detail plus an open hook.
+  if(/\b(?:what do i find|what can i find|what is here|what's here|i search|i look around|look around|search the|search for|look for clues|investigate)\b/.test(s)) return 'discover';
+
+  // Bare yes/no uncertainty is a binary fate question, not a multi-option oracle.
+  if(/^(?:is|are|was|were|do|does|did|will|would|should|could|has|have|had)\b.+\?$/.test(s)) return 'fate';
 
   // Uncertain world-facing probes get options instead of a single forced answer.
   if(/\b(?:what could|what might|is there|maybe|perhaps|odds)\b/.test(s)) return 'oracle';
@@ -11422,6 +11458,43 @@ function campPlayDetectMode(text){
   if(/^(?:i\b|i'm going to\b|we\b|draw\b|attack\b|move\b|step\b|go\b|open\b|take\b|ask\b|tell\b|search\b|look\b|listen\b|wait\b|cast\b|strike\b|run\b|hide\b|sneak\b|climb\b|push\b|pull\b)/.test(s)) return 'act';
 
   return 'act';
+}
+
+function campPlayModeStarterPrompts(mode){
+  const m=mode&&mode.id?mode:campPlayModeById(mode);
+  const prompts={
+    act:['I step forward and...','I look for a way to...'],
+    ask:['What does the table know about...','Can I do this with what we have established?'],
+    scene:['Set the scene from the live state.','Start the session and give me my options.'],
+    oracle:['What might be true here?','Give me 2-3 plausible options.'],
+    fate:['Is this true here?','Does the world answer yes or no?'],
+    interrupt:['Something intrudes from the living world.'],
+    reaction:['How does this NPC react?'],
+    discover:['What do I find here?','I search the area for what matters.'],
+    consequence:['What cost or pressure follows from this?'],
+    spark:['Give me an evocative spark for this scene.'],
+    twist:['Raise the stakes from the live threads.'],
+    montage:['Compress this downtime into a short montage.'],
+    omen:['Plant a quiet omen tied to a live thread.'],
+    recap:['Catch me up on where we are.','Remind me what matters right now.'],
+    continuity:['Check this against canon and the live campaign state.'],
+    scribe:['Turn this into a clean campaign ledger note.'],
+    npc:['Have this NPC answer in character.'],
+    ooc:['Out of character: help me think through the options.'],
+    resolve3d6:['Roll to resolve this risky action.'],
+  };
+  return prompts[m.id]||[];
+}
+
+function campPlayStarterPrompts(persona, mode){
+  const seen={}, out=[];
+  const personaPrompts=typeof assistantNormalizeStarterPrompts==='function'?assistantNormalizeStarterPrompts(persona&&persona.starterPrompts):[];
+  personaPrompts.concat(campPlayModeStarterPrompts(mode)).forEach(prompt=>{
+    prompt=String(prompt||'').trim();
+    const key=prompt.toLowerCase();
+    if(prompt&&!seen[key]){ seen[key]=true; out.push(prompt); }
+  });
+  return out.slice(0,6);
 }
 
 function campPlayPersonaOptions(personas){
@@ -11640,6 +11713,7 @@ async function campPlay(host, name){
   );
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
+  const starterRow=h('div',{class:'play-starters'});
   const tablePanel=h('div',{class:'play-tools'});
   const groundingLine=h('div',{class:'play-grounding hint'},'Grounded on: (none yet)');
   const transcript=h('div',{class:'play-log'});
@@ -11647,7 +11721,7 @@ async function campPlay(host, name){
   const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
   const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
   const status=h('div',{class:'sync-status'});
-  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode='auto';
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID;
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -11693,7 +11767,7 @@ async function campPlay(host, name){
     transcript.scrollTop=transcript.scrollHeight;
   }
   function drawModeRow(){
-    const commonIds={auto:true,act:true,ask:true,scene:true,oracle:true,recap:true};
+    const commonIds={auto:true,act:true,ask:true,scene:true,oracle:true,recap:true,fate:true,interrupt:true,reaction:true,discover:true};
     const renderChip=(mode,isAuto)=>{
       const pinned=!isAuto && mode.id===activeMode;
       const on=isAuto?activeMode==='auto':pinned;
@@ -11717,11 +11791,28 @@ async function campPlay(host, name){
     );
     updateModeHelp();
   }
+  function currentTurnMode(){
+    const pinned=activeMode!=='auto';
+    return pinned?campPlayModeById(activeMode):campPlayModeById(campPlayDetectMode(input.value));
+  }
+  function drawStarters(mode){
+    const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
+    const prompts=campPlayStarterPrompts(persona,mode||currentTurnMode());
+    starterRow.replaceChildren();
+    if(!prompts.length) return;
+    starterRow.append(h('span',{class:'hint'},'Quick prompts'));
+    prompts.forEach(promptText=>{
+      const btn=h('button',{class:'chip dash',type:'button'},promptText);
+      btn.onclick=()=>{ input.value=promptText; input.focus(); updateModeHelp(); };
+      starterRow.append(btn);
+    });
+  }
   function updateModeHelp(){
     const pinned=activeMode!=='auto';
-    const current=pinned?campPlayModeById(activeMode):campPlayModeById(campPlayDetectMode(input.value));
+    const current=currentTurnMode();
     input.placeholder=current.id==='act'?'What do you do?':'Add details for '+current.label.toLowerCase()+'.';
     modeHelp.replaceChildren(document.createTextNode((pinned?'Pinned: '+current.label:'Auto -> '+current.label)+' - '+current.hint+'.'));
+    drawStarters(current);
   }
   function queueModeHelp(){
     if(modeHelpTimer) clearTimeout(modeHelpTimer);
@@ -11783,7 +11874,7 @@ async function campPlay(host, name){
   }
 
   input.addEventListener('input', queueModeHelp);
-  personaSel.onchange=drawTools;
+  personaSel.onchange=()=>{ drawTools(); drawStarters(); };
   groundingSel.onchange=drawTools;
   sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; updateModeHelp(); runTurn(v); };
   sceneBtn.onclick=()=>{ runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.','scene'); };
@@ -11814,7 +11905,7 @@ async function campPlay(host, name){
         h('section',{class:'play-chat-stack'},
           groundingLine,
           h('div',{class:'play-transcript-card'}, transcript),
-          h('div',{class:'play-input-card'}, modeRow, modeHelp, input, h('div',{class:'play-action-row'}, sendBtn, sceneBtn, status))
+          h('div',{class:'play-input-card'}, modeRow, modeHelp, starterRow, input, h('div',{class:'play-action-row'}, sendBtn, sceneBtn, status))
         )
       )
     )
