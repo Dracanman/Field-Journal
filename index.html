@@ -147,6 +147,41 @@
   .view-header .divider{ margin:10px 0 4px; }
   .view-header .subtitle{ margin:2px 0 0; }
   .pagefoot{ text-align:center; color:var(--green); font-style:italic; font-size:14px; margin-top:26px; opacity:.85; }
+
+  /* Composed wide-screen layout: content + a static at-a-glance side-rail. A generic
+     version of the play-table-stage (campaign.css) for non-Play views, so an iPad/desktop
+     reads as composed instead of a lone centered column. Collapses to one column <=780px,
+     where the rail drops BELOW the content. The rail holds static widgets only — no motion
+     (the calm budget lives elsewhere; nothing here animates or transitions). */
+  .view-stage{ display:grid; grid-template-columns:minmax(0,1fr) minmax(238px,300px); gap:18px; align-items:start; }
+  .view-main{ min-width:0; }
+  .view-rail{ display:grid; gap:12px; align-content:start; position:sticky; top:14px; }
+  .rail-card{
+    background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:12px; padding:13px 14px;
+    -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
+    backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
+  }
+  @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
+    .rail-card{ background:rgba(255,255,255,.86); }
+  }
+  .rail-card .rail-title{ margin:0 0 9px; font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); }
+  .rail-stats{ display:grid; gap:9px; }
+  .rail-stat{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .rail-stat .num{ font-size:23px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1; }
+  .rail-stat .lbl{ color:var(--hint); font-size:13px; font-style:italic; }
+  .rail-list{ display:grid; gap:5px; }
+  .rail-link{
+    text-align:left; background:transparent; border:0; border-radius:8px; padding:6px 8px; min-width:0;
+    color:var(--ink-soft); font:inherit; font-size:14px; cursor:pointer;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .rail-link:hover{ background:var(--glass-bg); color:var(--ink); }
+  .rail-empty{ margin:0; color:var(--hint); font-style:italic; font-size:13px; line-height:1.45; }
+  @media (max-width:780px){
+    .view-stage{ grid-template-columns:1fr; }
+    .view-main{ order:1; }
+    .view-rail{ order:2; position:static; top:auto; }
+  }
   /* ---------- home ---------- */
   .cover{ text-align:center; padding:30px 10px 24px; }
   .cover .emblem{ width:150px; height:150px; color:var(--green); margin:14px auto 18px; }
@@ -2842,17 +2877,27 @@ function viewHome(){
     h('div',{class:'tag'},'a cozy little workshop for the rooted folk of the Godling Universe'),
     h('div',{class:'tag hand', style:{fontSize:'22px', color:'var(--green)', marginTop:'10px'}}, '“same trunk, different branches”'),
   ));
-  wrap.append(shelf('The Field Journal — make a little world by hand', 'field'));
-  wrap.append(shelf("The Worldmaker's Pages — invent new corners of the world", 'world'));
-
-  const recent = DB.creations.slice(-6).reverse();
-  if (recent.length){
-    const s = h('div',{class:'shelf'}, h('h3',null,'Lately in your journal'));
-    const g = h('div',{class:'gal-grid'});
-    recent.forEach(c=> g.append(galCard(c)));
-    s.append(g); wrap.append(s);
-  }
+  // Shelves are the main column; an at-a-glance rail composes the width on iPad/desktop and
+  // drops below the shelves on phone. The rail replaces the old inline "Lately" grid.
+  const main = h('div',null,
+    shelf('The Field Journal — make a little world by hand', 'field'),
+    shelf("The Worldmaker's Pages — invent new corners of the world", 'world'));
+  wrap.append(viewStage(main, homeRail()));
   return wrap;
+}
+// At-a-glance rail for Home: live counts from this device's journal + a "lately" jump list.
+// All synchronous (no network) and static (no motion) — within the calm budget.
+function homeRail(){
+  const n=DB.creations.length, favs=(DB.favorites||[]).length, colls=(DB.collections||[]).length;
+  const recent=DB.creations.slice(-6).reverse();
+  return [
+    railCard('At a glance', h('div',{class:'rail-stats'},
+      railStat(n, n===1?'piece':'pieces'),
+      railStat(favs, 'favorites'),
+      railStat(colls, colls===1?'collection':'collections'))),
+    railCard('Lately', railLinks(recent.map(c=>({label:creationTitle(c), onclick:()=>openCreation(c)})),
+      'Nothing in your journal yet — pick a card to begin.')),
+  ];
 }
 // gentle shelf structure — like sits with like. The Naming Tree is a special pick
 // (not a worksheet), folded in via the __naming pseudo-id.
@@ -2977,6 +3022,41 @@ function framed(title, subtitle, foot){
     foot? h('div',{class:'pagefoot'}, foot): null,
   );
   return f;
+}
+
+/* ---------- composed view header + adaptive content/rail (Slice 16) -------- */
+// Shared display title · divider · italic subtitle. Same divider markup as framed(),
+// for views that compose their own shell instead of using the sprig frame.
+function viewHeader(title, subtitle){
+  return h('div',{class:'view-header'},
+    h('h1',{class:'display'}, title),
+    h('div',{class:'divider'}, h('span',{class:'o'}), h('span',{class:'rule'}), h('span',{class:'dot'}), h('span',{class:'rule'}), h('span',{class:'o'})),
+    subtitle? h('div',{class:'subtitle'}, subtitle): null);
+}
+// Adaptive two-column stage: content left, a static at-a-glance rail right; collapses to one
+// column (rail below) <=780px in CSS. With no rail it returns the content untouched, so a
+// narrow or rail-less view stays a plain single column.
+function viewStage(main, rail){
+  const cards = rail==null ? [] : (Array.isArray(rail)? rail.filter(Boolean) : [rail]);
+  if(!cards.length) return main;
+  return h('div',{class:'view-stage'},
+    h('div',{class:'view-main'}, main),
+    h('aside',{class:'view-rail', 'aria-label':'At a glance'}, ...cards));
+}
+// A glass panel for the rail: optional title + arbitrary children. Static only — no motion.
+function railCard(title, ...kids){
+  return h('div',{class:'rail-card'}, title? h('p',{class:'rail-title'}, title): null, ...kids);
+}
+// A labelled count for the rail (big number · italic label).
+function railStat(num, label){
+  return h('div',{class:'rail-stat'}, h('span',{class:'num'}, String(num)), h('span',{class:'lbl'}, label));
+}
+// A compact list of tap-through links for the rail. items=[{label,onclick}].
+function railLinks(items, emptyText){
+  items=(items||[]).filter(Boolean);
+  if(!items.length) return h('p',{class:'rail-empty'}, emptyText||'Nothing yet.');
+  return h('div',{class:'rail-list'}, ...items.map(it=>
+    h('button',{class:'rail-link', type:'button', title:it.label, onclick:it.onclick}, it.label)));
 }
 
 /* ---------- doodle component ---------------------------------------------- */
@@ -3725,8 +3805,7 @@ function viewSpaces(){
     h('section',{class:'spaces-intro'},
       svgUse('ic-seedling','spaces-emblem'),
       h('p',{class:'spaces-kicker'},'The Vael Field Journal'),
-      h('h1',{class:'display'},'Choose a space'),
-      h('p',{class:'hint'},'One front door, four rooms. Your work stays where it is when you move between them.')),
+      viewHeader('Choose a space', 'One front door, four rooms. Your work stays where it is when you move between them.')),
     h('div',{class:'spaces-grid'},...SPACES.map(spaceTile)),
     h('p',{class:'spaces-foot hand'},'same trunk, different branches'));
 }
@@ -5885,7 +5964,8 @@ function viewStudio(tab, params){
     tabs.append(h('button',{class:'tab'+(tab===k?' on':''), 'aria-pressed':(tab===k)?'true':'false', onclick:()=>go('studio',{tab:k})}, label)));
   body.append(tabs);
   body.append(h('p',{class:'hint', style:{textAlign:'center', margin:'8px auto 16px', maxWidth:'52ch'}}, cur[2]));
-  const host=h('div',null); body.append(host);
+  const host=h('div',null);
+  body.append(viewStage(host, studioRail()));
   if(tab==='browse') studioBrowse(host);
   else if(tab==='threads') studioThreads(host);
   else if(tab==='inbox') studioInbox(host);
@@ -5895,6 +5975,17 @@ function viewStudio(tab, params){
   else if(tab==='graph') studioGraph(host);
   else if(tab==='board') studioBoard(host);
   return f;
+}
+// Static context rail for the Studio (wide screens): the governance discipline at a glance,
+// plus the device tools a worldbuilder reaches for often. Synchronous; no motion.
+function studioRail(){
+  return [
+    railCard('Canon Studio', h('p',{class:'rail-empty'}, 'Idea → Canon Card → triage → promoted into a domain. Nothing becomes canon until it is carded, checked, and deliberately promoted.')),
+    railCard('Tools', railLinks([
+      {label:'☁ My file', onclick:()=>openGitHubPanel()},
+      {label:'⚙ Engine & AI', onclick:()=>openEngineSettings()},
+    ])),
+  ];
 }
 function studioBrowse(host){
   const cfg=ghCfg();
@@ -9316,16 +9407,27 @@ function viewCampaigns(){
         h('button',{class:'navbtn ghost', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
     return f;
   }
-  const cfg=ghCfg(); const host=h('div',null); body.append(host); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading your campaigns…'));
+  const cfg=ghCfg(); const host=h('div',null);
+  // wide-screen rail: context + live current/archived counts (filled after the load below).
+  const curNum=h('span',{class:'num'},'·'), archNum=h('span',{class:'num'},'·');
+  body.append(viewStage(host, [
+    railCard('The Game', h('p',{class:'rail-empty'}, 'Your runs — pick up where you left off. Play happens with the GM; the app keeps the save.')),
+    railCard('At a glance', h('div',{class:'rail-stats'},
+      h('div',{class:'rail-stat'}, curNum, h('span',{class:'lbl'}, 'current')),
+      h('div',{class:'rail-stat'}, archNum, h('span',{class:'lbl'}, 'archived')))),
+  ]));
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading your campaigns…'));
   (async()=>{ try{
     const names=await listCampaigns(cfg); const rows=[];
     for(const name of names){ let status=''; try{ const files=await campaignFiles(cfg,name); if(files.tracker){ const r=await ghGetText(cfg, files.tracker); if(r) status=parseTracker(r.text).status; } }catch(e){} rows.push({name,status,archived:trackerIsArchived(status)}); }
+    const current=rows.filter(r=>!r.archived), arch=rows.filter(r=>r.archived);
+    curNum.textContent=String(current.length); archNum.textContent=String(arch.length);
     const wrap=h('div',null,
       h('div',{class:'toolrow', style:{justifyContent:'center', marginBottom:'12px'}},
         h('button',{class:'navbtn primary', onclick:()=>startCampaignModal()}, '+ Start a new campaign'),
         h('button',{class:'navbtn ghost', onclick:()=>go('gameDemo')}, 'See an example (demo)')));
-    wrap.append(campaignGroup('Current', rows.filter(r=>!r.archived), 'No active campaigns yet — start one above.'));
-    const arch=rows.filter(r=>r.archived); if(arch.length) wrap.append(campaignGroup('Archived', arch, ''));
+    wrap.append(campaignGroup('Current', current, 'No active campaigns yet — start one above.'));
+    if(arch.length) wrap.append(campaignGroup('Archived', arch, ''));
     host.replaceChildren(wrap);
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); } })();
   return f;
