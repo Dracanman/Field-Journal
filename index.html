@@ -661,7 +661,7 @@
     display:grid; gap:4px; color:var(--gold); font-size:12px; font-style:normal;
     font-weight:800; text-transform:uppercase;
   }
-  .play-persona,.play-engine{
+  .play-persona,.play-engine,.play-grounding-mode{
     width:min(280px,72vw); border:1px solid var(--gold-soft); border-radius:8px;
     background:var(--paper-card); color:var(--ink); font:inherit; padding:7px 9px;
     min-height:38px;
@@ -688,10 +688,19 @@
     text-align:left; box-shadow:0 4px 12px -14px rgba(var(--shadow)/.35);
   }
   .play-mode-chip.on{ border-color:var(--green); background:#edf3e9; color:var(--green); }
+  .play-mode-chip.pinned{ box-shadow:inset 0 0 0 2px rgba(62,107,79,.16), 0 4px 12px -14px rgba(var(--shadow)/.35); }
   .play-mode-chip:hover{ border-color:var(--gold); color:var(--ink); }
   .play-mode-title{ line-height:1.1; }
   .play-mode-chip small{ color:var(--hint); font-size:11px; font-weight:700; font-style:italic; line-height:1.1; }
   .play-mode-chip.on small{ color:#587461; }
+  .play-mode-more{ min-width:132px; }
+  .play-mode-more summary{
+    min-height:44px; box-sizing:border-box; border:1px solid #dacda8; border-radius:999px;
+    background:#fffdf7; color:var(--ink-soft); cursor:pointer; display:flex; align-items:center;
+    padding:7px 12px; font-size:13px; font-weight:800; touch-action:manipulation;
+  }
+  .play-mode-more summary:hover{ border-color:var(--gold); color:var(--ink); }
+  .play-mode-more-list{ display:flex; flex-wrap:wrap; gap:7px; margin-top:7px; }
   .play-mode-help{ color:var(--hint); font-size:13px; font-style:italic; margin:-1px 0 1px; }
   .play-tools{ display:grid; grid-template-columns:1fr; gap:8px; }
   .play-tool-card{
@@ -740,7 +749,7 @@
   @media (max-width:560px){
     .play-command-card,.play-transcript-card,.play-input-card{ border-radius:10px; }
     .play-head .usage-meter{ margin-left:0; width:100%; }
-    .play-control-row,.play-select-label,.play-persona,.play-engine{ width:100%; }
+    .play-control-row,.play-select-label,.play-persona,.play-engine,.play-grounding-mode{ width:100%; }
     .play-tools-wrap{ max-height:240px; }
     .play-log{ min-height:180px; max-height:48vh; }
   }
@@ -2367,17 +2376,18 @@ function assistantResolvePersona(id,settings){
   const list=assistantAllPersonas(settings);
   return list.find(p=>p.id===id)||list.find(p=>p.id===ASSISTANT_DEFAULT_PERSONA_ID)||list[0]||assistantNormalizePersona({id:ASSISTANT_DEFAULT_PERSONA_ID,label:'Canon Librarian',system:''},{builtIn:true});
 }
-function assistantPersonaGovernance(mode){
-  const m=assistantGroundingMode(mode);
+function assistantPersonaGovernance(mode, overrideMode){
+  const m=assistantGroundingMode(overrideMode||mode);
   return [
     'CANON GOVERNANCE:',
     'Promoted canon is the authority. The assistant never writes canon directly; every output is a suggestion until reviewed through the normal Draft or campaign-ledger path.',
     ASSISTANT_GROUNDING_TEXT[m]||ASSISTANT_GROUNDING_TEXT.balanced
   ].join('\n');
 }
-function assistantBuildPersonaSystem(persona,groundingSystem){
+function assistantBuildPersonaSystem(persona,groundingSystem,opts){
+  opts=opts||{};
   const p=assistantNormalizePersona(persona&&persona.id&&persona.builtIn?persona:persona||{},{builtIn:!!(persona&&persona.builtIn)});
-  return [p.system,assistantPersonaGovernance(p.groundingMode),String(groundingSystem||'').trim()].filter(Boolean).join('\n\n');
+  return [p.system,assistantPersonaGovernance(p.groundingMode,opts.groundingMode),String(groundingSystem||'').trim()].filter(Boolean).join('\n\n');
 }
 /* ---------- persistence (IndexedDB primary, localStorage mirror/fallback) --- */
 const KEY = 'vfj.v4';
@@ -6816,6 +6826,36 @@ function assistantChatOptions(engine){
   return out;
 }
 
+function assistantAdvertisedModels(engine){
+  const candidates=[engine&&engine.models, engine&&engine.availableModels, engine&&engine.modelChoices, engine&&engine.advertisedModels];
+  for(let i=0;i<candidates.length;i++){
+    if(Array.isArray(candidates[i])) return candidates[i].map(m=>String(m||'').trim()).filter(Boolean);
+  }
+  return [];
+}
+
+function assistantPersonaModelAllowed(persona, engine, advertisedModels){
+  const model=String(persona&&persona.model||'').trim();
+  if(!model) return false;
+  if(assistantIsLocalEngine(engine)) return true;
+  const choices=Array.isArray(advertisedModels)?advertisedModels:assistantAdvertisedModels(engine);
+  return choices.map(m=>String(m||'').trim()).includes(model);
+}
+
+function assistantPersonaModelFor(persona, engine, advertisedModels){
+  persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
+  return assistantPersonaModelAllowed(persona,engine,advertisedModels)?persona.model:'';
+}
+
+function assistantChatOptionsForRequest(engine, persona, opts){
+  const out=assistantChatOptions(engine), options=opts||{};
+  const personaTemp=assistantOptionalNumber(persona&&persona.temperature);
+  const turnTemp=assistantOptionalNumber(options.temperature);
+  if(personaTemp!==null) out.temperature=personaTemp;
+  if(turnTemp!==null) out.temperature=turnTemp;
+  return out;
+}
+
 function assistantPresetByIndex(index){
   const n=Number(index);
   return Number.isFinite(n)&&ENGINE_TASK_PRESETS[n]?ENGINE_TASK_PRESETS[n]:null;
@@ -6958,18 +6998,15 @@ function studioAssistant(host){
   }
   function applyPersonaDefaults(persona){
     persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
-    const engine=assistantEngineById(profiles,engineSel.value), patch={};
+    const engine=assistantEngineById(profiles,engineSel.value);
     if(persona.model&&(assistantIsLocalEngine(engine)||modelChoiceExists(persona.model))){
       ensureModelChoice(persona.model);
-      patch.model=persona.model;
     }
     if(persona.temperature!==''){
       tempUse.checked=true;
       temperatureIn.value=String(persona.temperature);
       refreshTemperatureControl();
-      patch.temperature=persona.temperature;
     }
-    if(Object.keys(patch).length) persistCurrentEngine(patch);
   }
   function renderStarterPrompts(persona){
     const prompts=assistantNormalizeStarterPrompts(persona&&persona.starterPrompts);
@@ -7198,7 +7235,7 @@ function studioAssistant(host){
         messages:[{role:'user',content:q}],
         model:assistantModelFor(state,engine),
         maxTokens:ASSISTANT_MAX_TOKENS
-      },assistantChatOptions(engine));
+      },assistantChatOptionsForRequest(engine,assistantPersonaById(state.personaId),{temperature:tempUse.checked?temperatureIn.value:''}));
       const result=await assistantStreamAi(engine,chat,onChunk);
       cursor.remove();
       state.question=q;
@@ -7261,6 +7298,7 @@ function studioAssistant(host){
     ),
     h('div',{class:'assistant-persona-section'},
       h('div',{class:'assistant-section-label'},'Persona'),
+      h('p',{class:'assistant-persona-meta hint'},'Persona sets the assistant voice and grounding; the current ask is what you want from this turn.'),
       personaGrid,
       personaMeta,
       h('div',{class:'assistant-actions'},customizeBtn,duplicateBtn,deletePersonaBtn),
@@ -11292,18 +11330,19 @@ const CAMP_PLAY_LOG_PREFIX='CAMPAIGN PLAY LOG';
 const CAMP_PLAY_MAX_TOKENS=1024;
 const CAMP_PLAY_DEFAULT_PERSONA_ID='gm';
 const CAMP_PLAY_PERSONA_ORDER=['gm','worldbuilder','continuity','scribe'];
+const CAMP_PLAY_AUTO_MODE={id:'auto', label:'Auto lens', hint:'Detect per send'};
 const CAMP_PLAY_MODES=[
-  {id:'act', label:'Player action', hint:'Resolve what I do', prompt:'The user is declaring a player action. Resolve uncertainty with consequences, opportunity, pressure, and a clear next situation. Do not decide the player character\'s intent or next action.'},
-  {id:'ask', label:'Table question', hint:'Plain answer', prompt:'The user is asking an out-of-fiction table question. Answer clearly, separate canon facts from table suggestions, then offer a practical next step.'},
-  {id:'scene', label:'Frame scene', hint:'Set stakes', prompt:'Frame the current scene with sensory detail, immediate stakes, visible choices, and one or two quiet world pressures. End with a grounded prompt for the player.'},
-  {id:'oracle', label:'Oracle options', hint:'2-3 possibilities', prompt:'Act as an oracle for uncertain table direction. Offer 2-3 plausible answers, mark which are canon-grounded and which are table suggestions, and do not force one answer.'},
-  {id:'consequence', label:'Cost / pressure', hint:'Complicate fallout', prompt:'Focus on consequences that follow from the fiction. Prefer success-at-cost, pressure clocks, changed NPC posture, resource strain, or revealed complications over binary pass/fail.'},
-  {id:'recap', label:'Scene recap', hint:'Where things stand', prompt:'Summarize the recent situation for play: what is happening, what matters, open threads, current pressure, and the next playable choice.'},
-  {id:'continuity', label:'Continuity check', hint:'Find gaps', prompt:'Check continuity against promoted canon and the live campaign state. Name contradictions, uncertainty, and missing support instead of smoothing them over.'},
-  {id:'scribe', label:'Ledger note', hint:'Capture cleanly', prompt:'Shape the material into ledger-ready campaign notes. Keep it CAMPAIGN-ONLY unless the user later promotes it through the canon pipeline.'},
-  {id:'npc', label:'NPC voice', hint:'Dialogue / posture', prompt:'Write NPC-facing dialogue or posture only where the campaign state supports it. Keep NPCs motivated by the scene, never omniscient, and avoid deciding the player character\'s response.'},
-  {id:'ooc', label:'Out of character', hint:'Table talk', prompt:'Stay out of character. Explain the table situation, options, risks, and likely consequences plainly.'},
-  {id:'resolve3d6', label:'Draft 3d6 roll', hint:'Unpromoted playtest', draftResolution:true, prompt:'Use the draft 3d6 resolution lens only if the user wants a risky action resolved. Keep the mechanic backstage and render the outcome as fiction.'},
+  {id:'act', label:'Player action', hint:'Resolve what I do', temperature:0.75, prompt:'The user is declaring a player action. Resolve uncertainty with consequences, opportunity, pressure, and a clear next situation. Do not decide the player character\'s intent or next action.'},
+  {id:'ask', label:'Table question', hint:'Plain answer', temperature:0.25, prompt:'The user is asking an out-of-fiction table question. Answer clearly, separate canon facts from table suggestions, then offer a practical next step.'},
+  {id:'scene', label:'Frame scene', hint:'Set stakes', temperature:0.8, prompt:'Frame the current scene with sensory detail, immediate stakes, visible choices, and one or two quiet world pressures. End with a grounded prompt for the player.'},
+  {id:'oracle', label:'Oracle options', hint:'2-3 possibilities', temperature:0.85, prompt:'Act as an oracle for uncertain table direction. Offer 2-3 plausible answers, mark which are canon-grounded and which are table suggestions, and do not force one answer.'},
+  {id:'consequence', label:'Cost / pressure', hint:'Complicate fallout', temperature:0.75, prompt:'Focus on consequences that follow from the fiction. Prefer success-at-cost, pressure clocks, changed NPC posture, resource strain, or revealed complications over binary pass/fail.'},
+  {id:'recap', label:'Scene recap', hint:'Where things stand', temperature:0.3, prompt:'Summarize the recent situation for play: what is happening, what matters, open threads, current pressure, and the next playable choice.'},
+  {id:'continuity', label:'Continuity check', hint:'Find gaps', temperature:0.2, prompt:'Check continuity against promoted canon and the live campaign state. Name contradictions, uncertainty, and missing support instead of smoothing them over.'},
+  {id:'scribe', label:'Ledger note', hint:'Capture cleanly', temperature:0.35, prompt:'Shape the material into ledger-ready campaign notes. Keep it CAMPAIGN-ONLY unless the user later promotes it through the canon pipeline.'},
+  {id:'npc', label:'NPC voice', hint:'Dialogue / posture', temperature:0.8, prompt:'Write NPC-facing dialogue or posture only where the campaign state supports it. Keep NPCs motivated by the scene, never omniscient, and avoid deciding the player character\'s response.'},
+  {id:'ooc', label:'Out of character', hint:'Table talk', temperature:0.25, prompt:'Stay out of character. Explain the table situation, options, risks, and likely consequences plainly.'},
+  {id:'resolve3d6', label:'Draft 3d6 roll', hint:'Unpromoted playtest', temperature:0.45, draftResolution:true, prompt:'Use the draft 3d6 resolution lens only if the user wants a risky action resolved. Keep the mechanic backstage and render the outcome as fiction.'},
 ];
 const CAMP_PLAY_DRAFT_3D6_CONTEXT=[
   'DRAFT RESOLUTION LENS - SYS-002:',
@@ -11357,6 +11396,34 @@ function campPlayModeById(id){
   return CAMP_PLAY_MODES.find(m=>m.id===id)||CAMP_PLAY_MODES[0];
 }
 
+function campPlayDetectMode(text){
+  const raw=String(text||'').trim();
+  const s=raw.toLowerCase();
+  if(!s) return 'act';
+
+  // Explicit table/out-of-character markers win before fiction-facing intent.
+  if(/^(?:ooc\b|out of character\b|\/|\()/.test(s)) return 'ooc';
+
+  // Session navigation asks should recap or frame before ordinary Q&A.
+  if(/\b(?:recap|where were we|remind me|catch me up)\b/.test(s)) return 'recap';
+  if(/\b(?:set the scene|begin|start the session)\b/.test(s)) return 'scene';
+  if(/\b(?:continuity|contradict|contradiction|conflict|canon check|does this break canon)\b/.test(s)) return 'continuity';
+
+  // A named roll plus danger/action language opts into the draft resolution lens.
+  if(/\broll\b/.test(s) && /\b(?:attack|fight|strike|shoot|dodge|escape|sneak|hide|climb|jump|force|break|pick|steal|persuade|deceive|resist|risk)\b/.test(s)) return 'resolve3d6';
+
+  // Rules and permission questions are table questions, not oracle uncertainty.
+  if(/\b(?:what'?s the rule|what is the rule|how does .+ work|can i\b|rules?)\b/.test(s)) return 'ask';
+
+  // Uncertain world-facing probes get options instead of a single forced answer.
+  if(/\b(?:what could|what might|is there|maybe|perhaps|odds)\b/.test(s)) return 'oracle';
+
+  // First-person or command-like play text is the normal action lens.
+  if(/^(?:i\b|i'm going to\b|we\b|draw\b|attack\b|move\b|step\b|go\b|open\b|take\b|ask\b|tell\b|search\b|look\b|listen\b|wait\b|cast\b|strike\b|run\b|hide\b|sneak\b|climb\b|push\b|pull\b)/.test(s)) return 'act';
+
+  return 'act';
+}
+
 function campPlayPersonaOptions(personas){
   const list=Array.isArray(personas)?personas:[], out=[], seen={};
   CAMP_PLAY_PERSONA_ORDER.forEach(id=>{
@@ -11371,12 +11438,29 @@ function campPlayPersonaOptions(personas){
   return out;
 }
 
+function campPlayModelFor(engine, persona){
+  const model=String(persona&&persona.model||'').trim();
+  if(model&&(assistantIsLocalEngine(engine)||assistantAdvertisedModels(engine).includes(model))) return model;
+  return assistantModelFor({},engine);
+}
+
+function campPlayChatOptions(engine, persona, mode){
+  return assistantChatOptionsForRequest(engine,persona,{temperature:mode&&mode.temperature});
+}
+
+function campPlayGroundingMode(persona, overrideMode){
+  const override=String(overrideMode||'').trim();
+  if(override&&typeof assistantGroundingMode==='function') return assistantGroundingMode(override);
+  if(override) return /^(strict|balanced|creative)$/.test(override)?override:'balanced';
+  return typeof assistantGroundingMode==='function'?assistantGroundingMode(persona&&persona.groundingMode):(persona&&persona.groundingMode)||'balanced';
+}
+
 function campPlayBuildSystem(opts){
   opts=opts||{};
   const mode=campPlayModeById(opts.modeId);
   const persona=opts.persona||{};
   const personaSystem=typeof assistantBuildPersonaSystem==='function'
-    ? assistantBuildPersonaSystem(persona, opts.groundingSystem)
+    ? assistantBuildPersonaSystem(persona, opts.groundingSystem, {groundingMode:opts.groundingMode})
     : [persona.system, String(opts.groundingSystem||'').trim()].filter(Boolean).join('\n\n');
   return [
     personaSystem,
@@ -11548,6 +11632,12 @@ async function campPlay(host, name){
   const personaOptions=campPlayPersonaOptions(typeof assistantPersonaList==='function'?assistantPersonaList():[]);
   const personaSel=h('select',{class:'play-persona'},...personaOptions.map(p=>h('option',{value:p.id},p.label)));
   personaSel.value=personaOptions.some(p=>p.id===CAMP_PLAY_DEFAULT_PERSONA_ID)?CAMP_PLAY_DEFAULT_PERSONA_ID:(personaOptions[0]&&personaOptions[0].id)||CAMP_PLAY_DEFAULT_PERSONA_ID;
+  const groundingSel=h('select',{class:'play-grounding-mode'},
+    h('option',{value:''},'Follow persona'),
+    h('option',{value:'strict'},'Strict'),
+    h('option',{value:'balanced'},'Balanced'),
+    h('option',{value:'creative'},'Creative')
+  );
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
   const tablePanel=h('div',{class:'play-tools'});
@@ -11557,7 +11647,7 @@ async function campPlay(host, name){
   const sendBtn=h('button',{class:'navbtn primary', type:'button'},'Send');
   const sceneBtn=h('button',{class:'navbtn', type:'button'},'Set the scene');
   const status=h('div',{class:'sync-status'});
-  let busy=false, streamNode=null, saveTimer=null, activeMode='act';
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode='auto';
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -11603,17 +11693,39 @@ async function campPlay(host, name){
     transcript.scrollTop=transcript.scrollHeight;
   }
   function drawModeRow(){
-    const current=campPlayModeById(activeMode);
-    modeRow.replaceChildren(...CAMP_PLAY_MODES.map(mode=>{
-      const btn=h('button',{class:'play-mode-chip'+(mode.id===activeMode?' on':''),type:'button', title:mode.prompt, 'aria-pressed':mode.id===activeMode?'true':'false'},
+    const commonIds={auto:true,act:true,ask:true,scene:true,oracle:true,recap:true};
+    const renderChip=(mode,isAuto)=>{
+      const pinned=!isAuto && mode.id===activeMode;
+      const on=isAuto?activeMode==='auto':pinned;
+      const btn=h('button',{class:'play-mode-chip'+(on?' on':'')+(pinned?' pinned':''),type:'button', title:isAuto?'Detect the lens from this send.':'Borrow this lens for the next turn. '+mode.prompt, 'aria-pressed':on?'true':'false'},
         h('span',{class:'play-mode-title'},mode.label),
         h('small',null,mode.hint)
       );
       btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); };
       return btn;
-    }));
-    input.placeholder=current.id==='act'?'What do you do?':current.hint+'. Add the details here.';
-    modeHelp.replaceChildren(document.createTextNode('Next send: '+current.label+' - '+current.hint+'.'));
+    };
+    const chips=[CAMP_PLAY_AUTO_MODE].concat(CAMP_PLAY_MODES);
+    const common=chips.filter(mode=>commonIds[mode.id]).map(mode=>renderChip(mode,mode.id==='auto'));
+    const more=CAMP_PLAY_MODES.filter(mode=>!commonIds[mode.id]).map(mode=>renderChip(mode,false));
+    const morePinned=CAMP_PLAY_MODES.some(mode=>!commonIds[mode.id] && mode.id===activeMode);
+    modeRow.replaceChildren(
+      ...common,
+      h('details',{class:'play-mode-more', open:morePinned?true:null},
+        h('summary',null,'More lenses'),
+        h('div',{class:'play-mode-more-list'},...more)
+      )
+    );
+    updateModeHelp();
+  }
+  function updateModeHelp(){
+    const pinned=activeMode!=='auto';
+    const current=pinned?campPlayModeById(activeMode):campPlayModeById(campPlayDetectMode(input.value));
+    input.placeholder=current.id==='act'?'What do you do?':'Add details for '+current.label.toLowerCase()+'.';
+    modeHelp.replaceChildren(document.createTextNode((pinned?'Pinned: '+current.label:'Auto -> '+current.label)+' - '+current.hint+'.'));
+  }
+  function queueModeHelp(){
+    if(modeHelpTimer) clearTimeout(modeHelpTimer);
+    modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
     const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal);
@@ -11624,14 +11736,20 @@ async function campPlay(host, name){
         list.length?h('ul',null,...list.slice(0,8).map(item=>h('li',null,item))):h('p',{class:'hint'},card.empty||'No notes yet.')
       );
     }));
-    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')));
+    const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
+    const override=groundingSel.value;
+    const mode=campPlayGroundingMode(persona,override);
+    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')));
   }
 
-  async function runTurn(userText){
+  async function runTurn(userText, forceModeId){
     if(busy) return;
     const engine=assistantEngineById(profiles, engineSel.value)||defaultEngine;
     if(!engine){ status.textContent='Choose an engine first.'; return; }
-    const mode=campPlayModeById(activeMode);
+    const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
+    const turnGroundingOverride=groundingSel.value;
+    const turnGroundingMode=campPlayGroundingMode(persona,turnGroundingOverride);
+    const mode=campPlayModeById(forceModeId || (activeMode==='auto'?campPlayDetectMode(userText):activeMode));
     busy=true; sendBtn.disabled=true; sceneBtn.disabled=true;
     messages.push({role:'user', content:userText, modeLabel:mode.label});
     const gm={role:'assistant', content:'', proposal:null};
@@ -11640,30 +11758,35 @@ async function campPlay(host, name){
     let groundingSystem='';
     try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; drawTools(); }catch(e){}
     const system=campPlayBuildSystem({
-      persona:assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID),
+      persona,
       modeId:mode.id,
       draftResolution:!!mode.draftResolution,
       campaignName:name,
       parsed,
       threads,
-      groundingSystem
+      groundingSystem,
+      groundingMode:turnGroundingMode
     });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
-    const chat=Object.assign({ system, messages:history, model:assistantModelFor({}, engine), maxTokens:CAMP_PLAY_MAX_TOKENS }, assistantChatOptions(engine));
+    const chat=Object.assign({ system, messages:history, model:campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
     let raw='';
     try{
       await assistantStreamAi(engine, chat, piece=>{ raw+=piece; gm.content=campPlayStripState(raw); if(streamNode) streamNode.textContent=gm.content; transcript.scrollTop=transcript.scrollHeight; });
     }catch(e){ raw=''; gm.content='(The GM could not answer: '+(e&&e.message?e.message:String(e))+')'; }
     if(raw){ gm.content=campPlayStripState(raw)||'(no narration)'; gm.proposal=campPlayParseProposal(raw); }
     pendingProposal=gm.proposal||null;
+    groundingSel.value='';
     busy=false; sendBtn.disabled=false; sceneBtn.disabled=false;
     status.textContent='Your move.';
     drawTranscript(); drawTools();
     scheduleSave();
   }
 
-  sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; runTurn(v); };
-  sceneBtn.onclick=()=>{ activeMode='scene'; drawModeRow(); runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.'); };
+  input.addEventListener('input', queueModeHelp);
+  personaSel.onchange=drawTools;
+  groundingSel.onchange=drawTools;
+  sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; updateModeHelp(); runTurn(v); };
+  sceneBtn.onclick=()=>{ runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.','scene'); };
 
   drawModeRow(); drawTools(); drawTranscript();
   host.replaceChildren(
@@ -11672,10 +11795,12 @@ async function campPlay(host, name){
         h('div',{class:'play-head'},
           h('div',{class:'play-control-row'},
             h('label',{class:'play-select-label'},'Engine',engineSel),
-            h('label',{class:'play-select-label'},'Persona',personaSel)
+            h('label',{class:'play-select-label'},'Persona',personaSel),
+            h('label',{class:'play-select-label'},'Grounding',groundingSel)
           ),
           usageMeter()
         ),
+        h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn.'),
         h('p',{class:'play-note'},'The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
       ),
       h('div',{class:'play-table-stage'},
