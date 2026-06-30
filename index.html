@@ -1146,6 +1146,13 @@
   textarea.prc-sandbox{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.55; tab-size:2; }
   .prc-block{ margin:10px 0; }
   .prc-out{ width:100%; min-height:120px; border:1.5px solid var(--gold-soft); border-radius:8px; background:#f7f1e2; padding:10px 12px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; color:var(--ink-soft); resize:vertical; margin-top:8px; }
+  .prc-compile-actions{ margin:6px 0 8px; }
+  .prc-compile-status{ min-height:1.3em; }
+  .prc-compile-out{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-slot); padding:12px 14px; margin:8px 0 10px; min-height:58px; }
+  .prc-compile-out.is-bad{ border-color:#b4632e; background:#f8ecdf; }
+  .prc-compile-out section+section{ margin-top:10px; }
+  .prc-compile-out b{ display:block; color:var(--gold); font-size:12px; letter-spacing:.08em; margin-bottom:4px; text-transform:uppercase; }
+  .prc-compile-out pre{ margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; color:var(--ink-soft); }
   .prc-coach-actions{ margin:6px 0 8px; }
   .prc-coach-status{ min-height:1.3em; }
   .prc-coach-answer{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-slot); padding:12px 14px; margin:8px 0 10px; min-height:64px; }
@@ -2752,9 +2759,41 @@ function namingDefault(){ return {
   tweaks: { atmosphere:'Cloud-sea', awaitingPresence:'Stirring', ornament:'Illuminated plate' },
 }; }
 // the Code Practice (Apprentice) space — book-chapter progress + per-chapter
-// drill code, flashcard progress, the per-session checklist, the confusion log,
+// drill code, flashcard progress/scheduling, the per-session checklist, the confusion log,
 // and the paste-lock toggle. Free-text inputs live in .fields, keyed by name.
-function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
+function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, flashSchedule:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
+function normalizePracticeState(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{}, out=practiceDefault();
+  const objectMap=(v)=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  const textMap=(v)=>{ const src=objectMap(v), m={}; Object.keys(src).forEach(key=>{ const k=String(key||'').trim(); if(k) m[k]=String(src[key]||''); }); return m; };
+  const boolMap=(v)=>{ const src=objectMap(v), m={}; Object.keys(src).forEach(key=>{ const k=String(key||'').trim(); if(k) m[k]=!!src[key]; }); return m; };
+  const indexMap=(v)=>{ const src=objectMap(v), m={}; Object.keys(src).forEach(key=>{ const k=String(key||'').trim(), n=Number(src[key]); if(k&&Number.isFinite(n)&&n>=0) m[k]=Math.floor(n); }); return m; };
+  const finiteIndex=(v,fallback)=>{ const n=Number(v); return Number.isFinite(n)&&n>=0?Math.floor(n):fallback; };
+  const scheduleMap=(v)=>{ const src=objectMap(v), m={}; Object.keys(src).forEach(key=>{
+    const k=String(key||'').trim(), row=objectMap(src[key]); if(!k) return;
+    const box=finiteIndex(row.box,0), due=finiteIndex(row.due,0), interval=finiteIndex(row.interval,0), last=finiteIndex(row.last,0), reps=finiteIndex(row.reps,0);
+    if(row.seen||box||due||interval||last||reps) m[k]={box,due,interval,last,reps,seen:!!row.seen};
+  }); return m; };
+  out.fields=textMap(source.fields);
+  out.flash=finiteIndex(source.flash,0);
+  out.flashKnown=boolMap(source.flashKnown);
+  out.flashSchedule=scheduleMap(source.flashSchedule);
+  out.checklist=boolMap(source.checklist);
+  out.chapter=finiteIndex(source.chapter,1);
+  out.chapterDone=boolMap(source.chapterDone);
+  out.drills=textMap(source.drills);
+  out.drillIdx=indexMap(source.drillIdx);
+  out.pasteLock=source.pasteLock!==false;
+  out.journal=(Array.isArray(source.journal)?source.journal:[]).map(entry=>entry&&typeof entry==='object'&&!Array.isArray(entry)?{
+    title:String(entry.title||''),
+    tried:String(entry.tried||''),
+    happened:String(entry.happened||''),
+    confusing:String(entry.confusing||''),
+    askRune:String(entry.askRune||''),
+    createdAt:String(entry.createdAt||''),
+  }:null).filter(Boolean).slice(0,30);
+  return out;
+}
 function usageMetric(value){
   const n=Number(value);
   return Number.isFinite(n)&&n>0?n:0;
@@ -2799,7 +2838,7 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, fxRich:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -2810,11 +2849,12 @@ function hydrate(d){
   merged.openTo=openToSeen&&d.openTo==='last'?'last':'frontdoor';
   merged.openToSeen=true;
   merged.fxRich=!!d.fxRich;
+  merged.syncPractice=!!d.syncPractice;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
   merged.naming=Object.assign(namingDefault(), d.naming||{});
-  merged.practice=Object.assign(practiceDefault(), d.practice||{});
+  merged.practice=normalizePracticeState(d.practice);
   merged.engines={
     activeId:typeof engines.activeId==='string'?engines.activeId:'',
     profiles:Array.isArray(engines.profiles)?engines.profiles.map(profile=>Object.assign({},profile)) : [],
@@ -4102,6 +4142,11 @@ const PRACTICE_TABS = [
   ['journal', 'Journal', 'Your progress, a per-session checklist, and a log of confusions to bring to your coach later.'],
 ];
 const PRACTICE_COACH_MAX_TOKENS = 900;
+const PRACTICE_CE_BASE_URL = 'https://godbolt.org/api/compiler/';
+const PRACTICE_CE_DEFAULT_COMPILER = 'g142';
+const PRACTICE_CE_DEFAULT_ARGS = '-std=c++23 -O0 -Wall -Wextra -pedantic';
+const PRACTICE_FLASH_INTERVALS = [0, 1, 3, 7, 14, 30];
+const PRACTICE_MS_PER_DAY = 86400000;
 
 /* ---------- small DOM + state helpers (all reads/writes go through DB.practice) */
 function pField(name){ const v=DB.practice.fields[name]; return v!=null ? v : (PRACTICE_DEFAULTS[name]!=null ? PRACTICE_DEFAULTS[name] : ''); }
@@ -4129,8 +4174,81 @@ function pOutput(buildFn, label, msg){
       h('button',{class:'navbtn', onclick:()=>{ ta.value=buildFn(); toast('Refreshed.'); }}, 'Refresh')),
     ta);
 }
-function prcFlashIndex(){ const i=DB.practice.flash|0; return (i>=0 && i<GLOSSARY.length)?i:0; }
+function prcFlashIndex(){ return prcFlashCardIndex(prcFlashDeck(Date.now())); }
 function prcFlashKnown(i){ return !!DB.practice.flashKnown[i]; }
+function flashDay(now){
+  if(now instanceof Date) return Math.floor(now.getTime()/PRACTICE_MS_PER_DAY);
+  if(typeof now==='string'){
+    const parsed=Date.parse(now);
+    if(Number.isFinite(parsed)) return Math.floor(parsed/PRACTICE_MS_PER_DAY);
+  }
+  const n=Number(now);
+  if(Number.isFinite(n)) return Math.floor(n>10000000?n/PRACTICE_MS_PER_DAY:n);
+  return 0;
+}
+function flashClampBox(box){
+  const n=Number(box);
+  return Number.isFinite(n)&&n>=0?Math.min(Math.floor(n),PRACTICE_FLASH_INTERVALS.length-1):0;
+}
+function flashScheduleEntry(value){
+  const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
+  const box=flashClampBox(source.box);
+  const number=(v,fallback)=>{ const n=Number(v); return Number.isFinite(n)&&n>=0?Math.floor(n):fallback; };
+  return {
+    box,
+    interval:number(source.interval,PRACTICE_FLASH_INTERVALS[box]||0),
+    due:number(source.due,0),
+    last:number(source.last,0),
+    reps:number(source.reps,0),
+    seen:!!source.seen,
+  };
+}
+function flashReview(entry, remembered, now){
+  const cur=flashScheduleEntry(entry), day=flashDay(now);
+  const box=remembered?Math.min((cur.seen?cur.box:0)+1,PRACTICE_FLASH_INTERVALS.length-1):0;
+  const interval=remembered?(PRACTICE_FLASH_INTERVALS[box]||0):0;
+  return {box,interval,due:day+interval,last:day,reps:cur.reps+1,seen:true};
+}
+function flashCards(deck, schedule){
+  schedule=schedule&&typeof schedule==='object'&&!Array.isArray(schedule)?schedule:{};
+  return (Array.isArray(deck)?deck:[]).map((card,index)=>({index,card,schedule:flashScheduleEntry(schedule[index])}));
+}
+function dueCards(deck, now){
+  const day=flashDay(now);
+  return (Array.isArray(deck)?deck:[]).filter(card=>{
+    const schedule=flashScheduleEntry(card&&card.schedule);
+    return schedule.seen&&schedule.due<=day;
+  });
+}
+function flashDeck(deck, schedule, now){
+  const day=flashDay(now);
+  return flashCards(deck,schedule).map((card,pos)=>{
+    const seen=card.schedule.seen, due=seen&&card.schedule.due<=day;
+    const group=due?0:(seen?2:1);
+    const dueSort=seen?card.schedule.due:0;
+    return Object.assign({},card,{group,dueNow:due,newCard:!seen,_pos:pos,_dueSort:dueSort});
+  }).sort((a,b)=>a.group-b.group||a._dueSort-b._dueSort||a._pos-b._pos).map(card=>{
+    delete card.group; delete card._pos; delete card._dueSort; return card;
+  });
+}
+function flashDueText(entry, now){
+  const schedule=flashScheduleEntry(entry);
+  if(!schedule.seen) return 'New card';
+  const delta=schedule.due-flashDay(now);
+  if(delta<=0) return 'Due now';
+  if(delta===1) return 'Due tomorrow';
+  return 'Due in '+delta+' days';
+}
+function prcFlashSchedule(){ return DB.practice.flashSchedule&&typeof DB.practice.flashSchedule==='object'?DB.practice.flashSchedule:(DB.practice.flashSchedule={}); }
+function prcFlashDeck(now){ return flashDeck(GLOSSARY,prcFlashSchedule(),now); }
+function prcFlashCursor(deck){ const i=DB.practice.flash|0, n=(deck&&deck.length)||GLOSSARY.length; return n?(i>=0&&i<n?i:0):0; }
+function prcFlashCardIndex(deck){ const d=deck&&deck.length?deck:prcFlashDeck(Date.now()); const row=d[prcFlashCursor(d)]; return row?row.index:0; }
+function prcReviewFlash(index, remembered, now){
+  const schedule=prcFlashSchedule();
+  schedule[index]=flashReview(schedule[index],remembered,now);
+  DB.practice.flashKnown[index]=!!remembered;
+  save();
+}
 
 /* ========================================================================== *
    VIEW SHELL + TABS
@@ -4239,6 +4357,87 @@ async function practiceCoachCallAi(engine,chat,onChunk){
   if(!streamed&&result&&result.text) emit(result.text,{text:result.text,model:result.model});
   return result;
 }
+function ceCompilerId(id){
+  const clean=String(id||'').trim();
+  return clean||PRACTICE_CE_DEFAULT_COMPILER;
+}
+function ceCompileRequest(input){
+  input=input||{};
+  const compilerId=ceCompilerId(input.compilerId);
+  const source=String(input.source||'');
+  const args=input.args==null?PRACTICE_CE_DEFAULT_ARGS:String(input.args);
+  const stdin=input.stdin==null?'':String(input.stdin);
+  const body={
+    source,
+    lang:'c++',
+    files:[],
+    options:{
+      userArguments:args,
+      compilerOptions:{executorRequest:true},
+      executeParameters:{args:'',stdin},
+      filters:{binary:false,binaryObject:false,commentOnly:true,directives:true,demangle:true,execute:true,intel:true,labels:true,trim:false},
+      tools:[],
+      libraries:[],
+    },
+  };
+  return {
+    url:PRACTICE_CE_BASE_URL+encodeURIComponent(compilerId)+'/compile',
+    opts:{method:'POST',headers:{Accept:'application/json','Content-Type':'application/json'},body:JSON.stringify(body)},
+    compilerId,args,stdin,
+  };
+}
+function ceOutputLines(value){
+  if(value==null) return [];
+  if(Array.isArray(value)) return value.map(part=>{
+    if(part==null) return '';
+    if(typeof part==='string') return part;
+    if(typeof part.text==='string') return part.text;
+    return String(part);
+  }).filter(Boolean);
+  if(typeof value==='string') return value?[value]:[];
+  return [];
+}
+function ceExitCode(value){
+  const n=Number(value);
+  return Number.isFinite(n)?n:null;
+}
+function ceParseResponse(raw){
+  raw=raw&&typeof raw==='object'?raw:{};
+  const exec=raw.execResult&&typeof raw.execResult==='object'?raw.execResult:null;
+  const compileCode=ceExitCode(raw.code);
+  const execCode=exec?ceExitCode(exec.code):null;
+  const stdout=ceOutputLines(raw.stdout).concat(ceOutputLines(exec&&exec.stdout)).join('\n');
+  const stderr=ceOutputLines(raw.stderr).concat(ceOutputLines(exec&&exec.stderr)).join('\n');
+  const ok=raw.ok!==false&&(compileCode==null||compileCode===0)&&(!exec||execCode==null||execCode===0);
+  return {ok,stdout,stderr,raw};
+}
+function ceSafeEndpoint(endpoint){
+  return String(endpoint||'Compiler Explorer').split('?')[0]||'Compiler Explorer';
+}
+function ceSafeErrorText(body){
+  return String(body||'').replace(/\s+/g,' ').trim().slice(0,120);
+}
+function ceErr(status,endpoint,body){
+  const safeEndpoint=ceSafeEndpoint(endpoint);
+  let pageOrigin='null'; try{ if(typeof location!=='undefined'&&location.origin) pageOrigin=location.origin; }catch(e){}
+  const message=status===0?("Compiler Explorer couldn't be reached - check your connection or browser access (CORS) for "+pageOrigin+'. Use the link fallback if it keeps happening.')
+    : status===400?'Compiler Explorer did not accept this compile request - try a smaller drill or use the link fallback.'
+    : status===404?'Compiler Explorer could not find that compiler - use the link fallback or try again later.'
+    : status===429?'Compiler Explorer is rate-limiting - try again in a moment.'
+    : status>=500?'Compiler Explorer is having trouble (server error) - try again shortly.'
+    : status?('Compiler Explorer error '+status):"Compiler Explorer couldn't be reached.";
+  const detail=ceSafeErrorText(body);
+  const e=new Error(message+(detail?' '+detail:''));
+  e.status=status||0; e.provider='compiler-explorer'; e.endpoint=safeEndpoint;
+  return e;
+}
+async function ceCompile(input){
+  const request=ceCompileRequest(input);
+  let r; try{ r=await fetch(request.url,request.opts); }catch(e){ throw ceErr(0,request.url,''); }
+  if(!r.ok) throw ceErr(r.status,request.url,await r.text().catch(()=>''));
+  let raw; try{ raw=await r.json(); }catch(e){ throw ceErr(r.status||0,request.url,'Compiler Explorer returned a non-JSON response.'); }
+  return ceParseResponse(raw);
+}
 
 /* ---------- LEARN --------------------------------------------------------- */
 function practiceLearn(host){
@@ -4302,6 +4501,45 @@ function practiceLearn(host){
     prcSetDrillCode(drill.skeleton); practiceLearn(host);
   }}, '⤓ Load skeleton'));
   drillCard.append(sandboxTools);
+  const openCompilerExplorer=()=>{ try{ sandbox.focus(); sandbox.select(); navigator.clipboard&&navigator.clipboard.writeText(prcDrillCode()); }catch(_){}; try{ window.open('https://godbolt.org/','_blank','noopener'); }catch(_){}; toast('Code copied - paste it into Compiler Explorer to run.'); };
+  const compileStatus=h('div',{class:'sync-status prc-compile-status',role:'status'},'Ready to run when your sandbox has code.');
+  const compileOut=h('div',{class:'prc-compile-out'},h('p',{class:'hint'},'Output appears here after a run.'));
+  const compileBtn=h('button',{class:'navbtn primary',type:'button'},'Compile & run');
+  const ceBtn=h('button',{class:'navbtn',type:'button'},'▶ Compiler Explorer');
+  ceBtn.onclick=openCompilerExplorer;
+  compileBtn.onclick=async()=>{
+    const source=prcDrillCode();
+    if(!String(source||'').trim()){
+      compileStatus.textContent='Type some C++ first, then run it.';
+      compileOut.className='prc-compile-out';
+      compileOut.replaceChildren(h('p',{class:'hint'},'The sandbox is empty.'));
+      return;
+    }
+    compileBtn.disabled=true;
+    compileStatus.textContent='Compiling with Compiler Explorer...';
+    compileOut.className='prc-compile-out';
+    compileOut.replaceChildren(h('p',{class:'hint'},'Waiting for output.'));
+    try{
+      const result=await ceCompile({source,compilerId:PRACTICE_CE_DEFAULT_COMPILER,args:PRACTICE_CE_DEFAULT_ARGS,stdin:''});
+      compileStatus.textContent=result.ok?'Compiled and ran.':'Compiler Explorer returned a compile or run error.';
+      compileOut.className='prc-compile-out'+(result.ok?'':' is-bad');
+      const blocks=[];
+      if(String(result.stdout||'').trim()) blocks.push(h('section',null,h('b',null,'stdout'),h('pre',null,result.stdout)));
+      if(String(result.stderr||'').trim()) blocks.push(h('section',null,h('b',null,'stderr'),h('pre',null,result.stderr)));
+      compileOut.replaceChildren(...(blocks.length?blocks:[h('p',{class:'hint'},result.ok?'No output.':'No output returned.')]));
+    }catch(error){
+      compileStatus.textContent='Could not run in app. The Compiler Explorer link is still available.';
+      compileOut.className='prc-compile-out is-bad';
+      compileOut.replaceChildren(h('p',{class:'bad'},error&&error.message?error.message:String(error)));
+    }finally{
+      compileBtn.disabled=false;
+    }
+  };
+  drillCard.append(
+    h('h4',{class:'prc-sub'},'Run this drill'),
+    h('div',{class:'toolrow prc-compile-actions'},compileBtn,ceBtn),
+    compileStatus,
+    compileOut);
   const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
   const coachStatus=h('div',{class:'sync-status prc-coach-status',role:'status'});
   const coachAnswer=h('div',{class:'prc-coach-answer'},h('p',{class:'hint'},'Ask in app, or copy a prompt for another AI.'));
@@ -4349,8 +4587,7 @@ function practiceLearn(host){
     coachAnswer,
     h('p',{class:'hint'},'Copy-out fallback'),
     h('div',{class:'toolrow'},
-      ...practiceCoachModes().map(mode=>coachBtn(mode.build,mode.label)),
-      h('button',{class:'navbtn', onclick:()=>{ try{ sandbox.focus(); sandbox.select(); navigator.clipboard&&navigator.clipboard.writeText(prcDrillCode()); }catch(_){}; try{ window.open('https://godbolt.org/','_blank','noopener'); }catch(_){}; toast('Code copied — paste it into Compiler Explorer to run.'); }}, '▶ Compiler Explorer')),
+      ...practiceCoachModes().map(mode=>coachBtn(mode.build,mode.label))),
     coachOut);
   host.append(drillCard);
 
@@ -4380,20 +4617,23 @@ function prcFlashcards(){
   const wrap=h('div',{class:'prc-card prc-flash'});
   function render(){
     wrap.replaceChildren();
-    const i=prcFlashIndex(), card=GLOSSARY[i];
+    const now=Date.now(), deck=prcFlashDeck(now), cursor=prcFlashCursor(deck), row=deck[cursor]||deck[0], i=row?row.index:0, card=GLOSSARY[i];
+    const schedule=row?row.schedule:flashScheduleEntry(null), due=dueCards(deck,now).length;
     const known=GLOSSARY.filter((_,k)=>prcFlashKnown(k)).length;
     wrap.append(
       h('h3',{class:'prc-h'}, 'Flashcards'),
-      h('p',{class:'hint'}, `${i+1}/${GLOSSARY.length} cards - ${known} known`),
+      h('p',{class:'hint'}, `${cursor+1}/${GLOSSARY.length} cards - ${known} known - ${due} due`),
       h('div',{class:'prc-flashface'},
         h('b',null, card.term),
         h('p',null, card.plain),
         h('p',{class:'hint'}, 'Example: '+card.example),
-        h('p',{class:'hint'}, 'File: '+card.file)),
+        h('p',{class:'hint'}, 'File: '+card.file),
+        h('p',{class:'hint'}, schedule.seen?('Box '+schedule.box+' - '+flashDueText(schedule,now)):flashDueText(schedule,now))),
       h('div',{class:'toolrow'},
-        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(i-1+GLOSSARY.length)%GLOSSARY.length; save(); render(); }}, '‹ Prev'),
-        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flashKnown[i]=!prcFlashKnown(i); save(); render(); }}, prcFlashKnown(i)? 'Mark Learning' : 'Mark Known'),
-        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(i+1)%GLOSSARY.length; save(); render(); }}, 'Next ›')),
+        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(cursor-1+deck.length)%deck.length; save(); render(); }}, '‹ Prev'),
+        h('button',{class:'navbtn', onclick:()=>{ prcReviewFlash(i,false,now); render(); }}, 'Still learning'),
+        h('button',{class:'navbtn primary', onclick:()=>{ prcReviewFlash(i,true,now); render(); }}, 'Known'),
+        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(cursor+1)%deck.length; save(); render(); }}, 'Next ›')),
     );
   }
   render();
@@ -4616,7 +4856,14 @@ function assistantSyncSettings(value){
   const fallbackId=typeof ASSISTANT_DEFAULT_PERSONA_ID==='string'?ASSISTANT_DEFAULT_PERSONA_ID:'worldbuilder';
   return typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(value):(value&&typeof value==='object'?value:{activePersonaId:fallbackId,customPersonas:[]});
 }
-function syncPayload(){ return { creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault(), assistant:assistantSyncSettings(DB.assistant) }; }
+function practiceSyncSettings(value){
+  return typeof normalizePracticeState==='function'?normalizePracticeState(value):(value&&typeof value==='object'?Object.assign(practiceDefault(),value):practiceDefault());
+}
+function syncPayload(){
+  const payload={ creations:DB.creations||[], sparks:DB.sparks||[], roots:DB.roots||{}, counters:DB.counters||{}, elements:DB.elements||[], expressions:DB.expressions||[], tombstones:DB.tombstones||{}, naming:DB.naming||namingDefault(), assistant:assistantSyncSettings(DB.assistant) };
+  if(DB.syncPractice) payload.practice=practiceSyncSettings(DB.practice);
+  return payload;
+}
 let syncTimer=null, syncing=false, _lastSyncedJSON=null;
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
 async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return;
@@ -4638,9 +4885,13 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
 }
 function stripForBackup(db){
   const d=Object.assign({},db);
+  const includePractice=!!d.syncPractice;
   if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
   delete d.campaignScratch;
   delete d.usageLedger;
+  delete d.syncPractice;
+  if(includePractice) d.practice=practiceSyncSettings(d.practice);
+  else delete d.practice;
   d.assistant=assistantSyncSettings(d.assistant);
   if(d.engines){
     const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -4655,6 +4906,25 @@ function stripForBackup(db){
   }
   return d;
 } // never write tokens, engine keys, engine endpoints, engine models, usage ledger, or session scratch into a backup
+function mergePracticeState(local,incoming){
+  const a=practiceSyncSettings(local), b=practiceSyncSettings(incoming);
+  const journalSeen={};
+  const journal=[];
+  (b.journal||[]).concat(a.journal||[]).forEach(entry=>{
+    const key=[entry.title,entry.createdAt,entry.tried,entry.happened,entry.confusing,entry.askRune].join('\u0001');
+    if(!journalSeen[key]){ journalSeen[key]=true; journal.push(entry); }
+  });
+  return Object.assign({},a,b,{
+    fields:Object.assign({},a.fields,b.fields),
+    flashKnown:Object.assign({},a.flashKnown,b.flashKnown),
+    flashSchedule:Object.assign({},a.flashSchedule,b.flashSchedule),
+    checklist:Object.assign({},a.checklist,b.checklist),
+    chapterDone:Object.assign({},a.chapterDone,b.chapterDone),
+    drills:Object.assign({},a.drills,b.drills),
+    drillIdx:Object.assign({},a.drillIdx,b.drillIdx),
+    journal:journal.slice(0,30),
+  });
+}
 // merge an incoming journal (from the repo or a backup file) into DB. Additive for new
 // work (existing items win, new ones appended by id), but deletions are honored via
 // tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
@@ -4678,6 +4948,7 @@ function mergeIncoming(inc){
     });
     DB.assistant=assistantSyncSettings({activePersonaId:incoming.activePersonaId||local.activePersonaId, customPersonas:custom});
   }
+  if('practice' in inc) DB.practice=mergePracticeState(DB.practice,inc.practice);
 }
 async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
@@ -4731,6 +5002,7 @@ function openGitHubPanel(){
   const ownerIn=h('input',{value:g.owner}), repoIn=h('input',{value:g.repo}), branchIn=h('input',{value:g.branch}), pathIn=h('input',{value:g.path});
   const makerIn=h('input',{value:g.makerStem, placeholder:'field-journal'});
   const syncChk=h('input',{type:'checkbox'}); syncChk.checked=!!DB.syncOnOpen; syncChk.onchange=()=>{ DB.syncOnOpen=syncChk.checked; save(); };
+  const practiceChk=h('input',{type:'checkbox'}); practiceChk.checked=!!DB.syncPractice; practiceChk.onchange=()=>{ DB.syncPractice=practiceChk.checked; save(); };
   const status=h('div',{class:'hint', style:{marginTop:'10px'}});
   function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal' }; }
   function persist(){ DB.github=collect(); save(); }
@@ -4742,6 +5014,8 @@ function openGitHubPanel(){
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Branch'),branchIn), h('div',null,h('label',null,'Folder'),pathIn)),
     h('div',{class:'world-only'}, h('label',null,'Her journal file name (for the Inbox)'), makerIn),
     h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'12px'}}, syncChk, 'Load my file automatically when I open the app'),
+    h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'8px'}}, practiceChk, 'Include Code Practice progress in backup/sync'),
+    h('p',{class:'hint', style:{margin:'4px 0 0'}}, 'When on, chapters, typed drills, flashcards, and the practice log can travel to another device. Engine keys and usage stay device-only.'),
     h('div',{class:'warn'},'Your token is a key. Use a fine-grained token limited to just this one repo (Contents: read & write). It’s kept only on this device, never written into the repo, and you can revoke it on GitHub any time.'),
     status,
     h('div',{class:'toolrow', style:{marginTop:'14px'}},
