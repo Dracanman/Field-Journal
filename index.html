@@ -989,6 +989,12 @@
 .region-forge-detected{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 .region-chip{display:inline-flex;align-items:center;border:1px solid #e2d0a8;border-radius:999px;background:#f3ead1;padding:3px 8px;font-size:12px;color:#5b4720}
 .region-forge-warning{margin:10px 0 0;text-align:left}
+.region-forge-ai-actions{align-items:center;margin:0}
+.region-forge-ai-card{margin-top:10px;padding:12px;border:1px solid #d6c794;border-radius:10px;background:#fffaf0}
+.region-forge-ai-card.active{border-color:#91ad81;background:#f2f7ec}
+.region-forge-ai-card.bad{border-color:#e1b8aa;background:#fff4ef}
+.region-forge-ai-card p{margin:6px 0 0}
+.region-forge-ai-status{margin:8px 0 0}
 .region-forge-seed-actions{align-content:end;align-items:end;margin:0}
 .region-forge-summary{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 .region-forge-summary p{margin:6px 0 0}
@@ -1002,8 +1008,8 @@
   .region-fog-controls .toolrow .navbtn{width:100%}
   .region-view-toggle{margin-left:0;width:100%}
   .region-atlas-grid,.region-forge-grid{grid-template-columns:1fr}
-  .region-forge-accept,.region-forge-seed-actions{align-items:stretch;flex-direction:column}
-  .region-forge-accept .navbtn,.region-forge-seed-actions .navbtn{width:100%}
+  .region-forge-accept,.region-forge-seed-actions,.region-forge-ai-actions{align-items:stretch;flex-direction:column}
+  .region-forge-accept .navbtn,.region-forge-seed-actions .navbtn,.region-forge-ai-actions .navbtn{width:100%}
 }
 /* ---------- Engine settings: device-only profiles, no model calls yet ---------- */
 .engine-settings{display:grid;gap:14px}
@@ -1088,6 +1094,10 @@
 .space-veil{position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(100deg,var(--paper-card) 2%,rgba(251,247,236,.72) 30%,rgba(251,247,236,.3) 62%,rgba(251,247,236,.08) 100%)}
 .space-tile:hover .space-art,.space-tile.current .space-art{opacity:.68}
 .space-icon,.space-copy,.space-open,.space-current{position:relative;z-index:2}
+.space-status-host{position:absolute;z-index:4;pointer-events:none;display:inline-grid;place-items:center}
+.space-status-dot{display:block;width:11px;height:11px;border-radius:999px;background:var(--accent);box-shadow:0 0 0 3px rgba(255,255,255,.74),0 8px 18px -10px var(--accent)}
+.space-tile>.space-status-host{top:14px;right:14px}
+.bottom-nav-tab>.space-status-host{top:7px;right:12px}
 /* keep the small labels legible where the painting shows through strongest */
 .space-subtitle,.space-description,.space-open,.space-current{text-shadow:0 1px 2px rgba(251,247,236,.92),0 0 7px rgba(251,247,236,.65)}
 .space-icon{display:grid;place-items:center;width:54px;height:54px;border:1px solid var(--gold-soft);border-radius:50%;color:var(--accent);font-size:27px;background:var(--paper-card)}
@@ -1136,6 +1146,11 @@
   textarea.prc-sandbox{ font-family:ui-monospace,Menlo,Consolas,monospace; font-size:13px; line-height:1.55; tab-size:2; }
   .prc-block{ margin:10px 0; }
   .prc-out{ width:100%; min-height:120px; border:1.5px solid var(--gold-soft); border-radius:8px; background:#f7f1e2; padding:10px 12px; font-family:ui-monospace,Menlo,Consolas,monospace; font-size:12.5px; line-height:1.5; color:var(--ink-soft); resize:vertical; margin-top:8px; }
+  .prc-coach-actions{ margin:6px 0 8px; }
+  .prc-coach-status{ min-height:1.3em; }
+  .prc-coach-answer{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper-slot); padding:12px 14px; margin:8px 0 10px; min-height:64px; }
+  .prc-coach-answer p{ margin:0; }
+  .prc-coach-answer-text{ margin:0; white-space:pre-wrap; font-family:inherit; font-size:14px; line-height:1.55; color:var(--ink-soft); }
 
   .prc-grid{ display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
   .prc-gloss{ margin:4px 0; }
@@ -2851,6 +2866,8 @@ function nextSpecimen(wsId){ DB.counters[wsId] = (DB.counters[wsId]||0)+1; retur
 
 /* ---------- app state & router -------------------------------------------- */
 let VIEW = { name:'home' };
+const SPACE_STATUS_COUNTS={loaded:false,key:'',worldbuilder:0,game:0};
+let spaceStatusPromise=null;
 // `name` is the reserved view id (render() does VIEWS[VIEW.name]); it must win over any
 // caller param so a param literally called `name` can't silently reroute to home.
 function go(name, params){ VIEW = Object.assign({}, params, {name}); window.scrollTo(0,0); render(); }
@@ -2876,6 +2893,7 @@ function render(){
   catch(e){ $app.append(errorCard(e)); }
   $app.append(quickCaptureButton());
   $app.append(bottomNav());
+  ensureSpaceStatusDots();
 }
 function errorCard(e){
   return h('div',{style:{maxWidth:'560px', margin:'48px auto', padding:'24px 26px', border:'1.5px solid var(--gold-soft)', borderRadius:'12px', background:'#fffdf7', textAlign:'center'}},
@@ -2938,6 +2956,69 @@ function spaceSubNav(place){
       onclick:()=>go(item.view,item.params),
     }, item.short||item.label)));
 }
+function spaceStatusLabel(profile, count){
+  const n=Number(count)||0; if(!n) return '';
+  if(profile==='game') return n+' live thread'+(n===1?'':'s');
+  if(profile==='worldbuilder') return n+' candidate card'+(n===1?'':'s');
+  return '';
+}
+function spaceStatusCount(profile){ return SPACE_STATUS_COUNTS.loaded ? (SPACE_STATUS_COUNTS[profile]||0) : 0; }
+function spaceStatusAria(space){
+  const status=spaceStatusLabel(space.profile, spaceStatusCount(space.profile));
+  return status ? space.title+', '+status : space.title;
+}
+function spaceStatusBadge(profile){
+  const label=spaceStatusLabel(profile, spaceStatusCount(profile));
+  return label ? h('span',{class:'space-status-dot','aria-label':label,title:label}) : null;
+}
+function spaceStatusHost(profile){
+  const dot=spaceStatusBadge(profile);
+  return h('span',{class:'space-status-host'+(dot?' has-status':''),'data-status-space':profile,'aria-hidden':dot?null:'true'}, dot);
+}
+function spaceStatusKey(){
+  const g=ghCfg()||{};
+  return [g.owner||'',g.repo||'',g.branch||'',g.path||''].join('/');
+}
+function clearSpaceStatusCounts(key){
+  SPACE_STATUS_COUNTS.loaded=true; SPACE_STATUS_COUNTS.key=key||''; SPACE_STATUS_COUNTS.worldbuilder=0; SPACE_STATUS_COUNTS.game=0;
+}
+function applySpaceStatusDots(){
+  if(typeof document==='undefined' || !document.querySelectorAll) return;
+  document.querySelectorAll('[data-status-space]').forEach(host=>{
+    const dot=spaceStatusBadge(host.getAttribute('data-status-space'));
+    if(dot){ host.removeAttribute('aria-hidden'); host.className='space-status-host has-status'; host.replaceChildren(dot); }
+    else{ host.setAttribute('aria-hidden','true'); host.className='space-status-host'; host.replaceChildren(); }
+  });
+  document.querySelectorAll('[data-space-title]').forEach(node=>{
+    const title=node.getAttribute('data-space-title')||'', profile=node.getAttribute('data-space')||'';
+    const status=spaceStatusLabel(profile, spaceStatusCount(profile));
+    node.setAttribute('aria-label', status ? title+', '+status : title);
+  });
+}
+async function loadSpaceStatusCounts(key){
+  const cfg=ghCfg(); let worldbuilder=0, game=0;
+  try{ const q=await ghGetText(cfg, QUEUE_PATH); if(q) worldbuilder=parseQueueCards(q.text).filter(card=>card.col==='Candidate').length; }catch(e){ worldbuilder=0; }
+  try{
+    const names=await listCampaigns(cfg);
+    for(const name of names){ try{
+      const files=await campaignFiles(cfg,name);
+      if(!files.threads) continue;
+      const r=await ghGetText(cfg, files.threads);
+      if(r) game+=(parseThreads(r.text).LIVE||[]).length;
+    }catch(e){} }
+  }catch(e){ game=0; }
+  if(key!==spaceStatusKey()) return;
+  SPACE_STATUS_COUNTS.loaded=true; SPACE_STATUS_COUNTS.key=key; SPACE_STATUS_COUNTS.worldbuilder=worldbuilder; SPACE_STATUS_COUNTS.game=game;
+  applySpaceStatusDots();
+}
+function ensureSpaceStatusDots(){
+  if(!ghReady()){ if(SPACE_STATUS_COUNTS.key || !SPACE_STATUS_COUNTS.loaded){ clearSpaceStatusCounts(''); applySpaceStatusDots(); } return; }
+  const key=spaceStatusKey();
+  if(SPACE_STATUS_COUNTS.key!==key){ SPACE_STATUS_COUNTS.loaded=false; SPACE_STATUS_COUNTS.key=key; SPACE_STATUS_COUNTS.worldbuilder=0; SPACE_STATUS_COUNTS.game=0; spaceStatusPromise=null; }
+  if(SPACE_STATUS_COUNTS.loaded){ applySpaceStatusDots(); return; }
+  if(spaceStatusPromise) return;
+  spaceStatusPromise=loadSpaceStatusCounts(key).catch(()=>{}).finally(()=>{ spaceStatusPromise=null; });
+}
 function bottomNav(){
   const spaces=(typeof SPACES!=='undefined'&&SPACES)||[];
   return h('nav',{class:'bottom-nav glass no-print', 'aria-label':'Spaces'},
@@ -2947,9 +3028,12 @@ function bottomNav(){
         class:'bottom-nav-tab'+(current?' current':''),
         type:'button',
         'data-space':space.profile,
+        'data-space-title':space.title,
         'aria-current':current?'page':null,
+        'aria-label':spaceStatusAria(space),
         onclick:()=>setProfile(space.profile),
       },
+        spaceStatusHost(space.profile),
         h('span',{class:'bottom-nav-icon', 'aria-hidden':'true'}, space.icon),
         h('span',{class:'bottom-nav-label'}, space.title));
     }));
@@ -3932,9 +4016,12 @@ function spaceTile(space){
     class:'space-tile'+(current?' current':''),
     type:'button',
     'data-space':space.profile,
+    'data-space-title':space.title,
     'aria-current':current?'page':null,
+    'aria-label':spaceStatusAria(space),
     onclick:()=>setProfile(space.profile),
   },
+    spaceStatusHost(space.profile),
     h('img',{class:'space-art',src:(typeof SPACE_ART!=='undefined'&&SPACE_ART[space.profile])||('art/space-'+space.profile+'.jpg'),alt:'','aria-hidden':'true',decoding:'async'}),
     h('span',{class:'space-veil','aria-hidden':'true'}),
     h('span',{class:'space-icon','aria-hidden':'true'},svgUse(space.emblem,'space-emblem')),
@@ -4006,14 +4093,15 @@ function openOpenToSettings(){
                  UE5 map), flashcards, and a glossary.
      • Journal — progress, a per-session checklist, and a confusion log.
    Chapter/glossary data live in src/data/practice-*.js; all editable state
-   lives in DB.practice and saves through the kit's save(). The coach is offline
-   — it builds prompts you copy into Claude/ChatGPT, not backend calls.
+   lives in DB.practice and saves through the kit's save(). The coach is local-first:
+   it can answer through the configured engine, and still falls back to copy-out prompts.
  * ========================================================================== */
 
 const PRACTICE_TABS = [
   ['learn',   'Learn',   'Follow the book chapter by chapter: a drill you type yourself, a coach that hints without spoiling, flashcards, and a glossary.'],
   ['journal', 'Journal', 'Your progress, a per-session checklist, and a log of confusions to bring to your coach later.'],
 ];
+const PRACTICE_COACH_MAX_TOKENS = 900;
 
 /* ---------- small DOM + state helpers (all reads/writes go through DB.practice) */
 function pField(name){ const v=DB.practice.fields[name]; return v!=null ? v : (PRACTICE_DEFAULTS[name]!=null ? PRACTICE_DEFAULTS[name] : ''); }
@@ -4106,6 +4194,51 @@ function prcCriticPrompt(){ const d=prcCurDrill();
 function prcUE5Prompt(){
   return ['I am learning standard C++ but heading to Unreal Engine 5 C++. For the concept in my code below, show the direct UE5 equivalent as a short mapping (e.g., std::vector→TArray, std::string→FString, std::cout→UE_LOG), with one gotcha each.','',
     'Concept / code:', prcCodeBlock(),'','Keep it a mapping, not a rewrite of my program.'].join('\n'); }
+function practiceCoachModes(){
+  return [
+    {id:'hint',label:'Socratic hint',build:prcSocraticPrompt},
+    {id:'compile',label:'Compile-check',build:prcCompilerPrompt},
+    {id:'critique',label:'Critique',build:prcCriticPrompt},
+    {id:'ue5',label:'UE5 map',build:prcUE5Prompt},
+  ];
+}
+function practiceCoachIsLocalEngine(engine){
+  return engine&&engine.type==='OpenAI-compatible local endpoint';
+}
+function practiceCoachEngine(){
+  return typeof getActiveEngine==='function'?getActiveEngine():null;
+}
+function practiceCoachSpendLabel(engine){
+  if(!engine) return 'No engine configured. Copy prompts still work.';
+  return practiceCoachIsLocalEngine(engine)?'Local coach - $0 on this meter.':'Active API coach - metered usage will be recorded.';
+}
+function practiceCoachChat(prompt,engine){
+  return {
+    messages:[{role:'user',content:String(prompt||'')}],
+    model:engine&&engine.model||'',
+    maxTokens:PRACTICE_COACH_MAX_TOKENS,
+    temperature:0.25,
+  };
+}
+async function practiceCoachCallAi(engine,chat,onChunk){
+  const win=typeof window!=='undefined'?window:null;
+  const hook=win&&typeof win.__practiceAiSend==='function'?win.__practiceAiSend:null;
+  let streamed=false;
+  const emit=(piece,meta)=>{
+    if(piece) streamed=true;
+    if(typeof onChunk==='function') onChunk(piece,meta);
+  };
+  if(hook){
+    const result=await hook(engine,chat,emit);
+    if(!streamed&&result&&result.text) emit(result.text,{text:result.text,model:result.model});
+    if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
+    return result;
+  }
+  if(typeof aiStream==='function') return aiStream(engine,chat,emit);
+  const result=await aiSend(engine,chat);
+  if(!streamed&&result&&result.text) emit(result.text,{text:result.text,model:result.model});
+  return result;
+}
 
 /* ---------- LEARN --------------------------------------------------------- */
 function practiceLearn(host){
@@ -4170,15 +4303,53 @@ function practiceLearn(host){
   }}, '⤓ Load skeleton'));
   drillCard.append(sandboxTools);
   const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
+  const coachStatus=h('div',{class:'sync-status prc-coach-status',role:'status'});
+  const coachAnswer=h('div',{class:'prc-coach-answer'},h('p',{class:'hint'},'Ask in app, or copy a prompt for another AI.'));
+  const coachEngine=practiceCoachEngine();
   const coachBtn=(builder,label)=> h('button',{class:'navbtn', onclick:()=>{ coachOut.value=builder(); prcCopyArea(coachOut, 'Copied — paste into Claude / ChatGPT.'); }}, label);
+  const askCoach=async(builder,label)=>{
+    const prompt=builder();
+    coachOut.value=prompt;
+    const engine=practiceCoachEngine();
+    if(!engine){
+      coachStatus.textContent='Add an Engine profile first, or copy the prompt below.';
+      coachAnswer.replaceChildren(h('p',{class:'hint'},'Copy-out is still available below.'));
+      return;
+    }
+    coachStatus.textContent=practiceCoachIsLocalEngine(engine)?'Asking local coach...':'Asking active API coach. Metered usage will be recorded.';
+    const answerPre=h('pre',{class:'prc-coach-answer-text stream-text'});
+    coachAnswer.replaceChildren(answerPre);
+    try{
+      const result=await practiceCoachCallAi(engine,practiceCoachChat(prompt,engine),piece=>{
+        if(piece) answerPre.append(document.createTextNode(piece));
+      });
+      if(!String(answerPre.textContent||'').trim()) answerPre.append(document.createTextNode(result&&result.text?result.text:'(No text returned.)'));
+      coachStatus.textContent='Coach answer ready. Hints only; your practice progress stayed local.';
+    }catch(error){
+      coachAnswer.replaceChildren(h('p',{class:'bad'},error&&error.message?error.message:String(error)));
+      coachStatus.textContent='The coach could not answer in app. Copy the prompt instead.';
+    }
+  };
+  const askBtn=(builder,label)=>{
+    const btn=h('button',{class:'navbtn primary',type:'button',disabled:coachEngine?null:'true'},'Ask '+label);
+    btn.onclick=()=>askCoach(builder,label);
+    return btn;
+  };
+  const settingsBtn=h('button',{class:'navbtn ghost',type:'button'},'Engine settings');
+  settingsBtn.onclick=()=>openEngineSettings();
   drillCard.append(
     h('h4',{class:'prc-sub'},'Coach (scoped to this chapter)'),
-    h('p',{class:'hint'},'Each builds a ready prompt for your AI — none of them write the answer for you.'),
+    h('p',{class:'hint'},'Each path uses the same chapter-scoped tutor prompt. In-app answers never write canon or repo files.'),
+    typeof usageMeter==='function'?usageMeter():null,
+    h('p',{class:'hint'},practiceCoachSpendLabel(coachEngine)),
+    h('div',{class:'toolrow prc-coach-actions'},
+      ...practiceCoachModes().map(mode=>askBtn(mode.build,mode.label)),
+      !coachEngine?settingsBtn:null),
+    coachStatus,
+    coachAnswer,
+    h('p',{class:'hint'},'Copy-out fallback'),
     h('div',{class:'toolrow'},
-      coachBtn(prcSocraticPrompt,'Socratic hint'),
-      coachBtn(prcCompilerPrompt,'Compile-check'),
-      coachBtn(prcCriticPrompt,'Critique'),
-      coachBtn(prcUE5Prompt,'UE5 map'),
+      ...practiceCoachModes().map(mode=>coachBtn(mode.build,mode.label)),
       h('button',{class:'navbtn', onclick:()=>{ try{ sandbox.focus(); sandbox.select(); navigator.clipboard&&navigator.clipboard.writeText(prcDrillCode()); }catch(_){}; try{ window.open('https://godbolt.org/','_blank','noopener'); }catch(_){}; toast('Code copied — paste it into Compiler Explorer to run.'); }}, '▶ Compiler Explorer')),
     coachOut);
   host.append(drillCard);
@@ -11260,6 +11431,10 @@ const REGION_FORGE_HIDDEN_LINE_RE = /\b(?:gm[-\s]?only|hidden|secret|private|aut
 const REGION_FORGE_DIGEST_LINE_LIMIT = 24;
 const REGION_FORGE_DIGEST_CHAR_LIMIT = 160;
 const REGION_FORGE_START_REVEAL_RADIUS = 2;
+const REGION_FORGE_AI_MAX_TOKENS = 900;
+const REGION_FORGE_AI_TEXT_LIMIT = 360;
+const REGION_FORGE_AI_HIDDEN_KEY_RE = /^(?:gm|gmonly|gm_only|gmnotes|gmtruth|hiddentext|hiddennotes|secret|secrets|private|author|authorside|author_side|patron|patrongifts|patron_gifts|rawhidden|rawgm)$/i;
+const REGION_FORGE_AI_HIDDEN_TEXT_RE = /\b(?:gm[-\s]?only|private|author[-\s]?side|patron|eldrabreer|spoiler)\b/i;
 
 function regionForgeCleanLine(line){
   return String(line||'').replace(/^[-*#>\s]+/,'').trim().replace(/\s+/g,' ');
@@ -11410,6 +11585,214 @@ function regionForgeGenerateCandidate(state,bundle,campaignName){
   return regionForgeInitialReveal(withOverrides,{campaignName});
 }
 
+function regionForgeAiClampText(value,max){
+  const text=String(value||'').trim().replace(/\s+/g,' ');
+  if(text.length<=(max||REGION_FORGE_AI_TEXT_LIMIT)) return text;
+  return text.slice(0,max||REGION_FORGE_AI_TEXT_LIMIT).replace(/\s+\S*$/,'').trim();
+}
+function regionForgeAiSystem(){
+  return [
+    'REGION FORGE GOVERNANCE',
+    'Return JSON only. You propose a candidate for review; you do not write files, mutate live data, or promote canon.',
+    'The deterministic Region Forge and region validator remain authoritative. Any proposal may be rejected.',
+    'Use only visible Forge inputs. Do not reveal, infer, quote, or name hidden, GM-only, private, author-side, patron, or spoiler material.',
+    'Allowed shapes: {"shape":{...},"forces":{...},"direction":"..."} or {"region":{...complete schema-v2 candidate...}}.'
+  ].join('\n');
+}
+function regionForgeAiPublicBundle(bundle,campaignName){
+  const source=bundle||{};
+  const out={
+    campaign:{name:campaignName,premise:source.campaign&&source.campaign.premise||''},
+    setup:regionClone(source.setup||{}),
+    visible:regionClone(source.visible||{}),
+  };
+  if(source.character) out.character=regionClone(source.character);
+  return out;
+}
+function regionForgeAiPrompt(state,bundle,campaignName){
+  const publicBundle=regionForgeAiPublicBundle(bundle,campaignName);
+  const publicInput=regionForgeBuildInput(state,publicBundle,campaignName);
+  const facts=regionForgeCampaignFacts(bundle);
+  return [
+    'Return one JSON object for an optional Region Forge proposal.',
+    'Do not include prose outside JSON.',
+    'Hidden inputs detected: '+(facts.hiddenInputs?'yes; acknowledge only this boolean, do not infer or expose contents.':'no.'),
+    'Visible Forge input:',
+    JSON.stringify(regionForgeStableSnapshot(publicInput),null,2),
+    'Preferred hint keys: shape.id, shape.title, shape.width, shape.height, shape.cosmicLayer, shape.neighborLayer, shape.blendStrength, shape.terrainCharacter, forces.elementEmphasis, forces.ambientMana, forces.danger, direction.',
+    'If returning a region object, it must be complete schema-v2 JSON for campaign "'+campaignName+'" and must contain no hidden/GM-only/private fields.'
+  ].join('\n');
+}
+function regionForgeAiJsonText(text){
+  const raw=String(text==null?'':text).trim();
+  const fenced=/```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
+  if(fenced) return fenced[1].trim();
+  const start=raw.indexOf('{'), end=raw.lastIndexOf('}');
+  if(start>=0&&end>start) return raw.slice(start,end+1);
+  return raw;
+}
+function regionForgeParseAiProposal(text){
+  try{ return JSON.parse(regionForgeAiJsonText(text)); }
+  catch(error){ throw new Error('AI proposal must be a JSON object: '+String(error&&error.message||error)); }
+}
+function regionForgeAiError(path,message){ return {path,message,text:(path?path+': ':'')+message}; }
+function regionForgeAiProposalHiddenErrors(value,path,out){
+  const errors=out||[], here=path||'proposal';
+  if(Array.isArray(value)){
+    value.forEach((item,index)=>regionForgeAiProposalHiddenErrors(item,here+'['+index+']',errors));
+    return errors;
+  }
+  if(regionIsRecord(value)){
+    if(regionVisibilityHidden(value)) errors.push(regionForgeAiError(here,'contains hidden or GM-only visibility'));
+    Object.keys(value).forEach(key=>{
+      const nextPath=here+'.'+key, normalized=String(key||'').replace(/[-\s]/g,'').toLowerCase(), child=value[key];
+      if(REGION_FORGE_AI_HIDDEN_KEY_RE.test(normalized) && child!==false && child!=='' && child!=null){
+        errors.push(regionForgeAiError(nextPath,'hidden/GM-only proposal fields are not allowed'));
+      }
+      if(normalized==='sourceprofilesnapshot' && /(?:^|\.)metadata$/.test(here)){
+        errors.push(regionForgeAiError(nextPath,'AI proposals cannot carry source profile snapshots'));
+      }
+      if(normalized==='visibility'){
+        const v=typeof child==='string'?child.trim().toLowerCase():'';
+        if(REGION_HIDDEN_VISIBILITIES.includes(v)) errors.push(regionForgeAiError(nextPath,'hidden visibility is not allowed in AI proposals'));
+      }
+      regionForgeAiProposalHiddenErrors(child,nextPath,errors);
+    });
+    return errors;
+  }
+  if(typeof value==='string' && REGION_FORGE_AI_HIDDEN_TEXT_RE.test(value)){
+    errors.push(regionForgeAiError(here,'appears to contain hidden/GM-only source text'));
+  }
+  return errors;
+}
+function regionForgeAiLooksLikeRegion(value){
+  return regionIsRecord(value) && (value.schemaVersion!==undefined ||
+    (Array.isArray(value.localLayers) && Array.isArray(value.features) && regionIsRecord(value.terrain)));
+}
+function regionForgeAiRegionObject(raw){
+  if(regionForgeAiLooksLikeRegion(raw)) return raw;
+  if(!regionIsRecord(raw)) return null;
+  const keys=['region','candidate','candidateRegion'];
+  for(let i=0;i<keys.length;i++){
+    const value=raw[keys[i]];
+    if(regionForgeAiLooksLikeRegion(value)) return value;
+  }
+  return null;
+}
+function regionForgeAiFirstValue(){
+  for(let i=0;i<arguments.length;i++){
+    const value=arguments[i];
+    if(value!==undefined && value!==null && value!=='') return value;
+  }
+  return undefined;
+}
+function regionForgeAiTextValue(value){
+  if(Array.isArray(value)) return value.map(item=>regionForgeAiClampText(item,80)).filter(Boolean).join(' ');
+  if(regionIsRecord(value)){
+    const weighted=Object.entries(value).filter(([,weight])=>Number(weight)>0).map(([key])=>key);
+    if(weighted.length) return weighted.join(' ');
+    return regionForgeCollectText(value).map(item=>regionForgeAiClampText(item,80)).filter(Boolean).join(' ');
+  }
+  return regionForgeAiClampText(value,REGION_FORGE_AI_TEXT_LIMIT);
+}
+function regionForgeAiStatePatch(raw,currentState){
+  const src=regionIsRecord(raw)?raw:{};
+  const shape=regionIsRecord(src.shape)?src.shape:{};
+  const forces=regionIsRecord(src.forces)?src.forces:{};
+  const patch={};
+  const id=regionForgeAiFirstValue(src.id,src.regionId,shape.id,shape.regionId);
+  if(id!==undefined) patch.id=regionForgeSlug(id,currentState&&currentState.id||'region');
+  const title=regionForgeAiFirstValue(src.title,shape.title);
+  if(title!==undefined) patch.title=regionForgeAiClampText(title,120);
+  const width=Number(regionForgeAiFirstValue(src.width,shape.width));
+  if(Number.isFinite(width)) patch.width=Math.round(regionForgeClamp(width,8,18));
+  const height=Number(regionForgeAiFirstValue(src.height,shape.height));
+  if(Number.isFinite(height)) patch.height=Math.round(regionForgeClamp(height,6,14));
+  const cosmic=String(regionForgeAiFirstValue(src.cosmicLayer,src.primaryCosmicLayer,shape.cosmicLayer,shape.primaryCosmicLayer)||'').trim().toLowerCase();
+  if(REGION_COSMIC_LAYERS.includes(cosmic)) patch.cosmicLayer=cosmic;
+  const neighbor=String(regionForgeAiFirstValue(src.neighborLayer,src.blendNeighbor,shape.neighborLayer,shape.blendNeighbor)||'').trim().toLowerCase();
+  const primary=patch.cosmicLayer||currentState&&currentState.cosmicLayer||'middle';
+  if(REGION_COSMIC_LAYERS.includes(neighbor) && regionCosmicBlendAdjacent(primary,neighbor)) patch.neighborLayer=neighbor;
+  const blendStrength=Number(regionForgeAiFirstValue(src.blendStrength,shape.blendStrength,src.transitionStrength,shape.transitionStrength));
+  if(Number.isFinite(blendStrength)) patch.blendStrength=regionForgeClamp(blendStrength,0,1);
+  const terrain=regionForgeAiFirstValue(src.terrainCharacter,src.terrain,shape.terrainCharacter,shape.terrain);
+  if(terrain!==undefined) patch.terrainCharacter=regionForgeAiTextValue(terrain);
+  const elements=regionForgeAiFirstValue(src.elementEmphasis,src.elements,forces.elementEmphasis,forces.elements);
+  if(elements!==undefined) patch.elementEmphasis=regionForgeAiTextValue(elements);
+  const mana=String(regionForgeAiFirstValue(src.ambientMana,src.mana,forces.ambientMana,forces.mana,forces.manaBand)||'').trim().toLowerCase();
+  if(['recommended','quiet','steady','bright','charged','severe'].includes(mana)) patch.ambientMana=mana;
+  const danger=String(regionForgeAiFirstValue(src.danger,src.threat,forces.danger,forces.threat)||'').trim().toLowerCase();
+  if(['recommended','low','moderate','high'].includes(danger)) patch.danger=danger;
+  const direction=regionForgeAiFirstValue(src.direction,src.directionHints,src.guidance,src.notes);
+  if(direction!==undefined) patch.direction=regionForgeAiTextValue(direction);
+  return patch;
+}
+function regionForgeAiApplyPatch(state,patch){
+  const next={...(state||{})};
+  Object.keys(patch||{}).forEach(key=>{ next[key]=patch[key]; });
+  if(next.neighborLayer && !regionCosmicBlendAdjacent(next.cosmicLayer,next.neighborLayer)) next.neighborLayer='';
+  return next;
+}
+function regionForgeAiPatchSummary(patch){
+  const labels={
+    id:'id', title:'title', width:'width', height:'height', cosmicLayer:'cosmic layer',
+    neighborLayer:'blend neighbor', blendStrength:'blend strength', terrainCharacter:'terrain',
+    elementEmphasis:'elements', ambientMana:'mana', danger:'danger', direction:'direction',
+  };
+  const keys=Object.keys(patch||{}).filter(key=>labels[key]);
+  return keys.length?keys.map(key=>labels[key]).join(', '):'no usable Forge fields';
+}
+function regionForgeNormalizeAiProposal(raw,state,bundle,campaignName){
+  if(!regionIsRecord(raw)) return {kind:'invalid',raw,region:null,patch:{},errors:[regionForgeAiError('proposal','must be a JSON object')]};
+  const hiddenErrors=regionForgeAiProposalHiddenErrors(raw,'proposal');
+  if(hiddenErrors.length) return {kind:'invalid',raw,region:null,patch:{},errors:hiddenErrors};
+  const regionSource=regionForgeAiRegionObject(raw);
+  if(regionSource){
+    let normalized, errors=[];
+    try{ normalized=normalizeRegion(regionSource); }
+    catch(error){ return {kind:'region',raw,region:null,patch:{},errors:[regionForgeAiError('region',String(error&&error.message||error))]}; }
+    errors=errors.concat(validateRegion(normalized,{expectedCampaign:campaignName}));
+    errors=errors.concat(regionForgeAiProposalHiddenErrors(normalized,'region'));
+    if(!errors.length){
+      try{ normalized=regionForgeInitialReveal(normalized,{campaignName}); }
+      catch(error){ errors.push(regionForgeAiError('region',String(error&&error.message||error))); }
+    }
+    if(!errors.length) errors=errors.concat(validateRegion(normalized,{expectedCampaign:campaignName}));
+    return {
+      kind:'region',
+      raw,
+      region:errors.length?null:normalized,
+      patch:{},
+      errors,
+      summary:errors.length?'region candidate rejected':'complete region candidate',
+      active:false,
+    };
+  }
+  const patch=regionForgeAiStatePatch(raw,state);
+  const proposedState=regionForgeAiApplyPatch(state,patch);
+  let region=null, errors=[];
+  try{
+    region=regionForgeGenerateCandidate(proposedState,bundle,campaignName);
+    errors=validateRegion(region,{expectedCampaign:campaignName});
+  }catch(error){
+    errors=[regionForgeAiError('proposal',String(error&&error.message||error))];
+  }
+  return {
+    kind:'hints',
+    raw,
+    region:errors.length?null:region,
+    patch,
+    state:proposedState,
+    errors,
+    summary:'hint proposal: '+regionForgeAiPatchSummary(patch),
+    active:false,
+  };
+}
+function regionForgeAiProposalFromText(text,state,bundle,campaignName){
+  try{ return regionForgeNormalizeAiProposal(regionForgeParseAiProposal(text),state,bundle,campaignName); }
+  catch(error){ return {kind:'invalid',raw:null,region:null,patch:{},errors:[regionForgeAiError('proposal',String(error&&error.message||error))]}; }
+}
+
 function regionForgeSilhouetteCell(x,y,width,height){
   if(width<=3||height<=3) return x===0||y===0;
   return x===0||y===0||x===width-1||y===height-1||((x*7+y*11)%17===0);
@@ -11530,7 +11913,7 @@ function regionForgeTextarea(value,onchange,attrs){
 
 function regionForgeWorkspace(host,cfg,campaignName,initialRole){
   const state=regionForgeDefaultState(campaignName,initialRole==='starter'?'starter':'outer');
-  let bundle=null, status='Loading campaign inputs…', saving=false;
+  let bundle=null, status='Loading campaign inputs…', saving=false, aiProposal=null, aiBusy=false, aiStatus='';
   host.replaceChildren(h('p',{class:'hint',style:{textAlign:'center'}},status));
   regionForgeCampaignSource(cfg,campaignName).then(source=>{
     bundle=source; state.seed=regionForgeOuterUiSeed(campaignName,bundle); status=''; draw();
@@ -11544,11 +11927,51 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
     const next=regionForgeDefaultState(campaignName,role);
     Object.keys(next).forEach(key=>{ state[key]=next[key]; });
     if(state.role==='outer') state.seed=regionForgeOuterUiSeed(campaignName,bundle);
+    aiProposal=null; aiStatus='';
     draw();
   }
-  function update(key,value){ state[key]=value; draw(); }
+  function update(key,value){ state[key]=value; if(aiProposal){ aiProposal=null; aiStatus='AI proposal cleared after Forge inputs changed.'; } draw(); }
   function candidate(){
+    if(aiProposal&&aiProposal.active&&aiProposal.region) return aiProposal.region;
     return regionForgeGenerateCandidate(state,bundle,campaignName);
+  }
+  async function askAiProposal(){
+    if(!bundle){ aiStatus='Campaign inputs are still loading.'; draw(); return; }
+    if(typeof getActiveEngine!=='function'||typeof aiSend!=='function'){ aiStatus='AI proposal tools are not available in this build.'; draw(); return; }
+    const engine=getActiveEngine();
+    if(!engine){ aiStatus='Add an Engine profile first. Forge still works offline.'; draw(); return; }
+    aiBusy=true; aiStatus='Asking the selected engine for a structured proposal…'; draw();
+    try{
+      const result=await aiSend(engine,{
+        system:regionForgeAiSystem(),
+        messages:[{role:'user',content:regionForgeAiPrompt(state,bundle,campaignName)}],
+        maxTokens:REGION_FORGE_AI_MAX_TOKENS,
+        temperature:0.2,
+      });
+      aiProposal=regionForgeAiProposalFromText(result&&result.text,state,bundle,campaignName);
+      aiStatus=aiProposal.errors.length?'Proposal rejected: '+aiProposal.errors.map(e=>e.text).join('; '):'Proposal ready. Review it before using.';
+    }catch(error){
+      aiProposal=null; aiStatus='AI proposal failed: '+String(error&&error.message||error);
+    }finally{
+      aiBusy=false; draw();
+    }
+  }
+  function useAiProposal(){
+    if(!aiProposal||aiProposal.errors.length) return;
+    if(aiProposal.kind==='region'){
+      aiProposal={...aiProposal,active:true};
+      aiStatus='AI region candidate selected for preview. Reject returns to the deterministic Forge preview.';
+      draw(); return;
+    }
+    Object.keys(aiProposal.patch||{}).forEach(key=>{ state[key]=aiProposal.patch[key]; });
+    aiProposal=null;
+    aiStatus='AI proposal applied to Forge inputs. Review the generated preview before accepting.';
+    draw();
+  }
+  function rejectAiProposal(){
+    aiProposal=null;
+    aiStatus='AI proposal rejected. Live Forge data was unchanged.';
+    draw();
   }
   async function accept(){
     const preview=candidate(), errors=validateRegion(preview,{expectedCampaign:campaignName});
@@ -11589,6 +12012,21 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
         regionForgeField('Danger',regionForgeSelect(state.danger,[['recommended','Recommended'],['low','Low'],['moderate','Moderate'],['high','High']],v=>update('danger',v)),'Guides broad-strokes hazards, not automatic consequences.')));
     const directionStage=regionForgeStage('Direction','optional prose',
       regionForgeField('Short direction',regionForgeTextarea(state.direction,v=>update('direction',v),{rows:'3',placeholder:'Optional: lean toward misty ravines, old crossings, safe camp first…'}),'Used as a soft input only; validation and campaign facts remain authoritative.'));
+    const activeEngine=typeof getActiveEngine==='function'?getActiveEngine():null;
+    const proposalErrors=aiProposal&&Array.isArray(aiProposal.errors)?aiProposal.errors:[];
+    const proposalPreview=aiProposal&&aiProposal.region;
+    const aiStage=regionForgeStage('AI proposal','optional review step',
+      h('div',{class:'toolrow region-forge-ai-actions'},
+        h('button',{class:'navbtn primary',type:'button',disabled:(aiBusy||!bundle||!activeEngine)?'true':null,onclick:askAiProposal},aiBusy?'Asking…':'Ask AI'),
+        !activeEngine?h('button',{class:'navbtn ghost',type:'button',onclick:()=>openEngineSettings()},'Engine settings'):null,
+        h('button',{class:'navbtn ghost',type:'button',disabled:(!aiProposal||proposalErrors.length)?'true':null,onclick:useAiProposal},aiProposal&&aiProposal.kind==='region'?'Use candidate':'Use proposal'),
+        h('button',{class:'navbtn ghost',type:'button',disabled:!aiProposal?'true':null,onclick:rejectAiProposal},'Reject')),
+      aiProposal?h('div',{class:'region-forge-ai-card'+(proposalErrors.length?' bad':'')+(aiProposal.active?' active':'')},
+        h('b',null,aiProposal.kind==='region'?'Region candidate':'Hint proposal'),
+        h('p',{class:'hint'},aiProposal.summary||'Structured proposal'),
+        proposalPreview&&!proposalErrors.length?h('p',null,proposalPreview.title+' · '+regionCosmicLabel(proposalPreview)+' · '+proposalPreview.localLayers.length+' local layers · '+regionAtlasDiscoveryLabel(proposalPreview)):null,
+        proposalErrors.length?h('div',{class:'region-invalid'},h('b',null,'Rejected'),h('ul',null,...proposalErrors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},aiProposal.active?'Selected for preview':'Valid candidate')):null,
+      aiStatus?h('p',{class:'hint region-forge-ai-status',role:'status'},aiStatus):null);
     const seedText=preview&&preview.metadata&&preview.metadata.seed||state.seed;
     const seedStage=regionForgeStage('Seed','visible provenance',
       h('div',{class:'region-forge-grid'},
@@ -11600,7 +12038,7 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
       preview?h('p',{class:'hint'},'Provenance: '+preview.metadata.generator+' '+preview.metadata.generatorVersion+' · '+preview.metadata.regionRole+' · source hash stored, raw hidden text not shown.'):null);
     const previewStage=regionForgeStage('Preview','GM truth ⇄ player fog',
       errors.length?h('div',{class:'region-invalid'},h('b',null,'Validation'),h('ul',null,...errors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},'Valid generated region save'),
-      preview?regionMapPanel({region:preview,errors:[]},{initialView:'gm',footerText:'Preview only. GM view shows the complete generated truth; Player view applies the initial discovery mask and hides GM-only/fogged detail.'}):null,
+      preview?regionMapPanel({region:preview,errors:[]},{initialView:'gm',footerText:(aiProposal&&aiProposal.active?'AI candidate selected; accept still writes through the guarded region save path. ':'')+'Preview only. GM view shows the complete generated truth; Player view applies the initial discovery mask and hides GM-only/fogged detail.'}):null,
       preview?h('div',{class:'region-forge-summary'},
         h('b',null,'Generated summary'),
         h('p',null,preview.title+' · '+regionCosmicLabel(preview)+' · '+preview.localLayers.length+' local layers · '+regionAtlasDiscoveryLabel(preview)),
@@ -11609,7 +12047,7 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
       h('button',{class:'navbtn ghost',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region'})},'← Back to atlas'),
       h('button',{class:'navbtn primary',type:'button',disabled:(saving||!preview||errors.length)?'true':null,onclick:accept},saving?'Saving…':'Accept into campaign atlas'),
       h('span',{class:'hint',role:'status'},status));
-    host.replaceChildren(h('div',{class:'region-forge'},sourceStage,shapeStage,forcesStage,directionStage,seedStage,previewStage,acceptRow));
+    host.replaceChildren(h('div',{class:'region-forge'},sourceStage,shapeStage,forcesStage,directionStage,aiStage,seedStage,previewStage,acceptRow));
   }
 }
 
