@@ -924,6 +924,12 @@
 .region-map.cosmic-top{border-top:4px solid #8fc7e6}
 .region-map.cosmic-middle{border-top:4px solid #cdb25e}
 .region-map.cosmic-bottom{border-top:4px solid #6f6076}
+/* Primary appearance = the cosmic layer: the Cloudsea atmosphere behind the map.
+   Top radiant/airy, Middle calm, Bottom dim/heavy. Feature labels carry a light
+   halo (paint-order:stroke) so they stay legible on the darker Bottom sky. */
+.region-map.cosmic-top .region-map-svg{background:radial-gradient(120% 92% at 50% 38%,#fbf4d8,#efe6c6)}
+.region-map.cosmic-middle .region-map-svg{background:#f1ecda}
+.region-map.cosmic-bottom .region-map-svg{background:radial-gradient(120% 92% at 50% 42%,#494559,#322f3e)}
 .region-layer-switch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
 .region-map-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .region-view-toggle{margin-left:auto}
@@ -1111,6 +1117,40 @@
 .space-current{padding:4px 7px;border-radius:999px;background:#fff8}
 .spaces-foot{text-align:center;margin:26px 0 0;color:var(--green);font-size:22px}
 .spaces-nav{padding-inline:12px}
+/* The front-door art stays cream/parchment even in night mode, so it needs
+   local ink tokens instead of inheriting the dark chrome's pale text. */
+body.theme-night :is(.spaces-intro,.space-tile){
+  color-scheme:light;
+  --paper-card:#fbf7ec;
+  --ink:#2e2a24;
+  --ink-soft:#4a463b;
+  --hint:#5b6f86;
+  --gold:#b98e3c;
+  --gold-soft:#cdbf9a;
+  --green:#3e6b4f;
+  --shadow:60 52 30;
+}
+body.theme-night .space-tile[data-space="maker"]{--accent:#2d7f72}
+body.theme-night .space-tile[data-space="worldbuilder"]{--accent:#5960ac}
+body.theme-night .space-tile[data-space="game"]{--accent:#8c6038}
+body.theme-night .space-tile[data-space="learner"]{--accent:#2e789d}
+@media (prefers-color-scheme:dark){
+  body.theme-auto :is(.spaces-intro,.space-tile){
+    color-scheme:light;
+    --paper-card:#fbf7ec;
+    --ink:#2e2a24;
+    --ink-soft:#4a463b;
+    --hint:#5b6f86;
+    --gold:#b98e3c;
+    --gold-soft:#cdbf9a;
+    --green:#3e6b4f;
+    --shadow:60 52 30;
+  }
+  body.theme-auto .space-tile[data-space="maker"]{--accent:#2d7f72}
+  body.theme-auto .space-tile[data-space="worldbuilder"]{--accent:#5960ac}
+  body.theme-auto .space-tile[data-space="game"]{--accent:#8c6038}
+  body.theme-auto .space-tile[data-space="learner"]{--accent:#2e789d}
+}
 @media(max-width:720px){
   .spaces-front{margin-top:8px}.spaces-intro h1{font-size:38px}
   .spaces-grid{grid-template-columns:1fr}.space-tile{min-height:142px;padding:20px}
@@ -1199,6 +1239,7 @@
 
   /* ---- cloud palette: cool aetherial surfaces (was warm parchment) -------- */
   :root{
+    color-scheme:light;
     --maxw:1280px;            /* cloud shell width; parchment tokens stay in tokens.css */
     --paper:#e9f1fb;          /* page / framed surface — cool sky-white       */
     --paper-card:#f3f8fe;     /* card & input body — luminous cool white      */
@@ -1212,9 +1253,12 @@
     --sky-1:#dfecfb;          /* top, palest                                  */
     --sky-2:#c6d6f1;          /* middle                                       */
     --sky-3:#cdc8ec;          /* foot, faint violet — high-altitude aether    */
+    --sky-haze-1:rgba(255,255,255,.55);
+    --sky-haze-2:rgba(150,190,255,.28);
     --glass-bg:rgba(255,255,255,.46);
     --glass-strong:rgba(255,255,255,.64);
     --glass-border:rgba(255,255,255,.72);
+    --glass-solid:rgba(255,255,255,.9);
     --glass-blur:14px;
     --glow:#7fb0ff;           /* aether cyan-blue glow                        */
     /* Accent tokens are UI identity only, not canon symbolism. */
@@ -1232,20 +1276,95 @@
   body.profile-game{ --accent:var(--accent-game); }
   body.profile-learn{ --accent:var(--accent-apprentice); }
 
+  body.theme-light{ color-scheme:light; }
+  body.theme-night{
+    color-scheme:dark;
+    --paper:#0f1824;
+    --paper-card:#162436;
+    --paper-slot:#203249;
+    --ink:#eef6ff;
+    --ink-soft:#cad8ea;
+    --gold:#d7b465;
+    --gold-soft:#77613a;
+    --green:#8fd1ae;
+    --slate:#9ab0da;
+    --hint:#aab8cc;
+    --shadow:3 8 18;
+    --sky-1:#07111f;
+    --sky-2:#0c1a2c;
+    --sky-3:#16162a;
+    --sky-haze-1:rgba(95,140,210,.18);
+    --sky-haze-2:rgba(125,100,190,.16);
+    --glass-bg:rgba(215,232,255,.09);
+    --glass-strong:rgba(225,238,255,.14);
+    --glass-border:rgba(207,226,255,.2);
+    --glass-solid:rgba(18,30,45,.94);
+    --glow:#75a8ff;
+    --accent-maker:#69cdb6;
+    --accent-worldbuilder:#abb1ff;
+    --accent-game:#e1aa78;
+    --accent-apprentice:#7ec4f4;
+    --accent-mana:#6cd1ed;
+    --accent-divinemana:#b7a3ff;
+    --accent-hunger:#ef9aad;
+    --accent-strain:#e1bd73;
+  }
+  @media (prefers-color-scheme:dark){
+    body.theme-auto{
+      color-scheme:dark;
+      --paper:#0f1824;
+      --paper-card:#162436;
+      --paper-slot:#203249;
+      --ink:#eef6ff;
+      --ink-soft:#cad8ea;
+      --gold:#d7b465;
+      --gold-soft:#77613a;
+      --green:#8fd1ae;
+      --slate:#9ab0da;
+      --hint:#aab8cc;
+      --shadow:3 8 18;
+      --sky-1:#07111f;
+      --sky-2:#0c1a2c;
+      --sky-3:#16162a;
+      --sky-haze-1:rgba(95,140,210,.18);
+      --sky-haze-2:rgba(125,100,190,.16);
+      --glass-bg:rgba(215,232,255,.09);
+      --glass-strong:rgba(225,238,255,.14);
+      --glass-border:rgba(207,226,255,.2);
+      --glass-solid:rgba(18,30,45,.94);
+      --glow:#75a8ff;
+      --accent-maker:#69cdb6;
+      --accent-worldbuilder:#abb1ff;
+      --accent-game:#e1aa78;
+      --accent-apprentice:#7ec4f4;
+      --accent-mana:#6cd1ed;
+      --accent-divinemana:#b7a3ff;
+      --accent-hunger:#ef9aad;
+      --accent-strain:#e1bd73;
+    }
+  }
+
   /* ---- Vael surfaces: restore the printed-kit parchment palette ---------- */
   .theme-vael{
+    color-scheme:light;
     --paper:#faf4e6;
     --paper-card:#fbf7ec;
     --paper-slot:#f0e7d0;
     --ink:#2e2a24;
     --ink-soft:#4a463b;
+    --gold:#b98e3c;
+    --gold-soft:#cdbf9a;
+    --green:#3e6b4f;
+    --slate:#3e4a6b;
+    --hint:#9a8f7a;
+    --shadow:60 52 30;
   }
 
   /* ---- sky backdrop: a fixed gradient with two slow-drifting light blobs -- */
   body{
     background:
-      radial-gradient(1200px 620px at 14% -12%, rgba(255,255,255,.55), transparent 60%),
-      radial-gradient(1000px 720px at 102% 8%, rgba(150,190,255,.28), transparent 55%),
+      radial-gradient(1200px 620px at 14% -12%, var(--sky-haze-1), transparent 60%),
+      radial-gradient(1000px 720px at 102% 8%, var(--sky-haze-2), transparent 55%),
       linear-gradient(165deg, var(--sky-1), var(--sky-2) 55%, var(--sky-3));
     background-attachment:fixed;
     background-size:200% 200%, 200% 200%, 100% 100%;
@@ -1268,7 +1387,7 @@
   }
   /* solid fallback where backdrop-filter is unsupported (old webviews) */
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
-    .glass{ background:rgba(255,255,255,.9); }
+    .glass{ background:var(--glass-solid); }
   }
   .glow{ box-shadow:0 10px 34px -16px var(--glow), 0 0 0 1px var(--glass-border); }
   /* glow tinted by the nearest element accent, falling back to aether cyan */
@@ -1283,16 +1402,40 @@
     border-radius:0 0 16px 16px;
   }
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
-    .topbar{ background:rgba(255,255,255,.92); }
+    .topbar{ background:var(--glass-solid); }
   }
   .navbtn{ background:var(--glass-bg); }
   .navbtn.primary{
     border-color:var(--accent); color:var(--ink);
     box-shadow:0 12px 28px -24px var(--accent);
   }
+  body.theme-night .navbtn.primary{
+    background:rgba(238,250,232,.94); color:#132133;
+  }
+  @media (prefers-color-scheme:dark){
+    body.theme-auto .navbtn.primary{
+      background:rgba(238,250,232,.94); color:#132133;
+    }
+  }
   .studio-tabs .tab{ background:var(--glass-bg); }
   .studio-tabs .tab.on{
     border-color:var(--accent); box-shadow:0 10px 22px -22px var(--accent);
+  }
+  body.theme-night :is(.space-subnav .tab, .studio-tabs .tab, .prc-lessontabs .tab, .toolbtn, .gal-card .acts button, .engine-quick){
+    background:var(--glass-bg); border-color:var(--glass-border); color:var(--ink-soft);
+  }
+  body.theme-night :is(.space-subnav .tab.on, .studio-tabs .tab.on, .prc-lessontabs .tab.on){
+    background:var(--glass-strong); border-color:var(--accent); color:var(--ink);
+  }
+  body.theme-night .prc-out{ background:var(--paper-slot); }
+  @media (prefers-color-scheme:dark){
+    body.theme-auto :is(.space-subnav .tab, .studio-tabs .tab, .prc-lessontabs .tab, .toolbtn, .gal-card .acts button, .engine-quick){
+      background:var(--glass-bg); border-color:var(--glass-border); color:var(--ink-soft);
+    }
+    body.theme-auto :is(.space-subnav .tab.on, .studio-tabs .tab.on, .prc-lessontabs .tab.on){
+      background:var(--glass-strong); border-color:var(--accent); color:var(--ink);
+    }
+    body.theme-auto .prc-out{ background:var(--paper-slot); }
   }
 
   /* cards & tiles: lift on the sky, glow softly on hover. Motion is interaction-only
@@ -1337,7 +1480,7 @@
     border-color:var(--glass-border);
   }
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
-    .assistant-answer{ background:rgba(255,255,255,.9); }
+    .assistant-answer{ background:var(--glass-solid); }
   }
 
   /* ---- streaming-text treatment (ready for Slice 2) ---------------------- */
@@ -1442,7 +1585,7 @@
     .bottom-nav-tab[data-space="game"]{ --accent:var(--accent-game); }
     .bottom-nav-tab[data-space="learner"]{ --accent:var(--accent-apprentice); }
     .bottom-nav-tab.current{
-      background:rgba(255,255,255,.58); color:var(--ink); box-shadow:inset 0 0 0 1px var(--accent),0 12px 24px -22px var(--accent);
+      background:var(--glass-bg); color:var(--ink); box-shadow:inset 0 0 0 1px var(--accent),0 12px 24px -22px var(--accent);
     }
     .bottom-nav-tab.current::before{
       content:""; position:absolute; top:5px; left:50%; width:22px; height:3px; border-radius:999px;
@@ -2838,7 +2981,7 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -2849,6 +2992,7 @@ function hydrate(d){
   merged.openTo=openToSeen&&d.openTo==='last'?'last':'frontdoor';
   merged.openToSeen=true;
   merged.fxRich=!!d.fxRich;
+  merged.themeMode=d.themeMode==='dark'||d.themeMode==='light'?d.themeMode:'auto';
   merged.syncPractice=!!d.syncPractice;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
@@ -3108,6 +3252,7 @@ function moreMenu(){
     advanced?item('☁ My file', ()=>openGitHubPanel()):null,
     advanced?item('⚙ Engine', ()=>openEngineSettings()):null,
     item('⌂ On open', ()=>openOpenToSettings()),
+    item('◐ Theme: '+themeModeLabel(), ()=>cycleThemeMode()),
     item((DB.fxRich?'✦ Atmospherics: on':'✧ Atmospherics: off'), ()=>setAtmospherics(!DB.fxRich)),
     item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
@@ -3921,9 +4066,13 @@ function undoToast(msg, onUndo){
 }
 
 /* ---------- Cozy / Full kit mode ------------------------------------------- */
-function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game','profile-learn');
+function themeModeValue(value){ return value==='dark'||value==='light'?value:'auto'; }
+function themeModeLabel(){ const m=themeModeValue(DB.themeMode); return m==='dark'?'Night' : m==='light'?'Day' : 'Auto'; }
+function themeModeClass(value){ const m=themeModeValue(value); return m==='dark'?'theme-night' : m==='light'?'theme-light' : 'theme-auto'; }
+function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game','profile-learn','theme-auto','theme-night','theme-light');
   const cls = DB.profile==='worldbuilder'?'profile-world' : DB.profile==='game'?'profile-game' : DB.profile==='learner'?'profile-learn' : 'profile-maker';
   b.classList.add(cls);
+  b.classList.add(themeModeClass(DB.themeMode));
   const advanced = DB.profile!=='maker';   // worldbuilder + game + apprentice always see the full toolset
   b.classList.add((advanced || DB.mode==='full')?'mode-full':'mode-simple');
   // Aliveness ceiling: .fx-rich opts into extra ambient motion (drifting motes, glow
@@ -3933,6 +4082,10 @@ function applyMode(){ const b=document.body; b.classList.remove('mode-simple','m
 // Opt-in "generous atmospherics" — a device-local visual preference (not synced, like mode).
 function setAtmospherics(on){ DB.fxRich=!!on; save(); applyMode();
   toast(DB.fxRich? 'Atmospherics on — the sky breathes a little.' : 'Atmospherics calm — motion only when you act.'); }
+// Device-local theme preference. Auto follows the operating system; Night/Day pin it here.
+function setThemeMode(value){ DB.themeMode=themeModeValue(value); save(); applyMode();
+  toast(DB.themeMode==='dark'?'Night theme — softer for late work.' : DB.themeMode==='light'?'Day theme — bright sky restored.' : 'Theme auto — following this device.'); }
+function cycleThemeMode(){ const m=themeModeValue(DB.themeMode); setThemeMode(m==='auto'?'dark':m==='dark'?'light':'auto'); }
 // Gating is pure CSS on the body class, so a mode switch only needs to flip the class
 // and refresh the top bar's label — no view re-render, so in-progress edits are kept.
 function setMode(m){ DB.mode=m; save(); applyMode(); if($app.firstChild) $app.replaceChild(topbar(), $app.firstChild); toast(m==='full'? 'Full kit — everything’s here.' : 'Cozy mode — just the essentials.'); }
@@ -11056,6 +11209,71 @@ function regionMapTextSummary(region, view){
   return lines.join('\n') + '\n';
 }
 
+// ---- Region cartography: hand-drawn terrain textures ----------------------
+// Map a terrain value to a motif family; smooth/unknown terrain has none (stays
+// flat). regionCellColor remains the authority for colour — textures sit on top.
+function regionTerrainFamily(value){
+  const v = String(value == null ? '' : value).toLowerCase();
+  if (/lava/.test(v)) return 'lava';
+  if (/water|sea|lake|river|deep/.test(v)) return 'water';
+  if (/forest|wood|jungle/.test(v)) return 'forest';
+  if (/mountain|peak|cliff|rock|stone|cave|cavern|tunnel|ash/.test(v)) return 'mountain';
+  if (/sand|desert|dirt|soil|loam/.test(v)) return 'sand';
+  if (/swamp|marsh|mud/.test(v)) return 'swamp';
+  if (/ice|snow|frost/.test(v)) return 'snow';
+  if (/grass|meadow|plain/.test(v)) return 'grass';
+  return 'plain';
+}
+function regionTerrainPatternId(value){
+  return 'rpat-' + String(value == null ? '' : value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+// Motif tile [w, h, specs]; each spec is [tag, attrs], drawn over the base colour.
+// null = no texture (smooth/unknown terrain) -> the cell keeps its flat colour.
+function regionTerrainMotif(family){
+  switch (family){
+    case 'water': return [1, 0.5, [
+      ['path', { d:'M0 .17 q.25 .13 .5 0 t.5 0', fill:'none', stroke:'#ffffff', 'stroke-opacity':0.5, 'stroke-width':0.035 }],
+      ['path', { d:'M0 .37 q.25 .13 .5 0 t.5 0', fill:'none', stroke:'#16435f', 'stroke-opacity':0.28, 'stroke-width':0.035 }]]];
+    case 'forest': return [0.6, 0.6, [
+      ['circle', { cx:0.16, cy:0.2, r:0.075, fill:'#173a18', 'fill-opacity':0.2 }],
+      ['circle', { cx:0.44, cy:0.42, r:0.065, fill:'#173a18', 'fill-opacity':0.2 }],
+      ['circle', { cx:0.28, cy:0.5, r:0.05, fill:'#173a18', 'fill-opacity':0.2 }]]];
+    case 'mountain': return [0.62, 0.62, [
+      ['path', { d:'M.07 .52 L.3 .15 L.53 .52', fill:'none', stroke:'#000000', 'stroke-opacity':0.22, 'stroke-width':0.045, 'stroke-linejoin':'round' }],
+      ['path', { d:'M.3 .15 L.4 .31', fill:'none', stroke:'#ffffff', 'stroke-opacity':0.18, 'stroke-width':0.032 }]]];
+    case 'sand': return [0.32, 0.32, [
+      ['circle', { cx:0.09, cy:0.1, r:0.016, fill:'#6f5125', 'fill-opacity':0.18 }],
+      ['circle', { cx:0.22, cy:0.2, r:0.016, fill:'#6f5125', 'fill-opacity':0.18 }],
+      ['circle', { cx:0.05, cy:0.25, r:0.016, fill:'#6f5125', 'fill-opacity':0.18 }]]];
+    case 'swamp': return [0.52, 0.4, [
+      ['path', { d:'M.06 .27 h.12', fill:'none', stroke:'#0a1405', 'stroke-opacity':0.22, 'stroke-width':0.032, 'stroke-linecap':'round' }],
+      ['path', { d:'M.27 .14 h.12', fill:'none', stroke:'#0a1405', 'stroke-opacity':0.22, 'stroke-width':0.032, 'stroke-linecap':'round' }]]];
+    case 'snow': return [0.36, 0.36, [
+      ['circle', { cx:0.1, cy:0.12, r:0.02, fill:'#5a7a90', 'fill-opacity':0.14 }],
+      ['circle', { cx:0.24, cy:0.22, r:0.018, fill:'#5a7a90', 'fill-opacity':0.14 }]]];
+    case 'grass': return [0.44, 0.44, [
+      ['path', { d:'M.12 .34 l.03 -.11', fill:'none', stroke:'#2c4a1e', 'stroke-opacity':0.15, 'stroke-width':0.028, 'stroke-linecap':'round' }],
+      ['path', { d:'M.3 .3 l.03 -.11', fill:'none', stroke:'#2c4a1e', 'stroke-opacity':0.15, 'stroke-width':0.028, 'stroke-linecap':'round' }]]];
+    case 'lava': return [0.5, 0.42, [
+      ['path', { d:'M.06 .28 q.12 -.1 .24 0', fill:'none', stroke:'#ffd27a', 'stroke-opacity':0.55, 'stroke-width':0.04, 'stroke-linecap':'round' }],
+      ['path', { d:'M.3 .12 q.1 .1 .2 .02', fill:'none', stroke:'#ffd27a', 'stroke-opacity':0.55, 'stroke-width':0.04, 'stroke-linecap':'round' }],
+      ['path', { d:'M.06 .34 q.12 -.1 .24 0', fill:'none', stroke:'#1a0a05', 'stroke-opacity':0.28, 'stroke-width':0.03 }]]];
+    default: return null;
+  }
+}
+// A <pattern> node (base colour + motif) for one terrain value, or null for
+// untextured terrain. The base rect carries no region-cell class, so the
+// cell-count tests still see exactly one region-cell rect per serialized cell.
+function regionTerrainPatternNode(value){
+  const motif = regionTerrainMotif(regionTerrainFamily(value));
+  if (!motif) return null;
+  const w = motif[0], h = motif[1];
+  const pat = regionSvg('pattern', { id:regionTerrainPatternId(value), patternUnits:'userSpaceOnUse', width:w, height:h });
+  pat.append(regionSvg('rect', { x:0, y:0, width:w, height:h, fill:regionCellColor(value) }));
+  motif[2].forEach(spec => pat.append(regionSvg(spec[0], spec[1])));
+  return pat;
+}
+
 // Build the read-only SVG for one local layer at a given viewport. Pure of any
 // writes; honours the chosen GM/player policy via the helpers above.
 function regionMapSvg(region, layerId, viewport, options){
@@ -11078,11 +11296,26 @@ function regionMapSvg(region, layerId, viewport, options){
   }
   svg.setAttribute('viewBox', regionMapViewBox(bounds, viewport));
   if (grid){
+    // hand-drawn terrain textures: one <pattern> per distinct revealed terrain
+    // value, painted over regionCellColor; smooth/unknown terrain keeps its flat colour.
+    const defs = regionSvg('defs'), patterned = new Set();
+    let hasPattern = false;
+    grid.cells.forEach(cell => {
+      if (!regionCellRevealed(mask, cell.index)) return;
+      const key = String(cell.value == null ? '' : cell.value).toLowerCase();
+      if (patterned.has(key)) return; patterned.add(key);
+      const node = regionTerrainPatternNode(cell.value);
+      if (node){ defs.append(node); hasPattern = true; }
+    });
+    if (hasPattern) svg.append(defs);
     const g = regionSvg('g', { class:'region-cells' });
     grid.cells.forEach(cell => {
-      if (regionCellRevealed(mask, cell.index))
-        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-cell', fill:regionCellColor(cell.value) }));
-      else
+      if (regionCellRevealed(mask, cell.index)){
+        const fill = regionTerrainMotif(regionTerrainFamily(cell.value))
+          ? 'url(#' + regionTerrainPatternId(cell.value) + ')'
+          : regionCellColor(cell.value);
+        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-cell', fill }));
+      } else
         g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-fog' }));
     });
     svg.append(g);
