@@ -2981,7 +2981,7 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, who:'', people:[], whoActiveAt:0, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -2994,6 +2994,10 @@ function hydrate(d){
   merged.fxRich=!!d.fxRich;
   merged.themeMode=d.themeMode==='dark'||d.themeMode==='light'?d.themeMode:'auto';
   merged.syncPractice=!!d.syncPractice;
+  // Device-local identity (who's on this shared device). Never synced — see syncPayload.
+  merged.who=typeof d.who==='string'?d.who.trim():'';
+  merged.people=Array.isArray(d.people)?d.people.map(x=>String(x||'').trim()).filter(Boolean):[];
+  merged.whoActiveAt=Number.isFinite(d.whoActiveAt)?d.whoActiveAt:0;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -3099,6 +3103,7 @@ function topbar(){
   // in Cozy so device preferences and the deliberate space switch are always reachable.
   const showMore = true;
   const util = h('div',{class:'navutil'},
+    whoChip(),
     h('button',{class:'navbtn spaces-nav', title:'all spaces', onclick:()=>go('spaces')}, '⌂ Spaces'),
     (world||game||learn)? null : modeSwitch(full),
     showMore? h('button',{class:'navbtn', 'aria-label':'more', title:'more', onclick:()=>moreMenu()}, '⋯') : null,
@@ -4167,6 +4172,82 @@ function showIntro(force){
   ), { cls:'intro-bg', onClose:()=>{ DB.seenIntro=true; save(); } });
 }
 
+/* ---------- Who's here? — whole-app identity (shared-device switcher) -------- *
+   Del and Liz share one iPad, so the app tracks WHO is acting (a person), distinct
+   from WHICH SPACE they're in. Identity is device-local (never synced): DB.who is the
+   active person, DB.people remembers everyone added on this device, DB.whoActiveAt
+   stamps the last activity so a returning person is only GENTLY re-confirmed after an
+   idle gap — never nagged on quick returns. The person enables remembering Liz,
+   tailoring her side, the Maker helper knowing who it's talking to, and bug-report
+   authorship. It sits in front of the front door (who → then space).
+ * --------------------------------------------------------------------------- */
+const WHO_IDLE_MS = 3 * 60 * 60 * 1000;   // re-confirm "still you?" after ~3h away
+
+function setWho(name){
+  const n = (name || '').trim();
+  if (!n) return '';
+  DB.who = n;
+  const people = DB.people = DB.people || [];
+  if (!people.includes(n)) people.push(n);
+  DB.whoActiveAt = Date.now();
+  saveLocal({ forceMirror:true });
+  return n;
+}
+function touchWho(){ DB.whoActiveAt = Date.now(); saveLocal(); }
+function whoIsIdle(){ return Date.now() - (DB.whoActiveAt || 0) > WHO_IDLE_MS; }
+
+// The "Who's here?" overlay — quick-pick a remembered person, or add a new name.
+// firstTime is non-dismissible (the app needs to know whose work this is); switching
+// later is dismissible. After a first-time pick it hands off to the space first-run.
+function whoPicker(opts){
+  opts = opts || {};
+  openOverlay(close => {
+    function choose(name){
+      if (!setWho(name)) return;
+      close();
+      if (opts.firstTime) firstRun(); else render();
+    }
+    const people = (DB.people || []).filter(Boolean);
+    const input = h('input',{ placeholder:'your name', 'aria-label':'your name', style:{ flex:'1 1 180px', minWidth:'0' } });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); choose(input.value); } });
+    return h('div',{ class:'intro' },
+      svgUse('ic-seedling','em'),
+      h('h2',{ class:'display' }, opts.firstTime ? 'Who’s here?' : 'Switch who’s here'),
+      h('p',{ class:'hint' }, 'So the journal knows whose work this is. You can switch any time.'),
+      people.length ? h('div',{ class:'profile-pick' }, ...people.map(name =>
+        h('button',{ class:'navbtn ppick'+(DB.who===name?' primary':''), onclick:()=>choose(name) },
+          h('b',null, name), h('small',null, DB.who===name ? 'that’s you now' : 'tap to switch')))) : null,
+      h('div',{ class:'toolrow', style:{ justifyContent:'center', marginTop:'10px' } },
+        input, h('button',{ class:'navbtn primary', onclick:()=>choose(input.value) }, 'That’s me')),
+    );
+  }, { cls:'intro-bg', dismissible: opts.firstTime ? false : true });
+}
+
+// Gentle re-confirm after an idle gap: "Welcome back — still Liz?" One tap, or switch.
+function confirmWho(){
+  openOverlay(close => h('div',{ class:'intro' },
+    svgUse('ic-seedling','em'),
+    h('h2',{ class:'display' }, 'Welcome back'),
+    h('p',{ class:'hint' }, 'Still '+DB.who+'?'),
+    h('div',{ class:'toolrow', style:{ justifyContent:'center' } },
+      h('button',{ class:'navbtn primary', onclick:()=>close() }, 'Yes, it’s me'),
+      h('button',{ class:'navbtn', onclick:()=>{ close(); whoPicker({}); } }, 'Switch')),
+  ), { cls:'intro-bg' });
+}
+// Called on boot for a returning person: re-confirm only if they've been away a while.
+function maybeConfirmWho(){
+  if (!DB.who) return;
+  const idle = whoIsIdle();
+  touchWho();
+  if (idle) confirmWho();
+}
+
+// The persistent "▾ Liz" chip in the top bar — always shows who's acting, one tap to switch.
+function whoChip(){
+  if (!DB.who) return null;
+  return h('button',{ class:'navbtn whochip', title:'switch who’s here', 'aria-label':'who’s here: '+DB.who+' — tap to switch', onclick:()=>whoPicker({}) },
+    h('span',{ class:'whochip-name' }, DB.who), ' ▾');
+}
 /* ---------- Spaces: one front door into the four existing profiles -------- */
 const SPACES=[
   {
@@ -6322,12 +6403,33 @@ function draftNamingCard(element, suffix){
     notes:'Proposed via the Naming Tree plate.' };
   go('studio',{tab:'drafter', params:{prefill}});
 }
+// A gentle, always-visible way to grow the tree — add a new lineage-suffix "bud"
+// (an open root). The Maker shouldn't have to cross into the Worldbuilder-only editor
+// just to add a suffix; assigning a bud to an element and drafting a Canon Card stay
+// world-only. Open roots are her own draft (synced to her journal, never canon).
+function namingGrow(){
+  const input=h('input',{placeholder:'a new suffix — e.g. -velor', style:{flex:'1 1 210px',minWidth:'0'}});
+  function add(){
+    const raw=(input.value||'').trim(); if(!raw) return;
+    const r=raw.startsWith('-')?raw:'-'+raw;
+    DB.naming=DB.naming||namingDefault();
+    const roots=DB.naming.openRoots=DB.naming.openRoots||[];
+    if(roots.includes(r)){ toast('That suffix is already on the tree.'); input.value=''; return; }
+    roots.push(r); save(); go('naming');
+  }
+  input.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); add(); } });
+  return h('div',{style:{maxWidth:'480px',margin:'16px auto 0',textAlign:'center'}},
+    h('div',{class:'kicker', style:{marginBottom:'6px'}},'Grow your tree'),
+    h('div',{class:'toolrow', style:{justifyContent:'center'}}, input, h('button',{class:'navbtn primary', onclick:add},'Add a suffix')),
+    h('p',{class:'hint', style:{marginTop:'6px'}},'It joins the crown as a bud, waiting to find its element.'));
+}
 function viewNamingTree(){
   const f=framed('The Vael Naming Tree','trunk → people · branches → elements · twigs → lineage-suffixes','Every suffix is memory. Every difference is still kinship.');
   const body=f.querySelector('.framed-body');
   body.append(namingTweaks());
   const host=h('div',null); body.append(host);
   mountScaledPlate(host, buildNamingStage());
+  body.append(namingGrow());
   body.append(namingEditor());
   body.append(h('div',{class:'toolrow', style:{justifyContent:'center', marginTop:'18px'}},
     h('button',{class:'navbtn', onclick:()=>go('worksheet',{id:'namekeeper'})}, 'The Name-Keeper ledger'),
@@ -13485,7 +13587,10 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   const initialView=initialOpenViewName(DB);
   if(initialView) VIEW={name:initialView};   // null leaves the untouched first-run screen in charge
   render();
-  firstRun();
+  // Identity first: on a shared device, learn who's here before the space first-run. A
+  // returning person is only gently re-confirmed after an idle gap (see maybeConfirmWho).
+  if(!DB.who){ whoPicker({firstTime:true}); }
+  else { maybeConfirmWho(); firstRun(); }
   // self-heal: load from the repo on open when asked to converge devices, OR whenever the
   // local journal came up empty but a repo file exists (recovers from storage eviction).
   if(ghReady() && (DB.syncOnOpen || !(DB.creations && DB.creations.length))) loadFromRepo({silent:true});
