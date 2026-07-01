@@ -551,7 +551,28 @@
   .ppick{ display:flex; flex-direction:column; align-items:flex-start; gap:3px; text-align:left; padding:14px 16px; border-radius:12px; white-space:normal; }
   .ppick b{ font-size:18px; color:var(--ink); }
   .ppick small{ color:var(--hint); font-style:italic; line-height:1.3; }
+  .ppick-badge{ position:absolute; top:12px; right:12px; width:16px; height:16px; color:var(--gold); }
+  .ppick{ position:relative; }
   .profile-tag{ flex:0 0 auto; color:var(--hint); }
+  .who-manage{ margin-top:12px; opacity:.85; }
+
+  /* ---------- PIN pad (6-digit person entry) ---------- */
+  .pin-dots{ display:flex; gap:12px; justify-content:center; margin:14px 0 6px; }
+  .pin-dot{ width:14px; height:14px; border-radius:50%; border:1.5px solid var(--gold-soft); background:transparent; transition:background .12s ease; }
+  .pin-dot.on{ background:var(--green); border-color:var(--green); }
+  .pin-err{ min-height:18px; margin:0 0 8px; color:#b0563f; font-size:13px; }
+  .pinpad{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; max-width:260px; margin:8px auto 4px; }
+  .pinkey{ font-size:22px; padding:14px 0; border-radius:12px; border:1.5px solid var(--gold-soft); background:var(--paper-card); color:var(--ink); cursor:pointer; touch-action:manipulation; }
+  .pinkey:hover{ border-color:var(--gold); }
+  .pinkey-back{ font-size:18px; color:var(--gold); }
+
+  /* ---------- who-can-enter manager ---------- */
+  .who-manage-panel{ max-width:480px; }
+  .who-manage-list{ display:flex; flex-direction:column; gap:8px; margin:12px 0; text-align:left; }
+  .who-row{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; padding:10px 12px; border:1px solid var(--gold-soft); border-radius:10px; background:var(--paper-card); }
+  .who-row b{ flex:1 1 80px; color:var(--ink); }
+  .who-row select{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper); padding:5px 7px; font-family:inherit; color:var(--ink-soft); }
+  .who-row .toolbtn.danger{ color:#b0563f; }
 
   /* ---------- github panel ---------- */
   .gh label{ display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
@@ -3168,7 +3189,7 @@ function hydrate(d){
   merged.syncPractice=!!d.syncPractice;
   // Device-local identity (who's on this shared device). Never synced — see syncPayload.
   merged.who=typeof d.who==='string'?d.who.trim():'';
-  merged.people=Array.isArray(d.people)?d.people.map(x=>String(x||'').trim()).filter(Boolean):[];
+  merged.people=normalizePeople(d.people);
   merged.whoActiveAt=Number.isFinite(d.whoActiveAt)?d.whoActiveAt:0;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
@@ -3180,6 +3201,35 @@ function hydrate(d){
     profiles:Array.isArray(engines.profiles)?engines.profiles.map(profile=>Object.assign({},profile)) : [],
   };
   return merged;
+}
+// ---- People / profiles (device-local, never synced) ------------------------
+// DB.people holds one profile per person who uses this shared device. Each is
+// { name, role, pin, createdAt }: role is 'owner' (admin), 'full' (trusted — same
+// powers, own flavor), or 'guest' (needs the owner's approval before acting). pin
+// is null or { salt, hash } — a salted, obfuscation-grade hash (see hashPin) that
+// keeps the raw 6-digit PIN out of storage. It is synchronous and works offline on
+// file:// (crypto.subtle isn't guaranteed there); a 6-digit space isn't crypto-hard
+// anyway, so this only resists a casual read of local storage. See views/identity.js.
+function personRole(v){ return v==='owner'||v==='full'||v==='guest'?v:'guest'; }
+function normalizePersonPin(v){
+  if(!v||typeof v!=='object') return null;
+  const salt=String(v.salt||''), hash=String(v.hash||'');
+  return (salt&&hash)? { salt, hash } : null;
+}
+function normalizePerson(v){
+  if(typeof v==='string'){ const n=v.trim(); return n? { name:n, role:'full', pin:null, createdAt:0 } : null; }
+  if(!v||typeof v!=='object') return null;
+  const name=String(v.name||'').trim(); if(!name) return null;
+  return { name, role:personRole(v.role), pin:normalizePersonPin(v.pin), createdAt:Number.isFinite(v.createdAt)?v.createdAt:0 };
+}
+// Normalize the stored list: de-dupe by name (first wins), migrate bare strings to
+// trusted 'full' profiles (they were already added on this device), and guarantee an
+// admin exists — if nobody is 'owner', the first person becomes owner.
+function normalizePeople(value){
+  const list=Array.isArray(value)?value:[], out=[], seen=Object.create(null);
+  for(const raw of list){ const p=normalizePerson(raw); if(!p) continue; const k=p.name.toLowerCase(); if(seen[k]) continue; seen[k]=1; out.push(p); }
+  if(out.length && !out.some(p=>p.role==='owner')) out[0].role='owner';
+  return out;
 }
 function validState(s){ return !!s && typeof s==='object' && Array.isArray(s.creations); }   // shape check — corruption guard
 function migrateFromLocal(){
@@ -4419,59 +4469,191 @@ function showIntro(force){
   ), { cls:'intro-bg', onClose:()=>{ DB.seenIntro=true; save(); } });
 }
 
-/* ---------- Who's here? — whole-app identity (shared-device switcher) -------- *
+/* ---------- Who's here? — whole-app identity + profiles (shared device) ------ *
    Del and Liz share one iPad, so the app tracks WHO is acting (a person), distinct
    from WHICH SPACE they're in. Identity is device-local (never synced): DB.who is the
-   active person, DB.people remembers everyone added on this device, DB.whoActiveAt
-   stamps the last activity so a returning person is only GENTLY re-confirmed after an
-   idle gap — never nagged on quick returns. The person enables remembering Liz,
-   tailoring her side, the Maker helper knowing who it's talking to, and bug-report
-   authorship. It sits in front of the front door (who → then space).
- * --------------------------------------------------------------------------- */
-const WHO_IDLE_MS = 3 * 60 * 60 * 1000;   // re-confirm "still you?" after ~3h away
+   active person's name, DB.people holds one profile per person (see normalizePeople in
+   persistence.js), DB.whoActiveAt stamps the last activity so a returning person is only
+   re-checked after an idle gap — never nagged on quick returns.
 
-function setWho(name){
-  const n = (name || '').trim();
-  if (!n) return '';
-  DB.who = n;
+   Phase A — profiles & entry:
+   • Roles: 'owner' (admin — Del), 'full' (trusted, same powers, own flavor — Liz),
+     'guest' (needs the owner's approval before acting). Fresh device: the first person
+     added becomes owner; anyone added later starts as a guest until the owner promotes
+     them. Existing devices migrate their remembered names to 'full'.
+   • PIN: each person may set a 6-digit PIN. Del and Liz switch between each other freely,
+     but a PIN (if set) is asked for on switching to a *different* person and on an idle
+     return — "free between us, gated for the gap and for strangers." A guest is stopped
+     with a gentle "ask the owner" until promoted.
+ * --------------------------------------------------------------------------- */
+const WHO_IDLE_MS = 3 * 60 * 60 * 1000;   // re-check "still you?" after ~3h away
+
+// ---- profile lookups -------------------------------------------------------
+function eqName(a, b){ return String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase(); }
+function findPerson(name){ return (DB.people||[]).find(p => eqName(p.name, name)) || null; }
+function activePerson(){ return findPerson(DB.who); }
+function hasOwner(){ return (DB.people||[]).some(p => p.role==='owner'); }
+function isOwner(name){ const p=findPerson(name); return !!p && p.role==='owner'; }
+// The active person is the owner/admin (Del). Used to gate the "who can enter" manager.
+function whoIsOwner(){ return isOwner(DB.who); }
+
+// ---- PIN (obfuscation-grade, synchronous, offline-safe) --------------------
+// A 6-digit PIN has only 10^6 values, so no hash makes it brute-force-hard; and the app
+// runs from file:// where crypto.subtle isn't guaranteed. So we use a small synchronous
+// salted hash (cyrb53) purely to keep the raw PIN out of local storage. It never syncs.
+function cyrb53(str, seed){
+  let h1=0xdeadbeef ^ seed, h2=0x41c6ce57 ^ seed;
+  for(let i=0;i<str.length;i++){ const ch=str.charCodeAt(i); h1=Math.imul(h1^ch,2654435761); h2=Math.imul(h2^ch,1597334677); }
+  h1=Math.imul(h1^(h1>>>16),2246822507); h1^=Math.imul(h2^(h2>>>13),3266489909);
+  h2=Math.imul(h2^(h2>>>16),2246822507); h2^=Math.imul(h1^(h1>>>13),3266489909);
+  return (4294967296*(2097151&h2)+(h1>>>0)).toString(16);
+}
+function normalizePinDigits(v){ return String(v==null?'':v).replace(/\D/g,'').slice(0,6); }
+function validPin(v){ return normalizePinDigits(v).length===6; }
+function hashPin(pin, salt){ return cyrb53(salt + ':' + normalizePinDigits(pin), 0x9e3779b9); }
+function makePin(pin){ const salt=Math.random().toString(36).slice(2,10); return { salt, hash:hashPin(pin, salt) }; }
+function personHasPin(p){ return !!(p && p.pin && p.pin.salt && p.pin.hash); }
+function verifyPin(p, pin){ return personHasPin(p) && p.pin.hash===hashPin(pin, p.pin.salt); }
+
+// ---- profile mutations -----------------------------------------------------
+// Ensure a profile exists for this name; create it if new. The very first person on a
+// device is the owner; anyone added afterwards starts as a guest awaiting approval.
+function addPerson(name){
+  const n=(name||'').trim(); if(!n) return null;
+  let p=findPerson(n);
+  if(p) return p;
   const people = DB.people = DB.people || [];
-  if (!people.includes(n)) people.push(n);
+  p = { name:n, role: people.length ? 'guest' : 'owner', pin:null, createdAt:Date.now() };
+  people.push(p);
+  saveLocal({ forceMirror:true });
+  return p;
+}
+// Low-level commit of "who is acting now" — assumes entry was already allowed (see enterAs).
+function setWho(name){
+  const p=addPerson(name); if(!p) return '';
+  DB.who = p.name;
   DB.whoActiveAt = Date.now();
   saveLocal({ forceMirror:true });
-  return n;
+  return p.name;
 }
 function touchWho(){ DB.whoActiveAt = Date.now(); saveLocal(); }
 function whoIsIdle(){ return Date.now() - (DB.whoActiveAt || 0) > WHO_IDLE_MS; }
 
+// Owner-only profile edits. setRole guards the last owner (a device must always keep one).
+function ownerCount(){ return (DB.people||[]).filter(p=>p.role==='owner').length; }
+function setPersonRole(name, role){
+  const p=findPerson(name); if(!p) return;
+  if(p.role==='owner' && role!=='owner' && ownerCount()<=1){ toast('Keep at least one owner.'); return; }
+  p.role=personRole(role); saveLocal({ forceMirror:true });
+}
+function setPersonPin(name, pin){
+  const p=findPerson(name); if(!p) return false;
+  if(pin==null || pin===''){ p.pin=null; saveLocal({ forceMirror:true }); return true; }
+  if(!validPin(pin)) return false;
+  p.pin=makePin(pin); saveLocal({ forceMirror:true }); return true;
+}
+function removePerson(name){
+  const p=findPerson(name); if(!p) return;
+  if(p.role==='owner' && ownerCount()<=1){ toast('Keep at least one owner.'); return; }
+  DB.people = (DB.people||[]).filter(x=>!eqName(x.name, name));
+  if(eqName(DB.who, name)) DB.who='';
+  saveLocal({ forceMirror:true });
+}
+
+// ---- entry flow ------------------------------------------------------------
+// The one gate every "become this person" path goes through. Guests are stopped until
+// approved; a PIN is asked for when switching to someone else or after an idle gap.
+function enterAs(name, opts){
+  opts=opts||{};
+  const n=(name||'').trim(); if(!n) return;
+  const existing=findPerson(n);
+  const p = existing || addPerson(n);
+  if(!p) return;
+  if(p.role==='guest'){ guestBlocked(p, opts); return; }
+  const switching = DB.who && !eqName(DB.who, n);
+  const needPin = personHasPin(p) && (switching || opts.firstTime || whoIsIdle());
+  if(needPin){ pinPrompt(p, ()=>commitWho(n, opts)); return; }
+  commitWho(n, opts);
+}
+function commitWho(name, opts){
+  opts=opts||{};
+  if(!setWho(name)) return;
+  if(opts.close) opts.close();
+  if(opts.firstTime) firstRun(); else render();
+}
+
+// ---- overlays --------------------------------------------------------------
+// A guest can't act until the owner lets them in. Gentle, not a scolding.
+function guestBlocked(p, opts){
+  openOverlay(close => h('div',{ class:'intro' },
+    svgUse('ic-seedling','em'),
+    h('h2',{ class:'display' }, 'Almost in'),
+    h('p',{ class:'hint' }, 'Welcome, '+p.name+'. This journal is private, so '+(ownerName()||'the owner')+' needs to let you in before you can start.'),
+    h('div',{ class:'toolrow', style:{ justifyContent:'center' } },
+      h('button',{ class:'navbtn', onclick:()=>{ close(); if(!DB.who) whoPicker(opts||{}); } }, 'Back')),
+  ), { cls:'intro-bg', dismissible: !!DB.who });
+}
+function ownerName(){ const o=(DB.people||[]).find(p=>p.role==='owner'); return o? o.name : ''; }
+
+// A 6-digit PIN pad. Calls onOk() only on a correct PIN. Non-dismissible for an idle
+// re-check of the current person (they must prove it's them); dismissible when switching.
+function pinPrompt(person, onOk, opts){
+  opts=opts||{};
+  openOverlay(close => {
+    let entry='';
+    const dots=h('div',{ class:'pin-dots' });
+    const err=h('p',{ class:'pin-err' });
+    function paint(){ dots.replaceChildren(...[0,1,2,3,4,5].map(i=> h('span',{ class:'pin-dot'+(i<entry.length?' on':'') }))); }
+    function press(d){ if(entry.length>=6) return; entry+=d; paint();
+      if(entry.length===6){ if(verifyPin(person, entry)){ close(); onOk(); } else { err.textContent='That PIN didn’t match. Try again.'; entry=''; setTimeout(paint, 260); } } }
+    function back(){ entry=entry.slice(0,-1); paint(); err.textContent=''; }
+    paint();
+    const pad=h('div',{ class:'pinpad' });
+    ['1','2','3','4','5','6','7','8','9'].forEach(d=> pad.append(h('button',{ class:'pinkey', type:'button', onclick:()=>press(d) }, d)));
+    pad.append(h('span'), h('button',{ class:'pinkey', type:'button', onclick:()=>press('0') }, '0'),
+      h('button',{ class:'pinkey pinkey-back', type:'button', 'aria-label':'delete', onclick:back }, '⌫'));
+    return h('div',{ class:'intro' },
+      svgUse('ic-seedling','em'),
+      h('h2',{ class:'display' }, 'Hello again, '+person.name),
+      h('p',{ class:'hint' }, 'Tap your 6-digit PIN.'),
+      dots, err, pad,
+      opts.allowSwitch!==false ? h('div',{ class:'toolrow', style:{ justifyContent:'center', marginTop:'6px' } },
+        h('button',{ class:'navbtn', onclick:()=>{ close(); whoPicker({}); } }, 'Not you? Switch')) : null,
+    );
+  }, { cls:'intro-bg', dismissible: !!opts.dismissible });
+}
+
 // The "Who's here?" overlay — quick-pick a remembered person, or add a new name.
 // firstTime is non-dismissible (the app needs to know whose work this is); switching
-// later is dismissible. After a first-time pick it hands off to the space first-run.
+// later is dismissible. Every pick routes through enterAs (role + PIN gate).
 function whoPicker(opts){
   opts = opts || {};
   openOverlay(close => {
-    function choose(name){
-      if (!setWho(name)) return;
-      close();
-      if (opts.firstTime) firstRun(); else render();
-    }
-    const people = (DB.people || []).filter(Boolean);
+    const go = (name)=> enterAs(name, Object.assign({}, opts, { close }));
+    const people = (DB.people || []);
     const input = h('input',{ placeholder:'your name', 'aria-label':'your name', style:{ flex:'1 1 180px', minWidth:'0' } });
-    input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); choose(input.value); } });
+    input.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); go(input.value); } });
     return h('div',{ class:'intro' },
       svgUse('ic-seedling','em'),
       h('h2',{ class:'display' }, opts.firstTime ? 'Who’s here?' : 'Switch who’s here'),
       h('p',{ class:'hint' }, 'So the journal knows whose work this is. You can switch any time.'),
-      people.length ? h('div',{ class:'profile-pick' }, ...people.map(name =>
-        h('button',{ class:'navbtn ppick'+(DB.who===name?' primary':''), onclick:()=>choose(name) },
-          h('b',null, name), h('small',null, DB.who===name ? 'that’s you now' : 'tap to switch')))) : null,
+      people.length ? h('div',{ class:'profile-pick' }, ...people.map(p =>
+        h('button',{ class:'navbtn ppick'+(eqName(DB.who,p.name)?' primary':''), onclick:()=>go(p.name) },
+          h('b',null, p.name),
+          h('small',null, eqName(DB.who,p.name) ? 'that’s you now' : (p.role==='guest' ? 'awaiting approval' : (personHasPin(p) ? 'PIN' : 'tap to switch'))),
+          p.role==='owner' ? svgUse('ic-seedling','ppick-badge') : null))) : null,
       h('div',{ class:'toolrow', style:{ justifyContent:'center', marginTop:'10px' } },
-        input, h('button',{ class:'navbtn primary', onclick:()=>choose(input.value) }, 'That’s me')),
+        input, h('button',{ class:'navbtn primary', onclick:()=>go(input.value) }, 'That’s me')),
+      whoIsOwner() ? h('button',{ class:'navbtn subtle who-manage', onclick:()=>{ close(); whoManager(); } }, '⚙ Who can enter') : null,
     );
   }, { cls:'intro-bg', dismissible: opts.firstTime ? false : true });
 }
 
-// Gentle re-confirm after an idle gap: "Welcome back — still Liz?" One tap, or switch.
+// Gentle re-check after an idle gap. If the person set a PIN, ask for it; otherwise a
+// one-tap "still you?". Either way the day starts without friction for a quick return.
 function confirmWho(){
+  const p=activePerson();
+  if(personHasPin(p)){ pinPrompt(p, ()=>render(), { dismissible:false, allowSwitch:true }); return; }
   openOverlay(close => h('div',{ class:'intro' },
     svgUse('ic-seedling','em'),
     h('h2',{ class:'display' }, 'Welcome back'),
@@ -4481,12 +4663,64 @@ function confirmWho(){
       h('button',{ class:'navbtn', onclick:()=>{ close(); whoPicker({}); } }, 'Switch')),
   ), { cls:'intro-bg' });
 }
-// Called on boot for a returning person: re-confirm only if they've been away a while.
+// Called on boot for a returning person: re-check only after an idle gap.
 function maybeConfirmWho(){
   if (!DB.who) return;
   const idle = whoIsIdle();
   touchWho();
   if (idle) confirmWho();
+}
+
+// Owner-only manager: promote/demote people, set or clear a person's PIN, remove them.
+function whoManager(){
+  if(!whoIsOwner()) return;
+  openOverlay(close => {
+    const list=h('div',{ class:'who-manage-list' });
+    function paint(){
+      list.replaceChildren(...(DB.people||[]).map(p=>{
+        const roleSel=h('select',{ onchange:e=>{ setPersonRole(p.name, e.target.value); paint(); } },
+          ...['owner','full','guest'].map(r=> h('option',{ value:r, selected:p.role===r?'':null }, r==='full'?'full access':r)));
+        return h('div',{ class:'who-row' },
+          h('b',null, p.name),
+          roleSel,
+          h('button',{ class:'toolbtn', onclick:()=>{ setPinFlow(p, paint); } }, personHasPin(p)?'Change PIN':'Set PIN'),
+          personHasPin(p)? h('button',{ class:'toolbtn', onclick:()=>{ setPersonPin(p.name,''); paint(); } }, 'Clear PIN') : null,
+          eqName(DB.who,p.name)? null : h('button',{ class:'toolbtn danger', onclick:()=>{ removePerson(p.name); paint(); } }, 'Remove'));
+      }));
+    }
+    paint();
+    return h('div',{ class:'intro who-manage-panel' },
+      h('h2',{ class:'display' }, 'Who can enter'),
+      h('p',{ class:'hint' }, 'Owners and full-access people share every power — full access is just Liz-flavored, not lesser. Guests wait for you.'),
+      list,
+      h('div',{ class:'toolrow', style:{ justifyContent:'center', marginTop:'10px' } },
+        h('button',{ class:'navbtn primary', onclick:()=>close() }, 'Done')));
+  }, { cls:'intro-bg' });
+}
+// Set/replace a person's PIN: enter 6 digits twice (must match).
+function setPinFlow(person, done){
+  openOverlay(close => {
+    let first='';
+    const inp=h('input',{ type:'tel', inputmode:'numeric', maxlength:'6', placeholder:'6 digits', 'aria-label':'new PIN',
+      oninput:e=>{ e.target.value=normalizePinDigits(e.target.value); } });
+    const msg=h('p',{ class:'pin-err' });
+    function next(){
+      const v=normalizePinDigits(inp.value);
+      if(!validPin(v)){ msg.textContent='A PIN is 6 digits.'; return; }
+      if(!first){ first=v; inp.value=''; msg.textContent=''; inp.focus();
+        title.textContent='Type it once more'; return; }
+      if(v!==first){ msg.textContent='Those didn’t match — start again.'; first=''; inp.value=''; title.textContent='Choose a 6-digit PIN'; return; }
+      setPersonPin(person.name, v); close(); if(done) done();
+    }
+    inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); next(); } });
+    const title=h('h2',{ class:'display' }, 'Choose a 6-digit PIN');
+    return h('div',{ class:'intro' },
+      title,
+      h('p',{ class:'hint' }, 'For '+person.name+'. Leave the owner without one to switch freely.'),
+      h('div',{ class:'toolrow', style:{ justifyContent:'center' } }, inp,
+        h('button',{ class:'navbtn primary', onclick:next }, 'Save')),
+      msg);
+  }, { cls:'intro-bg' });
 }
 
 // The persistent "▾ Liz" chip in the top bar — always shows who's acting, one tap to switch.
