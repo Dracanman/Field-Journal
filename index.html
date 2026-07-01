@@ -573,6 +573,14 @@
   .who-row b{ flex:1 1 80px; color:var(--ink); }
   .who-row select{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper); padding:5px 7px; font-family:inherit; color:var(--ink-soft); }
   .who-row .toolbtn.danger{ color:#b0563f; }
+  .who-flavor{ display:flex; gap:6px; align-items:center; }
+  .who-flavor select{ border:1.5px solid var(--gold-soft); border-radius:8px; background:var(--paper); padding:5px 7px; font-family:inherit; color:var(--ink-soft); }
+
+  /* ---------- flavor signature (Phase C — the active person's accent) ---------- */
+  /* A quiet per-person mark: the who-chip carries the person's accent, and the Maker
+     home subtitle picks it up — so Del's side and Liz's side feel different, not just named. */
+  .whochip{ box-shadow:inset 0 -2px 0 var(--who-accent, transparent); }
+  .flavor-warm .cover .sub, .flavor-keeper .cover .sub{ color:var(--who-accent, var(--gold)); }
 
   /* ---------- github panel ---------- */
   .gh label{ display:block; font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); margin:12px 0 4px; }
@@ -3212,6 +3220,10 @@ function hydrate(d){
 // anyway, so this only resists a casual read of local storage. See views/identity.js.
 function personRole(v){ return v==='owner'||v==='full'||v==='guest'?v:'guest'; }
 function personHome(v){ return v==='maker'||v==='worldbuilder'||v==='game'||v==='learner'?v:''; }
+// Phase C flavor — how a person's side of the app feels, not just their name. tone drives
+// copy/voice, accent is a visual signature. '' means "use the role default" (see identity.js).
+function personTone(v){ return v==='warm'||v==='keeper'||v==='plain'?v:''; }
+function personAccent(v){ return ['green','gold','ember','sky','stone','violet','rose'].indexOf(v)>=0?v:''; }
 function normalizePersonPin(v){
   if(!v||typeof v!=='object') return null;
   const salt=String(v.salt||''), hash=String(v.hash||'');
@@ -3226,11 +3238,11 @@ function normalizePersonFile(v){
   return (displayName||path||branch)? { displayName, path, branch } : null;
 }
 function normalizePerson(v){
-  if(typeof v==='string'){ const n=v.trim(); return n? { name:n, role:'full', pin:null, createdAt:0, file:null, home:'' } : null; }
+  if(typeof v==='string'){ const n=v.trim(); return n? { name:n, role:'full', pin:null, createdAt:0, file:null, home:'', tone:'', accent:'' } : null; }
   if(!v||typeof v!=='object') return null;
   const name=String(v.name||'').trim(); if(!name) return null;
   const p={ name, role:personRole(v.role), pin:normalizePersonPin(v.pin), createdAt:Number.isFinite(v.createdAt)?v.createdAt:0,
-    file:normalizePersonFile(v.file), home:personHome(v.home) };
+    file:normalizePersonFile(v.file), home:personHome(v.home), tone:personTone(v.tone), accent:personAccent(v.accent) };
   if(Array.isArray(v.favorites)) p.favorites=v.favorites.map(x=>String(x||'').trim()).filter(Boolean);
   return p;
 }
@@ -4206,7 +4218,7 @@ function viewGallery(){
     h('div',{class:'tag'},'everything you’ve made — revisit it, change it, print it, or weave it into the world')));
   wrap.append(backupRow());
   if (!DB.creations.length){
-    wrap.append(emptyState('ill-empty-sprout', 'Nothing yet — and that’s alright.', 'Pick a page from the home shelf and make a little something. Already have a backup from another device? Restore it above.'));
+    wrap.append(emptyState('ill-empty-sprout', (typeof voice==='function'? voice('empty') : 'Nothing yet — and that’s alright.'), 'Pick a page from the home shelf and make a little something. Already have a backup from another device? Restore it above.'));
     return wrap;
   }
   const state={ q:'', kit:'', tag:'' };
@@ -4383,10 +4395,15 @@ function undoToast(msg, onUndo){
 function themeModeValue(value){ return value==='dark'||value==='light'?value:'auto'; }
 function themeModeLabel(){ const m=themeModeValue(DB.themeMode); return m==='dark'?'Night' : m==='light'?'Day' : 'Auto'; }
 function themeModeClass(value){ const m=themeModeValue(value); return m==='dark'?'theme-night' : m==='light'?'theme-light' : 'theme-auto'; }
-function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game','profile-learn','theme-auto','theme-night','theme-light');
+function applyMode(){ const b=document.body; b.classList.remove('mode-simple','mode-full','profile-maker','profile-world','profile-game','profile-learn','theme-auto','theme-night','theme-light','flavor-warm','flavor-keeper','flavor-plain');
   const cls = DB.profile==='worldbuilder'?'profile-world' : DB.profile==='game'?'profile-game' : DB.profile==='learner'?'profile-learn' : 'profile-maker';
   b.classList.add(cls);
   b.classList.add(themeModeClass(DB.themeMode));
+  // Phase C: the active person's flavor — tone class + accent signature (device-local).
+  const fl = (typeof whoFlavor==='function') ? whoFlavor() : { tone:'plain', accent:'gold' };
+  b.classList.add('flavor-'+fl.tone);
+  const accentVal = (typeof ACCENTS!=='undefined' && ACCENTS[fl.accent]) || '';
+  if(b.style && b.style.setProperty){ if(accentVal) b.style.setProperty('--who-accent', accentVal); else b.style.removeProperty('--who-accent'); }
   const advanced = DB.profile!=='maker';   // worldbuilder + game + apprentice always see the full toolset
   b.classList.add((advanced || DB.mode==='full')?'mode-full':'mode-simple');
   // Aliveness ceiling: .fx-rich opts into extra ambient motion (drifting motes, glow
@@ -4596,6 +4613,23 @@ function applyPersonContext(p){
   if(p.home) DB.profile = p.home;   // caller applies this via applyMode + landing
   saveLocal();
 }
+// ---- flavor (Phase C): how a person's side of the app feels, not just their name ------
+// tone drives copy (see voice()); accent is a visual signature (a --who-accent CSS var set
+// in applyMode). '' on a person means "use the role default" — the owner reads as the
+// steady keeper, everyone else as the warm maker, until they choose otherwise.
+function resolveTone(p){ return (p && p.tone) ? p.tone : (p && p.role==='owner' ? 'keeper' : 'warm'); }
+function resolveAccent(p){ if(p && p.accent) return p.accent; const t=resolveTone(p); return t==='keeper'?'green':t==='plain'?'gold':'rose'; }
+function whoFlavor(){ const p=activePerson(); return p? { tone:resolveTone(p), accent:resolveAccent(p) } : { tone:'plain', accent:'gold' }; }
+function setPersonFlavor(name, tone, accent){ const p=findPerson(name); if(!p) return; p.tone=personTone(tone); p.accent=personAccent(accent); saveLocal({ forceMirror:true }); if(eqName(DB.who,name)) applyMode(); }
+// A few copy strings that speak in the active person's tone. Keeps "genuinely different,
+// not just a name" concrete without scattering conditionals through the views.
+const VOICES = {
+  warm:   { hi:'There you are', still:'Still you?',        empty:'Nothing yet — and that’s just fine.' },
+  keeper: { hi:'Back to the work', still:'Confirm it’s you.', empty:'Nothing logged yet.' },
+  plain:  { hi:'Welcome back', still:'Still you?',         empty:'Nothing here yet.' },
+};
+function voice(key){ const t=whoFlavor().tone; return (VOICES[t] && VOICES[t][key]) || VOICES.plain[key] || ''; }
+
 function rememberFavorites(){ const p=activePerson(); if(p){ p.favorites=(DB.favorites||[]).slice(); saveLocal(); } }
 function rememberPersonHome(profileKey){ const p=activePerson(); const key=personHome(profileKey); if(p && key){ p.home=key; saveLocal(); } }
 function rememberPersonFile(){ const p=activePerson(), g=DB.github; if(!p||!g) return;
@@ -4703,8 +4737,8 @@ function confirmWho(){
   if(personHasPin(p)){ pinPrompt(p, ()=>render(), { dismissible:false, allowSwitch:true }); return; }
   openOverlay(close => h('div',{ class:'intro' },
     svgUse('ic-seedling','em'),
-    h('h2',{ class:'display' }, 'Welcome back'),
-    h('p',{ class:'hint' }, 'Still '+DB.who+'?'),
+    h('h2',{ class:'display' }, voice('hi')+', '+DB.who),
+    h('p',{ class:'hint' }, voice('still')),
     h('div',{ class:'toolrow', style:{ justifyContent:'center' } },
       h('button',{ class:'navbtn primary', onclick:()=>close() }, 'Yes, it’s me'),
       h('button',{ class:'navbtn', onclick:()=>{ close(); whoPicker({}); } }, 'Switch')),
@@ -4727,9 +4761,14 @@ function whoManager(){
       list.replaceChildren(...(DB.people||[]).map(p=>{
         const roleSel=h('select',{ onchange:e=>{ setPersonRole(p.name, e.target.value); paint(); } },
           ...['owner','full','guest'].map(r=> h('option',{ value:r, selected:p.role===r?'':null }, r==='full'?'full access':r)));
+        const toneSel=h('select',{ 'aria-label':'tone', onchange:e=>{ setPersonFlavor(p.name, e.target.value, p.accent); paint(); } },
+          ...['warm','keeper','plain'].map(tn=> h('option',{ value:tn, selected:resolveTone(p)===tn?'':null }, tn)));
+        const accSel=h('select',{ 'aria-label':'accent', onchange:e=>{ setPersonFlavor(p.name, p.tone, e.target.value); paint(); } },
+          ...['green','gold','ember','sky','stone','violet','rose'].map(ac=> h('option',{ value:ac, selected:resolveAccent(p)===ac?'':null }, ac)));
         return h('div',{ class:'who-row' },
           h('b',null, p.name),
           roleSel,
+          h('div',{ class:'who-flavor' }, toneSel, accSel),
           h('button',{ class:'toolbtn', onclick:()=>{ setPinFlow(p, paint); } }, personHasPin(p)?'Change PIN':'Set PIN'),
           personHasPin(p)? h('button',{ class:'toolbtn', onclick:()=>{ setPersonPin(p.name,''); paint(); } }, 'Clear PIN') : null,
           eqName(DB.who,p.name)? null : h('button',{ class:'toolbtn danger', onclick:()=>{ removePerson(p.name); paint(); } }, 'Remove'));
