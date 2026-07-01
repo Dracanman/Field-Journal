@@ -3211,16 +3211,28 @@ function hydrate(d){
 // file:// (crypto.subtle isn't guaranteed there); a 6-digit space isn't crypto-hard
 // anyway, so this only resists a casual read of local storage. See views/identity.js.
 function personRole(v){ return v==='owner'||v==='full'||v==='guest'?v:'guest'; }
+function personHome(v){ return v==='maker'||v==='worldbuilder'||v==='game'||v==='learner'?v:''; }
 function normalizePersonPin(v){
   if(!v||typeof v!=='object') return null;
   const salt=String(v.salt||''), hash=String(v.hash||'');
   return (salt&&hash)? { salt, hash } : null;
 }
+// A person's own "file in the world" (Phase B): same repo/owner/token as the device, but
+// their own file (displayName -> stem), and optional folder/branch. null when unset — login
+// then defaults the stem to the person's name so files separate automatically.
+function normalizePersonFile(v){
+  if(!v||typeof v!=='object') return null;
+  const displayName=String(v.displayName||'').trim(), path=String(v.path||'').trim(), branch=String(v.branch||'').trim();
+  return (displayName||path||branch)? { displayName, path, branch } : null;
+}
 function normalizePerson(v){
-  if(typeof v==='string'){ const n=v.trim(); return n? { name:n, role:'full', pin:null, createdAt:0 } : null; }
+  if(typeof v==='string'){ const n=v.trim(); return n? { name:n, role:'full', pin:null, createdAt:0, file:null, home:'' } : null; }
   if(!v||typeof v!=='object') return null;
   const name=String(v.name||'').trim(); if(!name) return null;
-  return { name, role:personRole(v.role), pin:normalizePersonPin(v.pin), createdAt:Number.isFinite(v.createdAt)?v.createdAt:0 };
+  const p={ name, role:personRole(v.role), pin:normalizePersonPin(v.pin), createdAt:Number.isFinite(v.createdAt)?v.createdAt:0,
+    file:normalizePersonFile(v.file), home:personHome(v.home) };
+  if(Array.isArray(v.favorites)) p.favorites=v.favorites.map(x=>String(x||'').trim()).filter(Boolean);
+  return p;
 }
 // Normalize the stored list: de-dupe by name (first wins), migrate bare strings to
 // trusted 'full' profiles (they were already added on this device), and guarantee an
@@ -3496,7 +3508,7 @@ function modeSwitch(full){
   );
 }
 function profileLanding(p){ return p==='worldbuilder'?'studio' : p==='game'?'campaigns' : p==='learner'?'practice' : 'home'; }
-function setProfile(p){ DB.profile=p; if(p!=='maker') DB.mode='full'; save(); applyMode(); go(profileLanding(p));
+function setProfile(p){ DB.profile=p; if(p!=='maker') DB.mode='full'; if(typeof rememberPersonHome==='function') rememberPersonHome(p); save(); applyMode(); go(profileLanding(p));
   toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : p==='game'? 'The Game — your campaigns.' : p==='learner'? 'Apprentice — code practice.' : 'Maker — the journal.'); }
 
 /* ---------- home ----------------------------------------------------------- */
@@ -3558,7 +3570,7 @@ function shelfItem(id){
 // These re-render in place and KEEP your scroll position — collapsing a category down the page
 // shouldn't fling you back to the top every time. (go('home') always scrolls to 0.)
 function refreshHome(){ const y=window.scrollY||window.pageYOffset||0; render(); window.scrollTo(0,y); }
-function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); save(); refreshHome(); }
+function toggleFav(id){ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(id); if(i<0) f.push(id); else f.splice(i,1); rememberFavorites(); save(); refreshHome(); }
 function isCollapsed(key){ return (DB.collapsed||[]).includes(key); }
 // The Maker home opens tidy: its shelf sections start collapsed on first visit, so a
 // newcomer isn't met with everything at once. Runs once (collapseSeeded); after that the
@@ -3579,7 +3591,7 @@ function organizeCard(w){
   const list=h('div',{style:{display:'flex', flexDirection:'column', gap:'8px', marginTop:'4px'}});
   const favBtn=h('button',{class:'navbtn', style:{justifyContent:'flex-start'}});
   const paintFav=()=>{ favBtn.textContent=((DB.favorites||[]).includes(w.id)?'★ ':'☆ ')+'Favorite'; };
-  favBtn.onclick=()=>{ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(w.id); if(i<0) f.push(w.id); else f.splice(i,1); save(); paintFav(); };
+  favBtn.onclick=()=>{ const f=DB.favorites=DB.favorites||[]; const i=f.indexOf(w.id); if(i<0) f.push(w.id); else f.splice(i,1); rememberFavorites(); save(); paintFav(); };
   paintFav(); list.append(favBtn);
   const collRow=(c)=>{ const b=h('button',{class:'navbtn', style:{justifyContent:'flex-start'}});
     const paint=()=>{ b.textContent=(c.ids.includes(w.id)?'☑ ':'☐ ')+c.name; };
@@ -4399,6 +4411,7 @@ function firstRun(){ if(!DB.profileChosen){ chooseProfile(); return; } showIntro
 // and the Worldbuilder's canon studio remain genuinely separate spaces.
 function applyProfileChoice(p){
   DB.profile=p; DB.profileChosen=true; if(p!=='maker') DB.mode='full';
+  if(typeof rememberPersonHome==='function') rememberPersonHome(p);   // this person's own corner (Phase B)
 }
 function finishProfileChoice(p, replay){
   applyProfileChoice(p);
@@ -4560,6 +4573,35 @@ function removePerson(name){
   saveLocal({ forceMirror:true });
 }
 
+// ---- per-person context (Phase B) ------------------------------------------
+// On login/return, apply a person's own context: their favorites, their file in the world
+// (same repo, own file — the stem defaults to their name so files separate automatically),
+// and their preferred space. State only — no navigation, no applyMode — so the boot and
+// switch callers stay in control of landing. These are captured back from ordinary use:
+// rememberFavorites (pinning), rememberPersonFile (the GitHub panel), rememberPersonHome
+// (picking a space). Everything here is device-local and never enters the sync payload.
+function applyPersonContext(p){
+  if(!p) return;
+  // Per-person favorites. One-time: migrate the legacy shared list to the owner so nothing is lost.
+  if(!Array.isArray(p.favorites)){
+    p.favorites = (p.role==='owner' && Array.isArray(DB.favorites)) ? DB.favorites.slice() : [];
+  }
+  DB.favorites = p.favorites.slice();
+  // "My file in the world" — auto-point sync at this person's own file.
+  if(DB.github){
+    DB.github.displayName = (p.file && p.file.displayName) || p.name;
+    if(p.file && p.file.path) DB.github.path = p.file.path;
+    if(p.file && p.file.branch) DB.github.branch = p.file.branch;
+  }
+  if(p.home) DB.profile = p.home;   // caller applies this via applyMode + landing
+  saveLocal();
+}
+function rememberFavorites(){ const p=activePerson(); if(p){ p.favorites=(DB.favorites||[]).slice(); saveLocal(); } }
+function rememberPersonHome(profileKey){ const p=activePerson(); const key=personHome(profileKey); if(p && key){ p.home=key; saveLocal(); } }
+function rememberPersonFile(){ const p=activePerson(), g=DB.github; if(!p||!g) return;
+  const file={ displayName:String(g.displayName||'').trim(), path:String(g.path||'').trim(), branch:String(g.branch||'').trim() };
+  p.file=(file.displayName||file.path||file.branch)? file : null; saveLocal(); }
+
 // ---- entry flow ------------------------------------------------------------
 // The one gate every "become this person" path goes through. Guests are stopped until
 // approved; a PIN is asked for when switching to someone else or after an idle gap.
@@ -4578,8 +4620,13 @@ function enterAs(name, opts){
 function commitWho(name, opts){
   opts=opts||{};
   if(!setWho(name)) return;
+  const p=activePerson();
+  applyPersonContext(p);
+  applyMode();                       // reflect the person's preferred space
   if(opts.close) opts.close();
-  if(opts.firstTime) firstRun(); else render();
+  if(opts.firstTime) firstRun();     // a new person picks their space through first-run
+  else if(p && p.home) go(profileLanding(p.home));   // return them to their own corner
+  else render();
 }
 
 // ---- overlays --------------------------------------------------------------
@@ -5724,7 +5771,7 @@ function openGitHubPanel(){
   const practiceChk=h('input',{type:'checkbox'}); practiceChk.checked=!!DB.syncPractice; practiceChk.onchange=()=>{ DB.syncPractice=practiceChk.checked; save(); };
   const status=h('div',{class:'hint', style:{marginTop:'10px'}});
   function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal' }; }
-  function persist(){ DB.github=collect(); save(); }
+  function persist(){ DB.github=collect(); if(typeof rememberPersonFile==='function') rememberPersonFile(); save(); }
   const panel=h('div',{class:'gh'},
     h('p',{class:'hint'},'Save your whole journal to your own file in the world, so it’s safe and you can open it on any device.'),
     h('label',null,'Your name'), nameIn,
@@ -14187,6 +14234,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 (async function init(){
   try{ DB = await loadState(); }catch(e){ DB = defaults(); }
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
+  if(DB.who) applyPersonContext(activePerson());   // returning person: their file, favorites & space (Phase B)
   applyMode();
   const initialView=initialOpenViewName(DB);
   if(initialView) VIEW={name:initialView};   // null leaves the untouched first-run screen in charge
