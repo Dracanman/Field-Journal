@@ -478,6 +478,8 @@
   .assistant-controls select,.assistant-advanced select,.assistant-advanced input,.assistant-question,.assistant-outbound input{border:1.5px solid var(--gold-soft);border-radius:8px;background:var(--paper-card);padding:9px 11px;font-family:inherit;font-size:15px;color:var(--ink-soft)}
   .assistant-engine-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
   .assistant-spend{color:var(--hint);font-size:13px}
+  .assistant-auto-escalate{display:flex;align-items:center;gap:7px;color:var(--hint);font-size:13px;font-weight:700;letter-spacing:0;text-transform:none}
+  .assistant-auto-escalate input{width:auto}
   .assistant-advanced{display:grid;grid-template-columns:minmax(140px,1fr) minmax(160px,1.2fr) minmax(110px,.8fr) minmax(130px,.9fr) auto;gap:8px 10px;align-items:end;border:1px dashed var(--gold-soft);border-radius:8px;background:#fff8;padding:8px 10px}
   .assistant-advanced label{display:grid;gap:4px;color:var(--gold);font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
   .assistant-advanced .assistant-check{display:flex;align-items:center;gap:7px}
@@ -2963,7 +2965,7 @@ function assistantNormalizeCustomPersona(value){
   return p.system?p:null;
 }
 function assistantSettingsDefault(){
-  return {activePersonaId:ASSISTANT_DEFAULT_PERSONA_ID,customPersonas:[]};
+  return {activePersonaId:ASSISTANT_DEFAULT_PERSONA_ID,customPersonas:[],autoEscalateLocalToApi:false};
 }
 function normalizeAssistantSettings(value){
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -2976,7 +2978,7 @@ function normalizeAssistantSettings(value){
   ASSISTANT_PERSONAS.forEach(p=>{ ids[p.id]=true; });
   custom.forEach(p=>{ ids[p.id]=true; });
   const active=typeof source.activePersonaId==='string'&&ids[source.activePersonaId]?source.activePersonaId:ASSISTANT_DEFAULT_PERSONA_ID;
-  return {activePersonaId:active,customPersonas:custom.slice(0,24)};
+  return {activePersonaId:active,customPersonas:custom.slice(0,24),autoEscalateLocalToApi:source.autoEscalateLocalToApi===true};
 }
 function assistantBuiltInPersonas(){
   return ASSISTANT_PERSONAS.map(p=>assistantNormalizePersona(p,{builtIn:true})).filter(p=>p.id&&p.system);
@@ -5245,7 +5247,8 @@ async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!met
 // another device.
 function assistantSyncSettings(value){
   const fallbackId=typeof ASSISTANT_DEFAULT_PERSONA_ID==='string'?ASSISTANT_DEFAULT_PERSONA_ID:'worldbuilder';
-  return typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(value):(value&&typeof value==='object'?value:{activePersonaId:fallbackId,customPersonas:[]});
+  const normalized=typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(value):(value&&typeof value==='object'?value:{activePersonaId:fallbackId,customPersonas:[]});
+  return {activePersonaId:normalized.activePersonaId||fallbackId,customPersonas:Array.isArray(normalized.customPersonas)?normalized.customPersonas:[]};
 }
 function practiceSyncSettings(value){
   return typeof normalizePracticeState==='function'?normalizePracticeState(value):(value&&typeof value==='object'?Object.assign(practiceDefault(),value):practiceDefault());
@@ -5332,12 +5335,15 @@ function mergeIncoming(inc){
   DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
   DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id').filter(s=>!(s && tomb[s.id]));
   if('assistant' in inc){
+    const localDevice=typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(DB.assistant):{};
     const local=assistantSyncSettings(DB.assistant), incoming=assistantSyncSettings(inc.assistant);
     const seen={}, custom=[];
     (local.customPersonas||[]).concat(incoming.customPersonas||[]).forEach(p=>{
       if(p&&p.id&&!seen[p.id]){ seen[p.id]=true; custom.push(p); }
     });
-    DB.assistant=assistantSyncSettings({activePersonaId:incoming.activePersonaId||local.activePersonaId, customPersonas:custom});
+    DB.assistant=typeof normalizeAssistantSettings==='function'
+      ? normalizeAssistantSettings({activePersonaId:incoming.activePersonaId||local.activePersonaId, customPersonas:custom, autoEscalateLocalToApi:localDevice.autoEscalateLocalToApi===true})
+      : assistantSyncSettings({activePersonaId:incoming.activePersonaId||local.activePersonaId, customPersonas:custom});
   }
   if('practice' in inc) DB.practice=mergePracticeState(DB.practice,inc.practice);
 }
@@ -8209,6 +8215,69 @@ function assistantSpendLabel(engine){
   return assistantIsLocalEngine(engine)?'Local endpoint - $0 on this meter.':'API engine - metered usage will be recorded.';
 }
 
+const ASSISTANT_ESCALATION_HEURISTIC={
+  threshold:3,
+  minAnswerChars:140,
+  weights:{refusal:4,unknown:4,emptyGrounding:3,veryShort:3,tryHarder:3},
+  refusalPatterns:[
+    /\b(?:cannot|can't|unable to|won't)\b.{0,80}\b(?:answer|help|provide|determine|find)\b/i,
+    /\bI can(?:not|'t)\b/i
+  ],
+  unknownPatterns:[
+    /\bI (?:do not|don't) know\b/i,
+    /\bnot (?:enough|sufficient) (?:context|information)\b/i,
+    /\bnot established\b/i,
+    /\bno promoted canon\b/i,
+    /\bunknown\b/i
+  ],
+  tryHarderPatterns:[
+    /\btry harder\b/i,
+    /\bdig deeper\b/i,
+    /\blook again\b/i,
+    /\bmore thorough\b/i
+  ]
+};
+
+function assistantPatternHit(patterns, text){
+  return (Array.isArray(patterns)?patterns:[]).some(pattern=>pattern&&pattern.test&&pattern.test(text));
+}
+
+function assistantEscalationGroundingCount(localResult){
+  const result=localResult&&typeof localResult==='object'?localResult:{};
+  const grounding=result.grounding&&typeof result.grounding==='object'?result.grounding:result;
+  const ids=Array.isArray(grounding.ids)?grounding.ids.filter(Boolean).length:0;
+  const entries=Array.isArray(grounding.entries)?grounding.entries.filter(Boolean).length:0;
+  return ids+entries;
+}
+
+function shouldEscalate(input){
+  input=input&&typeof input==='object'?input:{};
+  const settings=input.settings&&typeof input.settings==='object'?input.settings:{};
+  if(settings.autoEscalateLocalToApi!==true) return false;
+  const local=input.localResult&&typeof input.localResult==='object'?input.localResult:{text:String(input.localResult||'')};
+  const question=String(input.question||'');
+  const text=String(local.text||local.answer||'').trim();
+  const cfg=ASSISTANT_ESCALATION_HEURISTIC, weights=cfg.weights||{};
+  let score=0;
+  if(assistantPatternHit(cfg.refusalPatterns,text)) score+=weights.refusal||0;
+  if(assistantPatternHit(cfg.unknownPatterns,text)) score+=weights.unknown||0;
+  if(!assistantEscalationGroundingCount(local)) score+=weights.emptyGrounding||0;
+  if(text.length<cfg.minAnswerChars) score+=weights.veryShort||0;
+  if(assistantPatternHit(cfg.tryHarderPatterns,question)) score+=weights.tryHarder||0;
+  return score>=cfg.threshold;
+}
+
+function assistantAutoEscalateEnabled(){
+  return !!(assistantPersonaSettings().autoEscalateLocalToApi);
+}
+
+function assistantSetAutoEscalate(value){
+  const settings=assistantPersonaSettings();
+  settings.autoEscalateLocalToApi=value===true;
+  assistantSavePersonaSettings(settings);
+  return settings.autoEscalateLocalToApi;
+}
+
 async function assistantCallAi(engine, chat){
   const hook=typeof window!=='undefined'&&typeof window.__assistantAiSend==='function'?window.__assistantAiSend:null;
   const result=hook?await hook(engine,chat):await aiSend(engine,chat);
@@ -8579,6 +8648,9 @@ function studioAssistant(host){
     if(apiEngine) engineSel.value=apiEngine.id;
     refreshEngineNote();
   };
+  const autoEscalateChk=h('input',{type:'checkbox'});
+  autoEscalateChk.checked=assistantAutoEscalateEnabled();
+  const autoEscalateLabel=h('label',{class:'assistant-check assistant-auto-escalate'},autoEscalateChk,h('span',null,'Auto-escalate weak local answers'));
   const question=h('textarea',{class:'assistant-question',rows:'6',placeholder:'Ask a question about promoted canon...'});
   const askBtn=h('button',{class:'primary'},'Ask');
   const status=h('div',{class:'sync-status'});
@@ -8591,6 +8663,10 @@ function studioAssistant(host){
   const ledgerBtn=h('button',{class:'secondary'},'Send to ledger');
   draftBtn.disabled=true;
   ledgerBtn.disabled=true;
+  autoEscalateChk.onchange=()=>{
+    const enabled=assistantSetAutoEscalate(autoEscalateChk.checked===true);
+    status.textContent=enabled?'Weak local answers will visibly retry through the API meter.':'Auto-escalation is off; local answers stay local unless you choose the API.';
+  };
   customizeBtn.onclick=()=>{ personaEditorOpen=!personaEditorOpen; renderPersonaPicker(); };
   duplicateBtn.onclick=()=>{
     try{
@@ -8637,6 +8713,63 @@ function studioAssistant(host){
     embedStatus.replaceChildren(document.createTextNode(text+(warning?' - '+warning:'')));
   }
 
+  function requestModelFor(engine){
+    return engine&&engine.id===engineSel.value?assistantModelFor(state,engine):String(engine&&engine.model||'');
+  }
+
+  function turnOptionsFor(engine){
+    return engine&&engine.id===engineSel.value?{temperature:tempUse.checked?temperatureIn.value:''}:{};
+  }
+
+  function renderAnswerShell(){
+    const answerPre=h('pre',{class:'assistant-answer-text stream-text'});
+    const cursor=h('span',{class:'cursor'},'▋');
+    answerPre.append(cursor);
+    answerHost.replaceChildren(answerPre);
+    return {
+      answerPre,
+      cursor,
+      onChunk(piece){
+        cursor.remove();
+        answerPre.append(h('span',{class:'chunk'},piece),cursor);
+        answerHost.scrollTop=answerHost.scrollHeight;
+      }
+    };
+  }
+
+  function renderStaticAnswer(text){
+    answerHost.replaceChildren(h('pre',{class:'assistant-answer-text'},String(text||'(No text returned.)')));
+  }
+
+  function storeAnswer(q, result, grounding, engine, finalStatus){
+    result=result||{};
+    state.question=q;
+    state.answer=result.text||'';
+    state.grounding=grounding;
+    if(engine&&engine.id===engineSel.value) state.model=result.model||requestModelFor(engine)||'';
+    setGroundingLine(grounding.ids);
+    setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning);
+    status.textContent=finalStatus;
+    draftBtn.disabled=false;
+    ledgerBtn.disabled=false;
+  }
+
+  async function runEngineAsk(engine, q, grounding, statusText){
+    status.textContent=statusText;
+    const shell=renderAnswerShell();
+    const persona=assistantPersonaById(state.personaId);
+    const chat=Object.assign({
+      system:assistantBuildPersonaSystem(persona,grounding.system),
+      messages:[{role:'user',content:q}],
+      model:requestModelFor(engine),
+      maxTokens:ASSISTANT_MAX_TOKENS
+    },assistantChatOptionsForRequest(engine,persona,turnOptionsFor(engine)));
+    const result=await assistantStreamAi(engine,chat,shell.onChunk);
+    shell.cursor.remove();
+    if(!result.text) shell.answerPre.append(document.createTextNode('(No text returned.)'));
+    return result;
+  }
+
   async function runAsk(){
     const q=question.value.trim();
     if(!q){
@@ -8655,35 +8788,27 @@ function studioAssistant(host){
     setEmbedStatus('checking');
     try{
       const grounding=await assistantCanonGrounding(q,engine,{onStatus:setEmbedStatus});
-      status.textContent=assistantIsLocalEngine(engine)?'Asking local engine...':'Asking API engine. Metered usage will be recorded.';
-      // stream the answer in: chunks fade in (.chunk) after a blinking caret (.cursor)
-      const answerPre=h('pre',{class:'assistant-answer-text stream-text'});
-      const cursor=h('span',{class:'cursor'},'▋');
-      answerPre.append(cursor);
-      answerHost.replaceChildren(answerPre);
-      const onChunk=(piece)=>{
-        cursor.remove();
-        answerPre.append(h('span',{class:'chunk'},piece),cursor);
-        answerHost.scrollTop=answerHost.scrollHeight;
-      };
-      const chat=Object.assign({
-        system:assistantBuildPersonaSystem(assistantPersonaById(state.personaId),grounding.system),
-        messages:[{role:'user',content:q}],
-        model:assistantModelFor(state,engine),
-        maxTokens:ASSISTANT_MAX_TOKENS
-      },assistantChatOptionsForRequest(engine,assistantPersonaById(state.personaId),{temperature:tempUse.checked?temperatureIn.value:''}));
-      const result=await assistantStreamAi(engine,chat,onChunk);
-      cursor.remove();
-      state.question=q;
-      state.answer=result.text||'';
-      state.grounding=grounding;
-      state.model=result.model||assistantModelFor(state,engine)||'';
-      if(!state.answer) answerPre.append(document.createTextNode('(No text returned.)'));
-      setGroundingLine(grounding.ids);
-      setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning);
-      status.textContent='Answer ready. Suggestions only; promote through the normal pipeline.';
-      draftBtn.disabled=false;
-      ledgerBtn.disabled=false;
+      const localStatus=assistantIsLocalEngine(engine)?'Asking local engine...':'Asking API engine. Metered usage will be recorded.';
+      const result=await runEngineAsk(engine,q,grounding,localStatus);
+      const canAutoEscalate=assistantIsLocalEngine(engine)&&apiEngine&&shouldEscalate({
+        question:q,
+        localResult:{text:result.text||'',model:result.model,usage:result.usage,grounding},
+        settings:assistantPersonaSettings()
+      });
+      if(canAutoEscalate){
+        const localText=result.text||'';
+        status.textContent='Local answer looked weak; escalating to API... Metered usage will be recorded.';
+        try{
+          const apiResult=await runEngineAsk(apiEngine,q,grounding,'Escalating to API... Metered usage will be recorded.');
+          storeAnswer(q,apiResult,grounding,apiEngine,'Answer ready after API escalation. Metered usage was recorded; promote through the normal pipeline.');
+          return;
+        }catch(apiError){
+          renderStaticAnswer(localText);
+          storeAnswer(q,result,grounding,engine,'API escalation failed; local answer kept. Suggestions only; promote through the normal pipeline.');
+          return;
+        }
+      }
+      storeAnswer(q,result,grounding,engine,'Answer ready. Suggestions only; promote through the normal pipeline.');
     }catch(e){
       answerHost.replaceChildren(h('p',{class:'bad'},e&&e.message?e.message:String(e)));
       status.textContent='The assistant could not complete the ask.';
@@ -8747,7 +8872,7 @@ function studioAssistant(host){
         h('label',{},'Model',modelSel),
         h('label',{},'Preset',presetSel)
       ),
-      h('div',{class:'assistant-engine-actions'},spend,settingsBtn,escalateBtn)
+      h('div',{class:'assistant-engine-actions'},spend,autoEscalateLabel,settingsBtn,escalateBtn)
     ),
     h('div',{class:'assistant-advanced'},
       h('label',{class:'assistant-check'},tempUse,h('span',null,'Temperature'),temperatureValue),
