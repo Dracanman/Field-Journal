@@ -206,6 +206,11 @@
   .shelf{ margin-top:26px; }
   .shelf h3{ font-size:15px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); border-bottom:1px solid var(--gold-soft); padding-bottom:8px; margin-bottom:10px; }
   .shelf-intro{ margin:0 0 16px; color:var(--hint); font-style:italic; font-size:14px; }
+  /* gentle reusable empty state — a spot illustration + a line or two (see emptyState() in framed.js) */
+  .empty-state{ text-align:center; padding:28px 18px; color:var(--hint); }
+  .empty-state-art{ width:100px; height:82px; color:var(--gold-soft); margin:0 auto 10px; display:block; }
+  .empty-state-title{ margin:0; color:var(--ink-soft); font-size:16px; font-weight:600; }
+  .empty-state-line{ margin:5px auto 0; max-width:420px; font-style:italic; font-size:14px; line-height:1.4; }
   /* warm hand-lettered category label inside a shelf — keeps the browsing playful, not filing-cabinet.
      Clickable to collapse/expand; collections also carry a × to remove them. */
   .shelf-cat{ font-family:'Caveat',cursive; font-size:22px; color:var(--green); margin:18px 0 8px; display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none; touch-action:manipulation; }
@@ -236,6 +241,9 @@
   /* ---------- worksheet editor ---------- */
   .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
   @media (max-width:900px){ .editor-wrap{ grid-template-columns:1fr; } .card-col{ order:-1; } }
+  .editor-intro{ display:grid; gap:10px; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--gold-soft); }
+  .editor-note{ margin:0; color:var(--ink-soft); font-style:italic; }
+  .editor-example-toggle[aria-pressed="true"]{ background:#eef0e4; border-color:var(--green); color:#4d5a36; }
   .field{ margin-bottom:20px; }
   .field > label{ display:block; font-size:12px; letter-spacing:.16em; text-transform:uppercase; color:var(--gold); margin-bottom:5px; }
   .field .fhint{ color:var(--hint); font-style:italic; font-size:14px; margin-bottom:6px; }
@@ -265,6 +273,8 @@
 
   /* ---------- keepsake card ---------- */
   .card-col{ display:flex; flex-direction:column; align-items:center; gap:14px; position:sticky; top:64px; }
+  .preview-label{ align-self:stretch; color:var(--gold); font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; text-align:center; }
+  .preview-note{ align-self:stretch; color:var(--hint); font-size:13px; font-style:italic; text-align:center; margin-top:-8px; }
   .keepsake{
     width:430px; max-width:100%; background:var(--paper-card);
     border:1px solid #e6dfca; border-radius:6px; overflow:hidden;
@@ -1602,6 +1612,19 @@ body.theme-night .space-tile[data-space="learner"]{--accent:#2e789d}
       bottom:calc(92px + env(safe-area-inset-bottom)); padding:7px 12px;
     }
   }
+
+  @media (max-width:560px){
+    .topbar,.content-subnav,.bottom-nav{
+      background:var(--glass-solid);
+      -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.18);
+      backdrop-filter:blur(var(--glass-blur)) saturate(1.18);
+    }
+    .bottom-nav-tab{ color:var(--ink-soft); }
+    .bottom-nav-tab.current{
+      background:var(--paper-card);
+      color:var(--ink);
+    }
+  }
 </style>
 </head>
 <body>
@@ -1794,6 +1817,17 @@ body.theme-night .space-tile[data-space="learner"]{--accent:#2e789d}
         <ellipse cx="48" cy="58" rx="15" ry="5" transform="rotate(-26 48 58)"/>
       </g>
     </symbol>
+    <!-- Empty-state spot illustration — a little pot with a sprout, "ready to grow" (currentColor) -->
+    <symbol id="ill-empty-sprout" viewBox="0 0 120 100">
+      <g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M44 60 L76 60 L71 86 L49 86 Z" stroke-width="2.4"/>
+        <path d="M41 60 L79 60" stroke-width="2.4"/>
+        <path d="M60 60 L60 42" stroke-width="2"/>
+        <path d="M60 51 C51 47 45 49 43 42 C51 40 57 44 60 51 Z" fill="currentColor" fill-opacity=".12" stroke-width="1.7"/>
+        <path d="M60 46 C69 42 75 44 77 37 C69 35 63 39 60 46 Z" fill="currentColor" fill-opacity=".12" stroke-width="1.7"/>
+        <g stroke-width="1.5" opacity=".55"><path d="M30 40 L30 46 M27 43 L33 43"/><path d="M90 32 L90 37 M87.5 34.5 L92.5 34.5"/></g>
+      </g>
+    </symbol>
   </defs>
 </svg>
 
@@ -1929,7 +1963,7 @@ const WORKSHEETS = [
       {key:'symbol', label:'A symbol for us', hint:'a shape, a mark, a small drawn thing', type:'short'},
       {key:'memory', label:'A memory this place keeps', hint:'a small, shared, true thing', type:'long', quote:true},
     ],
-    example:null,
+    example:{ name:'Lanternroot Hollow', feel:'safe and green-lit', grows:'soft moss, silver ferns, tiny yellow flowers', protects:'a ring of patient old roots', soundsmell:'rain on leaves and warm tea', light:'fireflies under fern fronds', symbol:'two leaves touching at the stem', memory:'We sat here until the rain passed, and the grove remembered our names kindly.' },
   },
   {
     id:'sacred', kit:'field', title:'A Sacred Creature',
@@ -1960,7 +1994,7 @@ const WORKSHEETS = [
       {key:'s2motive', label:'Another suspect — motive', type:'short', row:true},
       {key:'theory', label:'Your theory (what really happened)', hint:'case closed, or left open?', type:'long', quote:true},
     ],
-    example:null,
+    example:{ caseof:'The Vanishing Bell', facts:'The bell rang once at moonrise, then disappeared from the old tower. No footprints were found in the dust.', s1name:'The tower keeper', s1motive:'wanted the village to stop listening for warnings', s2name:'A windbound spirit', s2motive:'mistook the bell for its missing voice', theory:'The bell was not stolen; it woke up and flew into the cloudsea, still ringing very softly.' },
   },
   {
     id:'free-field', kit:'field', title:'A Page for Anything',
@@ -1971,7 +2005,7 @@ const WORKSHEETS = [
       {key:'title', label:'Call it anything (or nothing)', hint:'optional', type:'short'},
       {key:'note', label:'A note, if you like', hint:'or leave it blank for another day', type:'long', quote:true},
     ],
-    example:null,
+    example:{ title:'A Little Door in the Rain', note:'It only appears when someone is kind to a stranger, and it opens onto a dry room full of candles.' },
   },
   { id:'sparks', kit:'field', special:'sparks', accent:'gold', title:'Ideas & Sparks',
     subtitle:'jot any little spark — random ideas, names, what-ifs, kept in one place' },
@@ -2050,7 +2084,7 @@ const WORKSHEETS = [
       {key:'title', label:'Name it (or not)', hint:'optional', type:'short'},
       {key:'note', label:'What is it?', hint:'a new god, a strange law of magic, a whole little story', type:'long', quote:true},
     ],
-    example:null,
+    example:{ title:'The Rule of Upside-Down Rain', note:'On one floating island, rain falls upward whenever someone tells the truth they were afraid to say.' },
   },
 
   /* ===== special layouts ===== */
@@ -2067,7 +2101,7 @@ const WORKSHEETS = [
       {key:'trait', label:'A trait', type:'short'},
     ],
     card:{ kicker:'Vael Folk', name:'name', sub:'grew', subPrefix:'grew in ', quote:'trait' },
-    example:null },
+    example:{ name:'Thornmira', branch:'-thari', grew:'the oldest part of the grove', element:'wood', trait:'keeps acorn-cups for anyone who arrives thirsty' } },
   { id:'specimens', kit:'field', title:'Seeds & Specimens', special:'specimens', accent:'gold',
     subtitle:'little cards for seeds, leaves, and found things' },
   { id:'warmth', kit:'field', title:'The Warmth-Keeper', special:'warmth', accent:'rose',
@@ -3630,7 +3664,14 @@ function railLinks(items, emptyText){
   return h('div',{class:'rail-list'}, ...items.map(it=>
     h('button',{class:'rail-link', type:'button', title:it.label, onclick:it.onclick}, it.label)));
 }
-
+// A gentle empty-state block — a small spot illustration + a line or two — so "nothing here
+// yet" feels inviting rather than blank. Reused across views (empty journal, no saved regions…).
+function emptyState(illId, title, line){
+  return h('div',{class:'empty-state'},
+    svgUse(illId||'ill-empty-sprout','empty-state-art'),
+    title? h('p',{class:'empty-state-title'}, title) : null,
+    line? h('p',{class:'empty-state-line'}, line) : null);
+}
 /* ---------- doodle component ---------------------------------------------- */
 // onChange fires only when the *drawing* actually changes (a finished stroke, undo, clear,
 // or a loaded photo) — never on a plain tap of a colour/tool button. That keeps the heavy
@@ -3694,8 +3735,8 @@ function viewCardEditor(w, editId){
   return buildCardEditor(w, existing, Object.assign({}, initial), existing? existing.image : null);
 }
 
-// Rebuildable card editor. `seedImage` lets "Show me the example" (and edit)
-// re-open the same page pre-filled, without any router round-trip.
+// Rebuildable card editor. `seedImage` lets edit flows re-open the same page
+// pre-filled, without any router round-trip.
 function buildCardEditor(w, existing, state, seedImage){
   const f = framed(w.title, w.subtitle, w.kit==='field'? 'The Vael Field Journal — go gently, go slow' : "The Worldmaker's Pages — the world is wider because you're in it");
   f.classList.add('theme-vael');   // Field Journal / Worldmaker pages keep the warm Vael parchment look
@@ -3706,24 +3747,59 @@ function buildCardEditor(w, existing, state, seedImage){
   const doodle = Doodle(seedImage, w.imageHint, ()=>repaint());
   let importedImage = existing? (existing.importedImage||null) : null;   // full-res photo / Procreate art
   let tags = existing? (existing.tags||[]).slice() : [];
+  let showingExample = false;
+  const focusFields = [];
   const currentImage = ()=> importedImage || doodle.getData();
   const previewSpec = (w.specimen && !existing)? (DB.counters[w.id]||0)+1 : (existing && existing.specimenNo);
-  function repaint(){ cardCol.replaceChildren(keepsake(w, state, currentImage(), {specimenNo:previewSpec}), cardActions()); }
+
+  function firstFocusable(node){
+    return node&&node.querySelector?node.querySelector('input,textarea,button,canvas,[tabindex]'):node;
+  }
+  function focusFirstField(opts){
+    if(!focusFields.length) return;
+    const run=()=>{ const target=firstFocusable(focusFields[0]); if(target&&target.focus) target.focus(); };
+    if(opts&&opts.defer&&typeof requestAnimationFrame==='function') requestAnimationFrame(run); else run();
+  }
+  function registerField(fieldEl){
+    focusFields.push(fieldEl);
+    return fieldEl;
+  }
+  function previewState(){ return showingExample&&w.example?Object.assign({},w.example):state; }
+  function previewImage(){ return showingExample&&w.example?(w.exampleImage||null):currentImage(); }
+  function repaint(){
+    cardCol.replaceChildren(
+      h('div',{class:'preview-label'},'Your card, taking shape.'),
+      showingExample?h('div',{class:'preview-note'},'Example only - your fields stay unchanged.'):null,
+      keepsake(w, previewState(), previewImage(), {specimenNo:previewSpec}),
+      cardActions());
+  }
+
+  const exampleBtn = w.example?h('button',{class:'navbtn editor-example-toggle', type:'button', 'aria-pressed':'false'}, '✧ Show me an example'):null;
+  if(exampleBtn) exampleBtn.onclick=()=>{
+    showingExample=!showingExample;
+    exampleBtn.setAttribute('aria-pressed',showingExample?'true':'false');
+    exampleBtn.replaceChildren(document.createTextNode(showingExample?'Hide the example':'✧ Show me an example'));
+    repaint();
+  };
+  editor.append(h('div',{class:'editor-intro'},
+    h('p',{class:'editor-note'}, "Fill only what you like — there's no wrong way."),
+    exampleBtn
+  ));
 
   w.fields.forEach(fld=>{
     if (fld.type==='element'){
-      editor.append(h('div',{class:'field'},
+      editor.append(registerField(h('div',{class:'field'},
         h('label',null,fld.label),
         fld.hint? h('div',{class:'fhint'}, fld.hint):null,
         elementPicker(state, repaint),
-      ));
+      )));
     } else if (fld.type==='choice'){
-      editor.append(choiceField(fld, state, repaint));
+      editor.append(registerField(choiceField(fld, state, repaint)));
     } else {
       const tag = fld.type==='long'? 'textarea':'input';
       const inp = h(tag,{ value: state[fld.key]||'', placeholder: fld.hint||'', rows: fld.type==='long'?2:null,
         oninput:e=>{ state[fld.key]=e.target.value; repaint(); } });
-      editor.append(h('div',{class:'field'}, h('label',null,fld.label), inp));
+      editor.append(registerField(h('div',{class:'field'}, h('label',null,fld.label), inp)));
     }
   });
 
@@ -3755,10 +3831,6 @@ function buildCardEditor(w, existing, state, seedImage){
   editor.append(h('div',{class:'field advanced-only'}, h('label',null,'Tags'), h('div',{class:'fhint'},'press Enter after each — for searching later'), tagWrap));
 
   const tools = h('div',{class:'toolrow'});
-  if (w.example) tools.append(h('button',{class:'navbtn', onclick:()=>{
-    const rebuilt = buildCardEditor(w, existing, Object.assign({}, w.example), seedImage);
-    $app.replaceChildren(topbar(), rebuilt); window.scrollTo(0,0);
-  }}, 'Show me the example'));
   tools.append(h('button',{class:'navbtn primary', onclick:()=>{ saveCreation(w, state, doodle.getData(), existing, importedImage, tags); }}, existing?'Save changes':'Save to my journal'));
   tools.append(h('button',{class:'navbtn', onclick:()=>go('home')}, 'Start fresh'));
   editor.append(tools);
@@ -3772,6 +3844,7 @@ function buildCardEditor(w, existing, state, seedImage){
   wrap.append(editor, cardCol);
   f.querySelector('.framed-body').append(wrap);
   repaint();
+  focusFirstField({defer:true});
   return f;
 }
 
@@ -4056,7 +4129,7 @@ function viewGallery(){
     h('div',{class:'tag'},'everything you’ve made — revisit it, change it, print it, or weave it into the world')));
   wrap.append(backupRow());
   if (!DB.creations.length){
-    wrap.append(h('div',{class:'empty-note'},'Nothing yet — and that’s alright. Pick a page from the home shelf and make a little something. (Already have a backup from another device? Restore it above.)'));
+    wrap.append(emptyState('ill-empty-sprout', 'Nothing yet — and that’s alright.', 'Pick a page from the home shelf and make a little something. Already have a backup from another device? Restore it above.'));
     return wrap;
   }
   const state={ q:'', kit:'', tag:'' };
@@ -11899,8 +11972,8 @@ campRegion = async function(host, name){
       h('div', { class:'region-readonly' }, h('b', null, 'Region map · saved data'),
         h('span', null, 'Pins, markers, and reveal/fog can be edited. Terrain remains read-only.')));
     if (!result.regions.length){
-      wrap.append(h('div', { class:'region-empty' }, h('h3', null, 'No saved regions'),
-        h('p', { class:'hint' }, 'No saved regions exist for this campaign yet. Add a region JSON under campaign/' + name + '/regions/ to see it mapped here.')));
+      wrap.append(emptyState('ill-empty-sprout', 'No saved regions',
+        'No saved regions exist for this campaign yet. Add a region JSON under campaign/' + name + '/regions/ to see it mapped here.'));
     } else result.regions.forEach(entry => {
       wrap.append(regionStatusCard(entry));
       if (entry.region && (!entry.errors || !entry.errors.length)){
