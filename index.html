@@ -1198,6 +1198,22 @@
 /* the GM deserves a wider seat by default — there's room at the sides on desktop */
 .companion-panel:has(.companion-gm){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
 .companion-panel.tall:has(.companion-gm){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+/* 📖 reading mode: fold the writing area in EVERY chat so the transcript takes
+   the whole panel — guide/messages input rows, and the GM's input card. */
+.companion-panel.reading .companion-inputrow,
+.companion-panel.reading .companion-footrow,
+.companion-panel.reading .play-input-card{ display:none; }
+/* touch resize grip (top-left corner) — Safari/iPad has no native resize handle */
+.companion-grip{
+  position:absolute; left:0; top:0; width:22px; height:22px;
+  cursor:nwse-resize; touch-action:none; z-index:2;
+}
+.companion-grip::before{
+  content:''; position:absolute; left:6px; top:6px; width:9px; height:9px;
+  border-left:2px solid var(--glass-border); border-top:2px solid var(--glass-border);
+  border-radius:3px 0 0 0; opacity:.9;
+}
+@media (max-width:700px){ .companion-grip{ display:none; } }
 @media (min-width:701px){
   /* desktop: drag the header to move, native corner handle to resize —
      both remembered per device; double-click the header to snap back */
@@ -7677,6 +7693,9 @@ function companionSetMode(mode){
   if(mode==='chat') companionRenderLog();
 }
 
+function companionPanelClass(){
+  return 'companion-panel glass no-print'+(COMPANION.tall?' tall':'')+(COMPANION.reading?' reading':'');
+}
 // One toggle serves both shapes: on the phone the bottom sheet grows from ~46vh
 // to nearly full height; on desktop the panel gets wider and taller. Reading a
 // long GM turn is the reason this exists. ⤢ also resets any custom drag/resize
@@ -7686,9 +7705,20 @@ function companionSetTall(force){
   COMPANION.tall=force==null?!COMPANION.tall:!!force;
   DB.companionBox=null; saveLocal();
   companionApplyBox();
-  panel.className='companion-panel glass no-print'+(COMPANION.tall?' tall':'');
+  panel.className=companionPanelClass();
   const btn=panel._sizeBtn;
   if(btn){ btn.setAttribute('aria-pressed',COMPANION.tall?'true':'false'); btn.textContent=COMPANION.tall?'⤡':'⤢'; }
+}
+// 📖 reading mode (Del: "hiding the part you type in so you can just read… all
+// chats honestly") — folds the writing area in EVERY mode (GM input card, guide
+// and messages input rows) so the transcript takes the whole panel. Ephemeral by
+// design: reading is situational, so it never persists.
+function companionSetReading(force){
+  const panel=companionEnsurePanel();
+  COMPANION.reading=force==null?!COMPANION.reading:!!force;
+  panel.className=companionPanelClass();
+  const btn=panel._readBtn;
+  if(btn){ btn.setAttribute('aria-pressed',COMPANION.reading?'true':'false'); btn.textContent=COMPANION.reading?'⌨':'📖'; btn.setAttribute('title',COMPANION.reading?'Bring the writing area back':'Hide the writing area to read'); }
 }
 
 /* ---- move + resize (desktop) ------------------------------------------------
@@ -7760,6 +7790,39 @@ function companionWireDrag(panel, head){
   });
   head.addEventListener('dblclick', ()=>{ if(companionDesktop()) companionResetBox(); });
 }
+// The touch resize grip (top-left corner): works with a finger on iPad, where
+// Safari has no native resize handle. Dragging resizes toward/away from the
+// bottom-right corner — anchored panels stay in their corner, dragged panels
+// keep their bottom-right edge where it was.
+function companionWireGrip(panel, grip){
+  if(!grip||typeof grip.addEventListener!=='function') return;
+  grip.addEventListener('pointerdown', e=>{
+    if(!companionDesktop()) return;
+    const rect=typeof panel.getBoundingClientRect==='function'?panel.getBoundingClientRect():null;
+    if(!rect||!rect.width) return;
+    if(typeof e.preventDefault==='function') e.preventDefault();
+    const sx=e.clientX, sy=e.clientY, r0=rect;
+    const pinned=!!(DB.companionBox&&DB.companionBox.left!=null);
+    let moved=false;
+    const onMove=ev=>{
+      const dx=ev.clientX-sx, dy=ev.clientY-sy;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<3) return;
+      moved=true;
+      const w=Math.max(300, r0.width-dx), hgt=Math.max(260, r0.height-dy);
+      panel.style.width=w+'px'; panel.style.height=hgt+'px'; panel.style.maxWidth='none'; panel.style.maxHeight='none';
+      if(pinned){ panel.style.left=(r0.left+dx)+'px'; panel.style.top=(r0.top+dy)+'px'; }
+    };
+    const onUp=()=>{
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if(!moved) return;
+      const r=panel.getBoundingClientRect();
+      companionSaveBox(pinned?{left:r.left, top:r.top, w:r.width, hgt:r.height}:{w:r.width, hgt:r.height});
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+}
 // The native resize handle sets inline width/height itself; this just remembers it.
 function companionWireResize(panel){
   if(typeof ResizeObserver!=='function') return;
@@ -7786,18 +7849,26 @@ function companionEnsurePanel(){
     onclick:()=>companionSetMode(COMPANION.mode==='gm'?'chat':'gm')}, '♟');
   const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
     onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
+  const readBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
+    title:'Hide the writing area to read', onclick:()=>companionSetReading()}, '📖');
   const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
-  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, msgBtn, sizeBtn, closeBtn);
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, msgBtn, readBtn, sizeBtn, closeBtn);
+  // Safari (iPad included) never renders the native CSS resize corner, so the
+  // panel carries its own touch grip: the top-left corner resizes toward/away
+  // from the bottom-right, which stays visually put.
+  const grip=h('div',{class:'companion-grip', 'aria-hidden':'true'});
   const panel=h('div',{class:'companion-panel glass no-print', role:'dialog', 'aria-label':'Guide'},
     head,
-    body);
+    body,
+    grip);
   panel.style.display='none';
-  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn;
   COMPANION.panel=panel;
   companionWireDrag(panel, head);
   companionWireResize(panel);
+  companionWireGrip(panel, grip);
   companionSetMode('chat');
   companionApplyBox();
   return panel;
@@ -15618,8 +15689,10 @@ async function campPlayBuildSession(name, profiles){
   const inputCard=h('div',{class:'play-input-card'}, lensToggle, lensPanel, input, actionRow);
   const transcriptCard=h('div',{class:'play-transcript-card'}, transcript);
   const chatStack=h('section',{class:'play-chat-stack'}, groundingLine, transcriptCard, inputCard);
-  const lensMedia=(typeof window!=='undefined'&&typeof window.matchMedia==='function')?window.matchMedia('(max-width:560px)'):null;
-  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=!!(lensMedia&&lensMedia.matches);
+  // The lens rack is a one-row swipe strip in the panel — cheap enough to show by
+  // default on every size (Del's call: "a sidescroller is excellent for phone too");
+  // the Lens toggle still folds it.
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=false;
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -15705,7 +15778,7 @@ async function campPlayBuildSession(name, profiles){
         h('span',{class:'play-mode-title'},mode.label),
         h('small',null,mode.hint)
       );
-      btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); if(lensMedia&&lensMedia.matches) setLensCollapsed(true); };
+      btn.onclick=()=>{ activeMode=mode.id; drawModeRow(); };
       return btn;
     };
     const chips=[CAMP_PLAY_AUTO_MODE].concat(CAMP_PLAY_MODES);
@@ -15733,7 +15806,7 @@ async function campPlayBuildSession(name, profiles){
     starterRow.append(h('span',{class:'hint'},'Quick prompts'));
     prompts.forEach(promptText=>{
       const btn=h('button',{class:'chip dash',type:'button'},promptText);
-      btn.onclick=()=>{ input.value=promptText; input.focus(); updateModeHelp(); if(lensMedia&&lensMedia.matches) setLensCollapsed(true); };
+      btn.onclick=()=>{ input.value=promptText; input.focus(); updateModeHelp(); };
       starterRow.append(btn);
     });
   }
@@ -15810,11 +15883,6 @@ async function campPlayBuildSession(name, profiles){
   personaSel.onchange=()=>{ drawTools(); drawStarters(); };
   groundingSel.onchange=drawTools;
   lensToggle.onclick=()=>setLensCollapsed(!lensCollapsed);
-  if(lensMedia){
-    const syncLensMedia=e=>setLensCollapsed(!!e.matches);
-    if(typeof lensMedia.addEventListener==='function') lensMedia.addEventListener('change',syncLensMedia);
-    else if(typeof lensMedia.addListener==='function') lensMedia.addListener(syncLensMedia);
-  }
   sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; updateModeHelp(); runTurn(v); };
   sceneBtn.onclick=()=>{ runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.','scene'); };
 
