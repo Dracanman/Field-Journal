@@ -953,9 +953,19 @@
   .companion-gm .play-input{ min-height:56px; }
   .companion-gm .play-grounding{ font-size:11px; margin:0 2px; }
   .companion-gm .play-msg.you, .companion-gm .play-msg.gm{ max-width:100%; }
-  .companion-gm .play-mode-chip{ flex:0 1 auto; max-width:none; padding:4px 9px; }
+  /* the lens rack is ONE swipeable strip in the panel (a chip grid ate the whole
+     transcript — Del, 2026-07-02): every lens chip in one horizontal row, the
+     'More lenses' <details> flattened into it, quick prompts as a second strip. */
+  .companion-gm .play-mode-row{ display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+  .companion-gm .play-mode-chip{ flex:0 0 auto; max-width:none; padding:4px 10px; white-space:nowrap; }
   .companion-gm .play-mode-chip small{ display:none; }
-  .companion-gm .play-lens-panel:not(.lens-collapsed){ max-height:34vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+  .companion-gm .play-mode-more{ display:contents; }
+  .companion-gm .play-mode-more summary{ display:none; }
+  .companion-gm .play-mode-more-list{ display:contents; }
+  .companion-gm .play-starters{ display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; align-items:center; padding-bottom:4px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; }
+  .companion-gm .play-starters .chip{ flex:0 0 auto; white-space:nowrap; }
+  .companion-gm .play-mode-help{ font-size:11px; }
+  .companion-gm .play-lens-panel:not(.lens-collapsed){ max-height:none; overflow:visible; }
 
   /* ---------- the Play tab as the TABLE (chat rides the companion) ---------- */
   .play-head-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
@@ -1185,6 +1195,9 @@
 .companion-messages .companion-msg{ max-width:92%; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
 .companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
+/* the GM deserves a wider seat by default — there's room at the sides on desktop */
+.companion-panel:has(.companion-gm){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
+.companion-panel.tall:has(.companion-gm){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
 @media (min-width:701px){
   /* desktop: drag the header to move, native corner handle to resize —
      both remembered per device; double-click the header to snap back */
