@@ -8768,10 +8768,18 @@ function assistantEngineProfiles(){
   return (Array.isArray(settings.profiles)?settings.profiles.slice():[]).filter(profile=>!engineIsPrivateBackendType(profile.type));
 }
 
+// Honors the Engine settings ACTIVE badge everywhere (Q-6): the hint text there says
+// "Choose which connection in-app AI tools will use", and Practice's coach already followed
+// it — the Studio assistant and Campaign Play used to default to the first local engine
+// instead, silently overriding the ACTIVE pick until the user re-selected in the per-surface
+// dropdown. If a "prefer local" default is wanted again, it should be its own explicit
+// setting, not an implicit override of ACTIVE.
 function assistantDefaultEngine(profiles){
+  const active=getActiveEngine();
+  if(active&&(profiles||[]).some(p=>p.id===active.id)) return active;
   const local=(profiles||[]).find(assistantIsLocalEngine);
   if(local) return local;
-  return getActiveEngine()||(profiles&&profiles[0])||null;
+  return (profiles&&profiles[0])||null;
 }
 
 function assistantEngineById(profiles, id){
