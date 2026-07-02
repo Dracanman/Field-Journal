@@ -8886,27 +8886,35 @@ function canonGroundingIds(entries){
   return (entries||[]).map(canonEntryRef).filter(Boolean);
 }
 
+// Returns {text, truncated}: truncated is true when the entry's body reached the model only
+// in part (canonRagClampText cuts it and appends an ellipsis). A-2 residual: chunking already
+// keeps a long section from silently losing its tail (each chunk is its own retrievable
+// entry), but the last block emitted before the char budget fills can still be clamped — the
+// caller surfaces that so "the answer saw a cut" is visible, not silent.
 function canonGroundingBlock(entry, max){
   const ref=canonEntryRef(entry);
   const head='['+ref+'] '+(entry&&entry.title||'Untitled')+'\n';
-  const body=canonRagClampText(entry&&entry.body||'',Math.max(0,max-head.length));
-  return head+body;
+  const full=String(entry&&entry.body||'').trim();
+  const body=canonRagClampText(full,Math.max(0,max-head.length));
+  return {text:head+body, truncated:body!==full};
 }
 
-// Walk entries into grounding blocks under the char budget, reporting BOTH the joined text
-// and the entries that actually contributed a block. A-5: the loop stops once the budget is
-// spent, so trailing entries get no block — provenance ("Grounded on: …") must be built from
-// the emitted set, not the full retrieved list, or it names canon the model never received.
+// Walk entries into grounding blocks under the char budget, reporting the joined text, the
+// entries that actually contributed a block, and how many of those blocks were truncated.
+// A-5: the loop stops once the budget is spent, so trailing entries get no block — provenance
+// ("Grounded on: …") must be built from the emitted set, not the full retrieved list, or it
+// names canon the model never received.
 function canonGroundingBlocks(entries, charBudget){
   entries=entries||[];
-  let remaining=charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET, out=[], emitted=[];
+  let remaining=charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET, out=[], emitted=[], truncated=0;
   for(const entry of entries){
     if(remaining<=0) break;
     const block=canonGroundingBlock(entry,Math.min(CANON_RAG_MAX_ENTRY_CHARS,remaining));
-    out.push(block); emitted.push(entry);
-    remaining-=block.length+2;
+    out.push(block.text); emitted.push(entry);
+    if(block.truncated) truncated++;
+    remaining-=block.text.length+2;
   }
-  return {text:emitted.length?out.join('\n\n'):'No promoted entries matched the question.', emitted};
+  return {text:emitted.length?out.join('\n\n'):'No promoted entries matched the question.', emitted, truncated};
 }
 
 function canonGroundingText(entries, charBudget){
@@ -8931,6 +8939,7 @@ function canonGrounding(question, entries, opts){
     // UI's "Grounded on:" line and any ledger record match what the model was given.
     ids:canonGroundingIds(built.emitted),
     entries:built.emitted,
+    truncated:built.truncated,
   };
 }
 
@@ -9446,7 +9455,7 @@ function assistantNormalizeGrounding(value){
   value=value&&typeof value==='object'?value:{};
   const entries=Array.isArray(value.entries)?value.entries:[];
   const ids=Array.isArray(value.ids)?value.ids:canonGroundingIds(entries);
-  return {system:String(value.system||''),ids,entries,embeddingStatus:String(value.embeddingStatus||''),warning:String(value.warning||'')};
+  return {system:String(value.system||''),ids,entries,embeddingStatus:String(value.embeddingStatus||''),warning:String(value.warning||''),truncated:Number(value.truncated)||0};
 }
 
 function assistantPrivateResultEntry(row, index){
@@ -9504,6 +9513,7 @@ function assistantMergeGrounding(base, extra){
   base.entries=base.entries.concat(extra.entries);
   base.ids=Array.from(new Set(base.ids.concat(extra.ids).filter(Boolean)));
   base.warning=[base.warning,extra.warning].filter(Boolean).join(' ');
+  base.truncated=(base.truncated||0)+(extra.truncated||0);
   return base;
 }
 
@@ -10122,8 +10132,12 @@ function studioAssistant(host){
     refreshModels(engine);
   }
 
-  function setGroundingLine(ids){
-    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+assistantIdsText(ids)));
+  function setGroundingLine(ids, truncated){
+    // A-2 residual: flag when a shown entry reached the model only in part (budget boundary),
+    // so "the answer saw a cut" is visible rather than silent.
+    const n=Number(truncated)||0;
+    const note=n>0?'  ·  '+n+' entr'+(n===1?'y':'ies')+' shown in part (context budget)':'';
+    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+assistantIdsText(ids)+note));
   }
 
   function setEmbedStatus(value, warning, usedPrivateBackend){
@@ -10171,7 +10185,7 @@ function studioAssistant(host){
     state.answer=result.text||'';
     state.grounding=grounding;
     if(engine&&engine.id===engineSel.value) state.model=result.model||requestModelFor(engine)||'';
-    setGroundingLine(grounding.ids);
+    setGroundingLine(grounding.ids,grounding.truncated);
     setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning,(grounding.entries||[]).some(e=>e&&e.fromPrivateBackend));
     status.textContent=finalStatus;
     draftBtn.disabled=false;
@@ -15033,7 +15047,7 @@ async function campPlay(host, name){
   host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
 
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
-  let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, pendingProposal=null;
+  let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null;
   try{
     files=await campaignFiles(cfg,name);
     if(!files.tracker){ host.replaceChildren(h('p',{class:'hint'},'No state tracker for '+name+' yet — start play once the campaign is scaffolded.')); return; }
@@ -15225,7 +15239,7 @@ async function campPlay(host, name){
     const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
     const override=groundingSel.value;
     const mode=campPlayGroundingMode(persona,override);
-    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')));
+    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'')));
   }
 
   async function runTurn(userText, forceModeId){
@@ -15242,7 +15256,7 @@ async function campPlay(host, name){
     messages.push(gm); drawTranscript();
     status.textContent='The table is thinking...';
     let groundingSystem='';
-    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); drawTools(); }catch(e){}
+    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); groundingTruncated=Number(g&&g.truncated)||0; drawTools(); }catch(e){}
     const system=campPlayBuildSystem({
       persona,
       modeId:mode.id,
