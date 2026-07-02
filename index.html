@@ -8887,23 +8887,31 @@ function canonGroundingBlock(entry, max){
   return head+body;
 }
 
-function canonGroundingText(entries, charBudget){
+// Walk entries into grounding blocks under the char budget, reporting BOTH the joined text
+// and the entries that actually contributed a block. A-5: the loop stops once the budget is
+// spent, so trailing entries get no block — provenance ("Grounded on: …") must be built from
+// the emitted set, not the full retrieved list, or it names canon the model never received.
+function canonGroundingBlocks(entries, charBudget){
   entries=entries||[];
-  if(!entries.length) return 'No promoted entries matched the question.';
-  let remaining=charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET, out=[];
+  let remaining=charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET, out=[], emitted=[];
   for(const entry of entries){
     if(remaining<=0) break;
     const block=canonGroundingBlock(entry,Math.min(CANON_RAG_MAX_ENTRY_CHARS,remaining));
-    out.push(block);
+    out.push(block); emitted.push(entry);
     remaining-=block.length+2;
   }
-  return out.join('\n\n');
+  return {text:emitted.length?out.join('\n\n'):'No promoted entries matched the question.', emitted};
+}
+
+function canonGroundingText(entries, charBudget){
+  return canonGroundingBlocks(entries,charBudget).text;
 }
 
 function canonGrounding(question, entries, opts){
   if(Array.isArray(question)){ opts=entries||{}; entries=question; question=''; }
   opts=opts||{};
   entries=(entries||[]).slice(0,opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES);
+  const built=canonGroundingBlocks(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET);
   return {
     system:[
       'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
@@ -8911,10 +8919,12 @@ function canonGrounding(question, entries, opts){
       'Bare [OPEN]/[UNAUDITED]/[QUESTION] lines are unresolved questions - not canon. [DESTINATION] tags mark committed-but-not-fully-locked direction - do not invent the missing specifics.',
       question?'Question: '+String(question||'').trim():'',
       'GROUNDING:',
-      canonGroundingText(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET)
+      built.text
     ].filter(Boolean).join('\n\n'),
-    ids:canonGroundingIds(entries),
-    entries,
+    // ids + entries reflect only what actually made it into the grounding text (A-5), so the
+    // UI's "Grounded on:" line and any ledger record match what the model was given.
+    ids:canonGroundingIds(built.emitted),
+    entries:built.emitted,
   };
 }
 
@@ -9594,7 +9604,12 @@ function assistantSpendLabel(engine){
 const ASSISTANT_ESCALATION_HEURISTIC={
   threshold:3,
   minAnswerChars:140,
-  weights:{refusal:4,unknown:4,emptyGrounding:3,veryShort:3,tryHarder:3},
+  // A-8: veryShort is 2 (below threshold) so shortness alone cannot trigger a metered API
+  // call — a short-and-correct grounded answer such as a one-line yes with a canon id should
+  // not escalate. It now only escalates when paired with another signal (empty grounding,
+  // refusal/unknown wording, or an explicit try-harder request). The other weights stay at or
+  // above threshold so each still escalates on its own.
+  weights:{refusal:4,unknown:4,emptyGrounding:3,veryShort:2,tryHarder:3},
   refusalPatterns:[
     /\b(?:cannot|can't|unable to|won't)\b.{0,80}\b(?:answer|help|provide|determine|find)\b/i,
     /\bI can(?:not|'t)\b/i
