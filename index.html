@@ -9400,6 +9400,10 @@ if(typeof window!=='undefined'){
   window.__sqlQuery=privateSqlQuery;
   window.__sqlQuery.search=privateSqlSearch;
   window.__sqlQuery.embed=privateSqlEmbed;
+  // C-2: lets callers (assistantPrivateBackendGrounding) skip the attempt entirely on a
+  // device with no backend profile configured, instead of calling .search and catching the
+  // guaranteed "choose a profile first" throw on every single ask.
+  window.__sqlQuery.hasProfile=()=>!!privateActiveBackendProfile();
 }
 const ASSISTANT_MAX_TOKENS=900;
 
@@ -9426,13 +9430,22 @@ function assistantPrivateResultEntry(row, index){
     title,
     domain:String(row.domain||row.source||'Private backend').trim(),
     file:String(row.file||row.path||'private backend').trim(),
-    body
+    body,
+    fromPrivateBackend:true
   };
 }
 
+// C-2: this used to always call api.search when the hook existed, catch the guaranteed
+// "choose a private tailnet backend profile first" throw on any device with no backend
+// profile configured, and surface that as a persistent warning on every single ask —
+// noise unrelated to which chat engine is even selected. Checking hasProfile() first means
+// a device that simply doesn't use the private backend sees no warning at all; the warning
+// now only appears for a genuine failure (backend down, network error, etc.) once a profile
+// exists.
 async function assistantPrivateBackendGrounding(question){
   const api=typeof window!=='undefined'&&window.__sqlQuery?window.__sqlQuery:null;
   if(!api||typeof api.search!=='function') return null;
+  if(typeof api.hasProfile==='function'&&!api.hasProfile()) return null;
   try{
     const result=await api.search(question,{limit:3});
     const rows=Array.isArray(result&&result.items)?result.items:[];
@@ -9957,7 +9970,13 @@ function studioAssistant(host){
       btn.onclick=()=>selectPersona(persona.id);
       return btn;
     }));
-    personaMeta.replaceChildren(document.createTextNode((current.builtIn?'Built-in':'Custom')+' persona. '+(current.description||'')+' Grounding: '+current.groundingMode+'.'));
+    // CR-3: a persona's preferred model is silently dropped (falls back to the engine's own
+    // model, e.g. Claude ignoring a persona that wants an Ollama-only model) when it isn't a
+    // local engine and the engine doesn't advertise that model — say so here instead of
+    // letting the mismatch pass unremarked.
+    const currentEngine=assistantEngineById(profiles,engineSel.value);
+    const modelNote=current.model&&!assistantPersonaModelAllowed(current,currentEngine)?' Preferred model "'+current.model+'" isn’t available on this engine — using the engine’s own model instead.':'';
+    personaMeta.replaceChildren(document.createTextNode((current.builtIn?'Built-in':'Custom')+' persona. '+(current.description||'')+' Grounding: '+current.groundingMode+'.'+modelNote));
     customizeBtn.textContent=current.builtIn?'Customize a copy':'Edit custom';
     deletePersonaBtn.disabled=!!current.builtIn;
     renderStarterPrompts(current);
@@ -10072,13 +10091,15 @@ function studioAssistant(host){
     groundingLine.replaceChildren(document.createTextNode('Grounded on: '+assistantIdsText(ids)));
   }
 
-  function setEmbedStatus(value, warning){
+  function setEmbedStatus(value, warning, usedPrivateBackend){
     const text=value==='ready'?'Embeddings: ready'
       : value&&String(value).startsWith('building')?'Embeddings: building '+String(value).replace(/^building\s*/,'')
       : value==='checking'?'Embeddings: checking'
       : value==='fallback'?'Embeddings: fallback to keyword'
       : 'Embeddings: ready on demand';
-    embedStatus.replaceChildren(document.createTextNode(text+(warning?' - '+warning:'')));
+    // C-2: the backend fan-out is otherwise undisclosed — say so, but only on a turn where
+    // it actually contributed (a device with no backend profile never sees this).
+    embedStatus.replaceChildren(document.createTextNode(text+(usedPrivateBackend?' + private backend':'')+(warning?' - '+warning:'')));
   }
 
   function requestModelFor(engine){
@@ -10116,7 +10137,7 @@ function studioAssistant(host){
     state.grounding=grounding;
     if(engine&&engine.id===engineSel.value) state.model=result.model||requestModelFor(engine)||'';
     setGroundingLine(grounding.ids);
-    setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning);
+    setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning,(grounding.entries||[]).some(e=>e&&e.fromPrivateBackend));
     status.textContent=finalStatus;
     draftBtn.disabled=false;
     ledgerBtn.disabled=false;
@@ -10211,7 +10232,10 @@ function studioAssistant(host){
       ledgerBtn.disabled=false;
     }
   };
-  engineSel.onchange=refreshEngineNote;
+  // Switching engines can change whether the current persona's preferred model is honored
+  // (assistantPersonaModelAllowed) — re-render the persona meta line so the CR-3 model-note
+  // stays accurate instead of only updating on the next persona click.
+  engineSel.onchange=()=>{ refreshEngineNote(); renderPersonaPicker(); };
   refreshEngineNote();
   setGroundingLine([]);
   setEmbedStatus('');
@@ -14974,7 +14998,7 @@ async function campPlay(host, name){
   host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
 
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
-  let cast=[], groundingIds=[], pendingProposal=null;
+  let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, pendingProposal=null;
   try{
     files=await campaignFiles(cfg,name);
     if(!files.tracker){ host.replaceChildren(h('p',{class:'hint'},'No state tracker for '+name+' yet — start play once the campaign is scaffolded.')); return; }
@@ -14990,13 +15014,20 @@ async function campPlay(host, name){
   const engineSel=h('select',{class:'play-engine'},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' · '+p.type)));
   if(defaultEngine) engineSel.value=defaultEngine.id;
   const personaOptions=campPlayPersonaOptions(typeof assistantPersonaList==='function'?assistantPersonaList():[]);
-  const personaSel=h('select',{class:'play-persona'},...personaOptions.map(p=>h('option',{value:p.id},p.label)));
+  // CR-3: campPlayModelFor silently drops a persona's preferred model on a non-local engine
+  // that doesn't advertise it (falls back to the engine's own model with no visible sign the
+  // preference was ignored) — the title makes that behavior discoverable.
+  const personaSel=h('select',{class:'play-persona', title:'A persona’s preferred model is used on a local engine, or when the current engine advertises it — otherwise the engine’s own model is used instead.'},...personaOptions.map(p=>h('option',{value:p.id},p.label)));
   personaSel.value=personaOptions.some(p=>p.id===CAMP_PLAY_DEFAULT_PERSONA_ID)?CAMP_PLAY_DEFAULT_PERSONA_ID:(personaOptions[0]&&personaOptions[0].id)||CAMP_PLAY_DEFAULT_PERSONA_ID;
-  const groundingSel=h('select',{class:'play-grounding-mode'},
+  // CR-3: this is a one-turn override (campPlayGroundingMode reads it per-send, and it's
+  // reset to '' — "Follow persona" — right after each send below) styled like a persistent
+  // session control. The title + label make that explicit instead of leaving it a silent
+  // surprise the first time someone notices their pick didn't stick.
+  const groundingSel=h('select',{class:'play-grounding-mode', title:'Applies to your next send only, then returns to "Follow persona."'},
     h('option',{value:''},'Follow persona'),
-    h('option',{value:'strict'},'Strict'),
-    h('option',{value:'balanced'},'Balanced'),
-    h('option',{value:'creative'},'Creative')
+    h('option',{value:'strict'},'Strict (this turn)'),
+    h('option',{value:'balanced'},'Balanced (this turn)'),
+    h('option',{value:'creative'},'Creative (this turn)')
   );
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
@@ -15159,7 +15190,7 @@ async function campPlay(host, name){
     const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
     const override=groundingSel.value;
     const mode=campPlayGroundingMode(persona,override);
-    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')));
+    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')));
   }
 
   async function runTurn(userText, forceModeId){
@@ -15176,7 +15207,7 @@ async function campPlay(host, name){
     messages.push(gm); drawTranscript();
     status.textContent='The table is thinking...';
     let groundingSystem='';
-    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; drawTools(); }catch(e){}
+    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); drawTools(); }catch(e){}
     const system=campPlayBuildSystem({
       persona,
       modeId:mode.id,
@@ -15223,7 +15254,7 @@ async function campPlay(host, name){
           h('div',{class:'play-control-row'},
             h('label',{class:'play-select-label'},'Engine',engineSel),
             h('label',{class:'play-select-label'},'Persona',personaSel),
-            h('label',{class:'play-select-label'},'Grounding',groundingSel)
+            h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel)
           ),
           usageMeter()
         ),

@@ -1,6 +1,6 @@
 /* The Vael Field Journal — service worker (cache-first app shell, offline-capable).
    Canon/GitHub requests are never cached; they must stay live. */
-const CACHE = 'vfj-ba1b2bc1';
+const CACHE = 'vfj-ab07c06b';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
