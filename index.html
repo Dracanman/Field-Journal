@@ -953,7 +953,7 @@
   .companion-gm .play-input{ min-height:56px; }
   .companion-gm .play-grounding{ font-size:11px; margin:0 2px; }
   .companion-gm .play-msg.you, .companion-gm .play-msg.gm{ max-width:100%; }
-  .companion-gm .play-mode-chip{ flex:1 1 120px; max-width:none; }
+  .companion-gm .play-mode-chip{ flex:0 1 auto; max-width:none; padding:4px 9px; }
   .companion-gm .play-mode-chip small{ display:none; }
   .companion-gm .play-lens-panel:not(.lens-collapsed){ max-height:34vh; overflow:auto; -webkit-overflow-scrolling:touch; }
 
@@ -1185,6 +1185,13 @@
 .companion-messages .companion-msg{ max-width:92%; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
 .companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
+@media (min-width:701px){
+  /* desktop: drag the header to move, native corner handle to resize —
+     both remembered per device; double-click the header to snap back */
+  .companion-panel{ resize:both; min-width:300px; min-height:260px; }
+  .companion-head{ cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
+  .companion-head:active{ cursor:grabbing; }
+}
 @media (max-width:700px){
   .companion-fab{ bottom:calc(136px + env(safe-area-inset-bottom)); padding:7px 12px; }
   /* …the bubble steps aside while the sheet is up (it would sit on the input row) */
@@ -3300,6 +3307,8 @@ function hydrate(d){
   merged.peopleTombstones=d.peopleTombstones&&typeof d.peopleTombstones==='object'&&!Array.isArray(d.peopleTombstones)?Object.assign({},d.peopleTombstones):{};
   merged.whoActiveAt=Number.isFinite(d.whoActiveAt)?d.whoActiveAt:0;
   merged.liveRefresh=d.liveRefresh!==false;   // live background refresh — on unless turned off
+  // Where this device keeps the floating companion (drag/resize box) — device-local, never synced.
+  merged.companionBox=d.companionBox&&typeof d.companionBox==='object'&&!Array.isArray(d.companionBox)?Object.assign({},d.companionBox):null;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -7657,13 +7666,102 @@ function companionSetMode(mode){
 
 // One toggle serves both shapes: on the phone the bottom sheet grows from ~46vh
 // to nearly full height; on desktop the panel gets wider and taller. Reading a
-// long GM turn is the reason this exists.
+// long GM turn is the reason this exists. ⤢ also resets any custom drag/resize
+// box — it's the predictable size, and a remembered box would silently fight it.
 function companionSetTall(force){
   const panel=companionEnsurePanel();
   COMPANION.tall=force==null?!COMPANION.tall:!!force;
+  DB.companionBox=null; saveLocal();
+  companionApplyBox();
   panel.className='companion-panel glass no-print'+(COMPANION.tall?' tall':'');
   const btn=panel._sizeBtn;
   if(btn){ btn.setAttribute('aria-pressed',COMPANION.tall?'true':'false'); btn.textContent=COMPANION.tall?'⤡':'⤢'; }
+}
+
+/* ---- move + resize (desktop) ------------------------------------------------
+   Drag the header to move; the native bottom-right handle resizes; both are
+   remembered per device (DB.companionBox — never synced). Double-click the
+   header (or hit ⤢) to snap back to the default corner. The phone's bottom
+   sheet is anchored on purpose — no dragging there. */
+function companionDesktop(){
+  try{
+    return !(typeof window!=='undefined'&&typeof window.matchMedia==='function'&&window.matchMedia('(max-width:700px)').matches);
+  }catch(e){ return true; }
+}
+// Pure clamp: the panel stays reachable — never off-screen, never absurdly small.
+function companionClampBox(box, vw, vh){
+  const w=Math.min(Math.max(Number(box.w)||380, 300), Math.max(320, vw-24));
+  const hgt=Math.min(Math.max(Number(box.hgt)||520, 260), Math.max(300, vh-24));
+  const left=Math.min(Math.max(Number(box.left)||0, 8), Math.max(8, vw-w-8));
+  const top=Math.min(Math.max(Number(box.top)||0, 8), Math.max(8, vh-hgt-8));
+  return { left, top, w, hgt };
+}
+function companionApplyBox(){
+  const panel=COMPANION.panel;
+  if(!panel||!panel.style) return;
+  const reset=()=>{ ['left','top','right','bottom','width','height','maxWidth','maxHeight'].forEach(k=>{ panel.style[k]=''; }); };
+  const box=DB&&DB.companionBox;
+  if(!box||!companionDesktop()){ reset(); return; }
+  const vw=(typeof window!=='undefined'&&window.innerWidth)||1200;
+  const vh=(typeof window!=='undefined'&&window.innerHeight)||800;
+  const c=companionClampBox(box, vw, vh);
+  reset();
+  panel.style.width=c.w+'px'; panel.style.height=c.hgt+'px'; panel.style.maxWidth='none'; panel.style.maxHeight='none';
+  // A resize-only box (no left) keeps the default corner anchor; a dragged box pins left/top.
+  if(box.left!=null){ panel.style.left=c.left+'px'; panel.style.top=c.top+'px'; panel.style.right='auto'; panel.style.bottom='auto'; }
+}
+function companionSaveBox(part){
+  DB.companionBox=Object.assign({}, DB.companionBox||{}, part);
+  saveLocal();
+  companionApplyBox();
+}
+function companionResetBox(){
+  DB.companionBox=null;
+  saveLocal();
+  companionApplyBox();
+}
+function companionWireDrag(panel, head){
+  if(!head||typeof head.addEventListener!=='function') return;
+  head.addEventListener('pointerdown', e=>{
+    if(!companionDesktop()) return;
+    const target=e&&e.target;
+    if(target&&typeof target.closest==='function'&&target.closest('button')) return;   // header buttons still click
+    const rect=typeof panel.getBoundingClientRect==='function'?panel.getBoundingClientRect():null;
+    if(!rect||!rect.width) return;
+    const sx=e.clientX, sy=e.clientY, ox=rect.left, oy=rect.top, w=rect.width, hgt=rect.height;
+    let moved=false;
+    const onMove=ev=>{
+      const dx=ev.clientX-sx, dy=ev.clientY-sy;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<3) return;   // a sloppy click isn't a drag
+      moved=true;
+      const c=companionClampBox({left:ox+dx, top:oy+dy, w, hgt}, window.innerWidth||1200, window.innerHeight||800);
+      panel.style.left=c.left+'px'; panel.style.top=c.top+'px'; panel.style.right='auto'; panel.style.bottom='auto';
+    };
+    const onUp=()=>{
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      if(moved){ const r=panel.getBoundingClientRect(); companionSaveBox({left:r.left, top:r.top, w:r.width, hgt:r.height}); }
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  });
+  head.addEventListener('dblclick', ()=>{ if(companionDesktop()) companionResetBox(); });
+}
+// The native resize handle sets inline width/height itself; this just remembers it.
+function companionWireResize(panel){
+  if(typeof ResizeObserver!=='function') return;
+  let timer=null;
+  const ro=new ResizeObserver(()=>{
+    if(!COMPANION.open||!companionDesktop()) return;
+    clearTimeout(timer);
+    timer=setTimeout(()=>{
+      const r=typeof panel.getBoundingClientRect==='function'?panel.getBoundingClientRect():null;
+      if(!r||!r.width) return;
+      const cur=DB.companionBox||{};
+      if(Math.abs((cur.w||0)-r.width)>1||Math.abs((cur.hgt||0)-r.height)>1) companionSaveBox({w:r.width, hgt:r.height});
+    }, 400);
+  });
+  ro.observe(panel);
 }
 
 function companionEnsurePanel(){
@@ -7678,13 +7776,17 @@ function companionEnsurePanel(){
   const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, msgBtn, sizeBtn, closeBtn);
   const panel=h('div',{class:'companion-panel glass no-print', role:'dialog', 'aria-label':'Guide'},
-    h('div',{class:'companion-head'}, title, context, gmBtn, msgBtn, sizeBtn, closeBtn),
+    head,
     body);
   panel.style.display='none';
   panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn;
   COMPANION.panel=panel;
+  companionWireDrag(panel, head);
+  companionWireResize(panel);
   companionSetMode('chat');
+  companionApplyBox();
   return panel;
 }
 
@@ -7696,7 +7798,7 @@ function companionToggle(open){
   // float on top of its input row, so it steps aside while the panel is up.
   const fab=COMPANION.fab;
   if(fab) fab.className='companion-fab navbtn no-print'+(COMPANION.open?' panel-open':'');
-  if(COMPANION.open){ companionRefreshContext(); if(COMPANION.mode==='chat') companionRenderLog(); }
+  if(COMPANION.open){ companionApplyBox(); companionRefreshContext(); if(COMPANION.mode==='chat') companionRenderLog(); }
 }
 
 // The Play tab (or the ♟ header button) seats the Game Master in the panel.
@@ -15504,9 +15606,7 @@ async function campPlayBuildSession(name, profiles){
   const transcriptCard=h('div',{class:'play-transcript-card'}, transcript);
   const chatStack=h('section',{class:'play-chat-stack'}, groundingLine, transcriptCard, inputCard);
   const lensMedia=(typeof window!=='undefined'&&typeof window.matchMedia==='function')?window.matchMedia('(max-width:560px)'):null;
-  // The chat lives in the narrow companion panel now — the lens rack starts folded
-  // everywhere (one line: "Lens: Auto → …"), not just on small screens.
-  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=true;
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=!!(lensMedia&&lensMedia.matches);
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
