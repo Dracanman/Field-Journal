@@ -7969,7 +7969,63 @@ function canonCorpusFromDocs(indexText, domainDocs){
     if(seen[row.id]) return;
     out.push(Object.assign({},row,{corpusId:row.id,body:'',indexRow:row,order:canonDomainOrder(row.file)*100000+(row.line||0)}));
   });
-  return out.sort((a,b)=>(a.order||0)-(b.order||0)||canonEntryRef(a).localeCompare(canonEntryRef(b)));
+  const sorted=out.sort((a,b)=>(a.order||0)-(b.order||0)||canonEntryRef(a).localeCompare(canonEntryRef(b)));
+  return canonChunkCorpus(sorted);
+}
+
+// canonGroundingBlock clamps any single entry's body to CANON_RAG_MAX_ENTRY_CHARS before it
+// ever reaches the model — so a section longer than that (25 of 105 corpus entries, at last
+// audit) had its tail silently cut, sometimes losing a dated revision or exception clause
+// that lived past the cutoff. Splits a long entry into multiple full-sized sub-entries
+// (parent title + "part n/m") at corpus-build time instead, so the whole section stays
+// retrievable — just as more than one independently-rankable chunk. Splits on paragraph
+// boundaries so a chunk never cuts mid-sentence when avoidable; only hard-splits a single
+// paragraph that alone exceeds the limit.
+function canonChunkText(body, maxChars){
+  const paras=String(body||'').split(/\n\s*\n/);
+  const pieces=[]; let cur='';
+  paras.forEach(p=>{
+    const piece=cur?cur+'\n\n'+p:p;
+    if(piece.length>maxChars && cur){ pieces.push(cur); cur=p; }
+    else cur=piece;
+  });
+  if(cur) pieces.push(cur);
+  const out=[];
+  pieces.forEach(p=>{
+    if(p.length<=maxChars){ out.push(p); return; }
+    for(let i=0;i<p.length;i+=maxChars) out.push(p.slice(i,i+maxChars));
+  });
+  return out;
+}
+// Only chunk 1 keeps the entry's original id/shortId/nodeId/corpusId — it stays exactly as
+// citable as the pre-chunking entry. Chunks 2+ get a `:partN` suffix on every identity field
+// so canonEntryRef (id first, then shortId/nodeId/corpusId) never returns the same string for
+// two different chunks — a real collision risk otherwise, since canonEmbeddingRecordKey and
+// the hybrid-retrieval byRef lookup are both keyed by canonEntryRef: two chunks sharing a ref
+// would silently alias onto one cached embedding vector, scoring one chunk with the other's.
+function canonChunkEntry(entry, maxChars){
+  const body=entry&&entry.body||'';
+  if(body.length<=maxChars) return [entry];
+  const bodies=canonChunkText(body,maxChars);
+  const total=bodies.length;
+  if(total<=1) return [entry];
+  return bodies.map((chunkBody,i)=>{
+    const base={title:entry.title+' (part '+(i+1)+'/'+total+')', body:chunkBody, partIndex:i+1, partTotal:total};
+    if(i===0) return Object.assign({},entry,base);
+    const suffix=':part'+(i+1);
+    return Object.assign({},entry,base,{
+      id: entry.id?entry.id+suffix:entry.id,
+      shortId: entry.shortId?entry.shortId+suffix:entry.shortId,
+      nodeId: entry.nodeId?entry.nodeId+suffix:entry.nodeId,
+      corpusId: entry.corpusId?entry.corpusId+suffix:entry.corpusId,
+    });
+  });
+}
+function canonChunkCorpus(entries, maxChars){
+  maxChars=maxChars||CANON_RAG_MAX_ENTRY_CHARS;
+  const out=[];
+  (entries||[]).forEach(entry=>{ canonChunkEntry(entry,maxChars).forEach(chunk=>out.push(chunk)); });
+  return out;
 }
 
 function canonPromotedCorpus(indexText, domainDocs){
