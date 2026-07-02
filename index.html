@@ -9349,7 +9349,12 @@ function promoteCardModal(id){
           if(!validCanonId(id)) throw new Error('that card id looks wrong ('+id+')');
           // each write is conflict-safe (re-reads + re-applies if the file moved) and guarded
           status.textContent='Writing canon…';
-          await ghUpdate(cfg, destFile, dom=> (dom? dom.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n', 'Promote '+id+' → '+destFile, {guard:assertDomain, create:true});
+          // Idempotent on retry: if a prior attempt's domain write landed but a later step
+          // failed (network drop, etc.), the button re-enables and the natural retry must
+          // not append the same canon block a second time. buildDomainBlock always closes
+          // with "…(<id>)." — treat that as the promotion stamp for this id.
+          const promotionStamp='('+id+').';
+          await ghUpdate(cfg, destFile, dom=> (dom&&dom.includes(promotionStamp))? dom : (dom? dom.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n', 'Promote '+id+' → '+destFile, {guard:assertDomain, create:true});
           await ghUpdate(cfg, INDEX_PATH, ix=>markIndexPromoted(ix, id, c.desc, destFile, date), 'Mark '+id+' promoted in the index', {guard:assertIndex});
           await ghUpdate(cfg, QUEUE_PATH, q=>promoteInQueue(q, id, destFile, date), 'Queue hygiene: '+id+' promoted', {guard:assertQueue});
           try{ await ghUpdate(cfg, 'legacy/99_CHANGELOG.md', cl=> cl.replace(/\s*$/,'')+'\n- '+date+' — PROMOTED '+id+' — '+c.desc+' → '+destFile+'.\n', 'Log '+id+' promotion'); }catch(e){}
@@ -11131,8 +11136,15 @@ async function campLedger(host, name){
   }
   try{ await draw(); }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); }
 }
-// hand a captured idea to the canon side: switch to the Worldbuilder and open the Drafter prefilled
-function bridgeToCanon(entry){ DB.profile='worldbuilder'; DB.mode='full'; save(); applyMode(); go('studio',{tab:'drafter', params:{prefill:ledgerToCard(entry)}}); toast('Opened the Card Drafter on the canon side.'); }
+// hand a captured idea to the canon side: switch to the Worldbuilder and open the Drafter prefilled.
+// Was a silent profile+mode escalation (DB.mode='full') on a Game-space button — the one place
+// the Maker/Guest boundary got crossed as a side effect of a single tap. Dropped the mode
+// escalation and added a confirm; the profile switch itself stays (surfaces are intentionally
+// ungated per Del) — this just stops the switch from happening without notice.
+function bridgeToCanon(entry){
+  if(typeof confirm==='function' && !confirm('Switch to the Worldbuilder space to draft this as a Canon Card?')) return;
+  DB.profile='worldbuilder'; save(); applyMode(); go('studio',{tab:'drafter', params:{prefill:ledgerToCard(entry)}}); toast('Opened the Card Drafter on the canon side.');
+}
 
 async function campThreads(host, name){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the threads…'));
@@ -13655,6 +13667,7 @@ campResume=async function(host,name){
    campaign parse/write helpers. Self-registers as a campaign tab.
  * ========================================================================== */
 const CAMP_PLAY_LOG_PREFIX='CAMPAIGN PLAY LOG';
+let _campPlayFlushTeardown=null;   // at most one active pagehide/visibilitychange pair across Play visits
 const CAMP_PLAY_MAX_TOKENS=1024;
 const CAMP_PLAY_DEFAULT_PERSONA_ID='gm';
 const CAMP_PLAY_DEFAULT_MODE_ID='auto';
@@ -13898,17 +13911,21 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
   ];
 }
 
-// Remove the trailing ```state``` block from a reply, leaving the narration.
+// Remove every ```state``` block from a reply, leaving the narration. A misbehaving model
+// occasionally emits more than one; stripping only the first would leave the rest visible.
 function campPlayStripState(text){
-  return String(text||'').replace(/```state[\s\S]*?```/i,'').replace(/\s+$/,'').trim();
+  return String(text||'').replace(/```state[\s\S]*?```/gi,'').replace(/\s+$/,'').trim();
 }
 
 // Parse a GM ```state``` block into guarded-writer shapes, or null if none/empty.
+// If the model emits more than one, the last block wins (most likely to be its final say).
 function campPlayParseProposal(text){
-  const m=/```state\s*([\s\S]*?)```/i.exec(String(text||''));
-  if(!m) return null;
+  const re=/```state\s*([\s\S]*?)```/gi;
+  let m, last=null;
+  while((m=re.exec(String(text||'')))) last=m;
+  if(!last) return null;
   const fields={}, gauges={};
-  m[1].split('\n').forEach(line=>{
+  last[1].split('\n').forEach(line=>{
     const kv=/^\s*([A-Za-z ]+?)\s*:\s*(.+?)\s*$/.exec(line); if(!kv) return;
     const key=kv[1].trim().toLowerCase(), val=kv[2].trim();
     if(key==='scene') fields.scene=val;
@@ -14000,7 +14017,7 @@ async function campPlay(host, name){
   }
   host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
 
-  let files, parsed={}, runtime={}, threads={}, messages=[];
+  let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
   let cast=[], groundingIds=[], pendingProposal=null;
   try{
     files=await campaignFiles(cfg,name);
@@ -14009,7 +14026,8 @@ async function campPlay(host, name){
     if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); }
     if(th) threads=parseThreads(th.text);
     if(ca&&typeof parseCast==='function') cast=parseCast(ca.text);
-    messages=await campPlayLoadLog(cfg, name);
+    const log=await campPlayLoadLog(cfg, name);
+    messages=log.messages; logLoadFailed=log.failed;
   }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
 
   const defaultEngine=assistantDefaultEngine(profiles);
@@ -14047,9 +14065,23 @@ async function campPlay(host, name){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
   }
   function scheduleSave(){
+    // The prior transcript couldn't be verified (a transient read failure, not a genuinely
+    // new campaign) — refuse to save so a debounced write can't silently overwrite it with
+    // just this session's messages. Reload the tab once the connection is back.
+    if(logLoadFailed) return;
     if(saveTimer) clearTimeout(saveTimer);
     saveTimer=setTimeout(()=>{ campPlaySaveLog(cfg, name, messages).catch(()=>{}); }, 2500);
   }
+  function flushSaveNow(){
+    if(!saveTimer) return;
+    clearTimeout(saveTimer); saveTimer=null;
+    campPlaySaveLog(cfg, name, messages).catch(()=>{});
+  }
+  if(_campPlayFlushTeardown) _campPlayFlushTeardown();
+  const onVisibilityHide=()=>{ if(document.visibilityState==='hidden') flushSaveNow(); };
+  window.addEventListener('pagehide', flushSaveNow);
+  document.addEventListener('visibilitychange', onVisibilityHide);
+  _campPlayFlushTeardown=()=>{ window.removeEventListener('pagehide', flushSaveNow); document.removeEventListener('visibilitychange', onVisibilityHide); };
   function bubble(m){
     const who=m.role==='assistant'?'GM':(m.modeLabel?'You · '+m.modeLabel:'You');
     const textNode=h('pre',{class:'play-text'}, String(m.content||''));
@@ -14241,6 +14273,7 @@ async function campPlay(host, name){
         ),
         h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn.'),
         h('p',{class:'play-note'},'The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
+        logLoadFailed?h('p',{class:'play-note', role:'status'},'⚠ Could not load the previous session transcript (a network or read error, not a missing file) — this view is starting empty as a precaution. Your saved transcript on disk is untouched, and saving here is paused; reload this tab once the connection is back.'):null,
       ),
       h('div',{class:'play-table-stage'},
         h('aside',{class:'play-tools-wrap'},
@@ -14256,12 +14289,22 @@ async function campPlay(host, name){
   );
 }
 
+// The one campaign write with no content guard until now: the transform ignores the
+// existing file, so a bad guess of `messages` (see campPlayLoadLog's failed-read case)
+// would otherwise overwrite a real transcript with no check that the target is even a
+// play log. assertPlayLog at least refuses to clobber a file that doesn't look like one.
+function assertPlayLog(text){ if(text && !new RegExp('^#\\s+'+CAMP_PLAY_LOG_PREFIX,'i').test(text.trim())) throw new Error('refusing to write — that file isn’t the play session log'); return text; }
 async function campPlaySaveLog(cfg, name, messages){
   if(!messages || !messages.length) return;
-  await ghUpdate(cfg, campPlayLogPath(name), ()=>campPlayLogText(name, messages), 'Play session log', {create:true});
+  await ghUpdate(cfg, campPlayLogPath(name), ()=>campPlayLogText(name, messages), 'Play session log', {create:true, guard:assertPlayLog});
 }
+// Distinguishes "file absent" (a new campaign — start empty, safe to save) from "read
+// failed" (network/5xx — the file may hold a real transcript we never saw; the caller
+// must not save until this is resolved, so it doesn't overwrite the real thing with just
+// this session's messages).
 async function campPlayLoadLog(cfg, name){
-  try{ const r=await ghGetText(cfg, campPlayLogPath(name)); return r?campPlayParseLog(r.text):[]; }catch(e){ return []; }
+  try{ const r=await ghGetText(cfg, campPlayLogPath(name)); return { messages: r?campPlayParseLog(r.text):[], failed:false }; }
+  catch(e){ return { messages:[], failed:true }; }
 }
 
 registerCampaignTab(['play','▶ Play','Play in-app with the Game Master — your live state and canon come along.'], campPlay, {after:'resume'});
