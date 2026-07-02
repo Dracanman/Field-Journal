@@ -238,6 +238,24 @@
   .pick .fav:hover, .pick .addto:hover{ color:var(--gold); }
   .pick .fav.on{ color:var(--gold); }
 
+
+/* ---------- Start here (newcomer's first tap) + shelf identity ---------- */
+.start-here{
+  position:relative; margin:0 0 18px; padding:16px 18px;
+  border:1.5px solid var(--glass-border); border-radius:14px; background:var(--glass-strong);
+  -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15); backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
+  box-shadow:0 14px 34px -26px var(--glow);
+}
+.start-here-title{ display:block; font-size:17px; color:var(--ink); margin-bottom:4px; }
+.start-here-line{ margin:0 0 10px; color:var(--ink-soft); line-height:1.5; max-width:56ch; }
+.start-here-dismiss{ position:absolute; top:8px; right:10px; padding:2px 8px; line-height:1; }
+.shelf-kicker{
+  display:inline-block; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+  padding:2px 9px; border-radius:999px; border:1px solid var(--glass-border);
+  color:var(--ink-soft); background:var(--glass-bg); margin-bottom:2px;
+}
+.shelf-kicker-field{ color:var(--green); border-color:color-mix(in srgb, var(--green) 40%, transparent); }
+.shelf-kicker-world{ color:var(--gold); border-color:color-mix(in srgb, var(--gold) 45%, transparent); }
   /* ---------- worksheet editor ---------- */
   .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
   @media (max-width:900px){ .editor-wrap{ grid-template-columns:1fr; } .card-col{ order:-1; } }
@@ -3338,6 +3356,7 @@ function hydrate(d){
   merged.liveRefresh=d.liveRefresh!==false;   // live background refresh — on unless turned off
   // Where this device keeps the floating companion (drag/resize box) — device-local, never synced.
   merged.companionBox=d.companionBox&&typeof d.companionBox==='object'&&!Array.isArray(d.companionBox)?Object.assign({},d.companionBox):null;
+  merged.startHereDismissed=!!d.startHereDismissed;   // the newcomer card was waved away on this device
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -3681,10 +3700,25 @@ function viewHome(){
   // Shelves are the main column; an at-a-glance rail composes the width on iPad/desktop and
   // drops below the shelves on phone. The rail replaces the old inline "Lately" grid.
   const main = h('div',null,
+    startHereCard(),
     shelf('The Field Journal — make a little world by hand', 'field', 'Make one real thing your own way — a Vael, a grove, a keepsake.'),
     shelf("The Worldmaker's Pages — invent new corners of the world", 'world', 'Dream up a whole new kind — a people, a creature, a place, a Seed.'));
   wrap.append(viewStage(main, homeRail()));
   return wrap;
+}
+// A newcomer lands on collapsed shelves with no obvious first tap (Liz + Del both
+// hit this, 2026-06-30). Until the first piece exists, Home opens with one warm,
+// unmissable first step; it retires itself after that (or on dismiss — device-local).
+function startHereCard(){
+  if(DB.startHereDismissed || (DB.creations||[]).length) return null;
+  return h('div',{class:'start-here', role:'note'},
+    h('button',{class:'toolbtn start-here-dismiss', 'aria-label':'dismiss this', title:'dismiss', onclick:()=>{ DB.startHereDismissed=true; saveLocal(); refreshHome(); }},'×'),
+    h('b',{class:'start-here-title'},'✿ Start here'),
+    h('p',{class:'start-here-line'}, voice('hi')+'! The friendliest first page is a Portrait of a Vael — one card, five minutes, no wrong answers. Everything else on these shelves opens the same way: tap a card, fill what you feel like.'),
+    h('div',{class:'toolrow'},
+      h('button',{class:'navbtn primary', onclick:()=>go('worksheet',{id:'portrait'})},'✎ Make your first Vael'),
+      h('button',{class:'navbtn ghost', onclick:()=>go('tour')},'Welcome tour'),
+      h('button',{class:'navbtn ghost', onclick:()=>companionToggle(true)},'✦ Ask the guide')));
 }
 // At-a-glance rail for Home: live counts from this device's journal + a "lately" jump list.
 // All synchronous (no network) and static (no motion) — within the calm budget.
@@ -3798,7 +3832,10 @@ function shelfGroup(s, key, label, ids, opts){
   else s.append(h('p',{class:'hint', style:{margin:'0 0 8px'}}, opts.emptyText||'(empty)'));
 }
 function shelf(title, kit, intro){
-  const s = h('div',{class:'shelf'}, h('h3',null,title), intro? h('p',{class:'shelf-intro'}, intro) : null);
+  // Each shelf wears its purpose on a small kicker chip, so "which shelf do I
+  // want?" reads at a glance instead of from two similar intro sentences.
+  const kicker = kit==='field' ? '✎ by hand · one real thing at a time' : '✦ new kinds · invented for the whole world';
+  const s = h('div',{class:'shelf shelf-'+kit}, h('span',{class:'shelf-kicker shelf-kicker-'+kit}, kicker), h('h3',null,title), intro? h('p',{class:'shelf-intro'}, intro) : null);
   (DB.collections||[]).filter(c=>c.kit===kit).forEach(c=>
     shelfGroup(s, 'coll::'+c.id, '◆ '+c.name, c.ids, { keepEmpty:true, emptyText:'empty — tap + on any card to add it here', onDelete:()=>deleteCollection(c.id) }));
   const known = new Set((SHELF_GROUPS[kit]||[]).flatMap(([,ids])=>ids));
