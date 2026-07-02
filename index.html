@@ -8923,8 +8923,13 @@ function assistantAnswerToCard(state){
   const ids=assistantIdsText(grounding.ids);
   const title=assistantClampText(question||'Canon assistant suggestion',60);
   const domainHints=Array.from(new Set(grounding.entries.map(e=>e.domain||e.file).filter(Boolean))).join(', ');
+  // Derived from the top-ranked grounding entry's domain file rather than hardcoded, so
+  // drafting a card from a Cosmology/Vael/etc. answer reserves the right tag instead of
+  // always PEO — IDs are never reused, so a mis-tagged reservation is permanent bookkeeping
+  // noise. tagFromCategory already falls back to PEO when there's no grounding to go on.
+  const dominantFile=(grounding.entries[0]&&grounding.entries[0].file)||'';
   return {
-    tag:'PEO',
+    tag:tagFromCategory(dominantFile),
     title:title,
     category:domainHints,
     source:'Canon-grounded AI assistant',
