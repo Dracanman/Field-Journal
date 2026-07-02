@@ -2997,10 +2997,10 @@ const ASSISTANT_PERSONAS=[
    system:"You are the canon librarian for the Godling Universe. Answer from promoted canon first. Be precise, cite canon IDs when relevant, and say plainly when something is not established. Keep speculation out of the answer unless the user asks for suggestions, and mark every suggestion as unofficial."},
   {id:'gm', label:'Game Master', description:'Campaign-facing narration that honors canon and keeps player choice intact.', model:'Gemma3:12b', temperature:0.75, groundingMode:'balanced',
    starterPrompts:['Frame the next scene from this situation.','Give me three player-facing options.','Summarize the current stakes for play.'],
-   system:"You are the Game Master for a Godling Universe campaign. Use promoted canon and campaign context as constraints. Narrate vividly, honor felt-not-numbers magic and survival stakes, and end every turn on a clear situation with real choices woven into the prose. Never decide the player's actions, never overwrite canon, and label any invented table-facing detail as a suggestion."+
+   system:"You are the Game Master for a Godling Universe campaign. Use promoted canon and campaign context as constraints. Narrate vividly but concisely, honor felt-not-numbers magic and survival stakes, and end with a clear situation plus player options. Never decide the player's actions, never overwrite canon, and label any invented table-facing detail as a suggestion."+
      "\n\nGM VOICE & STYLE — Godling Universe"+
-     "\nEach narration beat runs roughly 150–300 words — long enough for the scene to breathe. \"Concise\" means no padding, not short: cut filler, never the scene. Lead with sensory detail — what is seen, heard, felt — over explanation; show, don't tell. The world is \"felt, not numbers\": never let dice, percentages, stats, or rulebook language surface in the prose. If a mechanic resolves, render the result as in-world fiction and keep the machinery backstage."+
-     "\nEvery scene sets immediate stakes plus one or two quiet world-pressures underneath, and ends on a clear situation with real, visible choices for the player. Weave two to four live choices into the closing prose of the scene — never render player options as a numbered or bulleted list; they are moments inside the fiction, not a menu. Prefer pressure over damage: cost, delay, danger, a faction moving, a rumor spreading, a harder choice — not binary pass/fail."+
+     "\nNarrate vividly but concisely. Lead with sensory detail — what is seen, heard, felt — over explanation; show, don't tell. The world is \"felt, not numbers\": never let dice, percentages, stats, or rulebook language surface in the prose. If a mechanic resolves, render the result as in-world fiction and keep the machinery backstage."+
+     "\nEvery scene sets immediate stakes plus one or two quiet world-pressures underneath, and ends with a clear situation and real, visible choices for the player. Prefer pressure over damage: cost, delay, danger, a faction moving, a rumor spreading, a harder choice — not binary pass/fail."+
      "\nPlant omens subtly and let them wait; don't pay them off early. NPCs are motivated by the scene, never omniscient — give posture and a line of voice, nothing more. Never decide the player character's actions, intent, or reply."+
      "\nTone is hopeful, not grim: small living things holding fast against the dark. Mark anything invented as a table suggestion; never present it as settled canon. Go gently, go slow."+
      "\n\nWrite in this voice:"+
@@ -6996,63 +6996,6 @@ async function messagesSend(text){
   return raw&&raw.item?raw.item:null;
 }
 
-/* ---- Web Push (lock-screen alerts, app closed) ------------------------------
-   Only possible in the installed HTTPS PWA (file:// has no service worker; on
-   iPhone/iPad the journal must be added to the Home Screen, iOS 16.4+). The
-   backend holds the VAPID keys; payloads are end-to-end encrypted to this
-   device's service worker — the push relay never sees the text. */
-function messagesPushSupported(){
-  try{
-    return typeof navigator!=='undefined'&&'serviceWorker' in navigator
-      &&typeof PushManager!=='undefined'
-      &&typeof location!=='undefined'&&location.protocol==='https:';
-  }catch(e){ return false; }
-}
-function messagesPushKeyBytes(b64url){
-  const pad='='.repeat((4-(b64url.length%4))%4);
-  const raw=atob((b64url+pad).replace(/-/g,'+').replace(/_/g,'/'));
-  const out=new Uint8Array(raw.length);
-  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
-  return out;
-}
-function messagesBuildPushRequest(profile, path, body){
-  return {
-    url:privateApiJoinUrl(profile&&profile.endpoint,path),
-    opts:body?{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)}
-             :{method:'GET',headers:privateApiHeaders(profile,false)},
-  };
-}
-async function messagesPushSubscription(){
-  try{
-    const reg=await navigator.serviceWorker.ready;
-    return await reg.pushManager.getSubscription();
-  }catch(e){ return null; }
-}
-async function messagesPushEnable(){
-  const profile=messagesProfile();
-  if(!profile) throw new Error('Messages ride your private backend — add the Private tailnet backend profile under ⚙ Engine first.');
-  if(typeof Notification!=='undefined'&&Notification.permission==='default'){
-    try{ await Notification.requestPermission(); }catch(e){}
-  }
-  if(typeof Notification!=='undefined'&&Notification.permission!=='granted'){
-    throw new Error('Notifications are blocked for the journal — allow them in the browser settings, then try again.');
-  }
-  const keyReply=await privateApiJson(profile, messagesBuildPushRequest(profile,'push/key'));
-  const reg=await navigator.serviceWorker.ready;
-  const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:messagesPushKeyBytes(String(keyReply&&keyReply.key||''))});
-  await privateApiJson(profile, messagesBuildPushRequest(profile,'push/subscribe',{subscription:sub.toJSON?sub.toJSON():sub, label:messagesSenderName()}));
-  return true;
-}
-async function messagesPushDisable(){
-  const sub=await messagesPushSubscription();
-  if(!sub) return true;
-  const endpoint=sub.endpoint;
-  try{ await sub.unsubscribe(); }catch(e){}
-  const profile=messagesProfile();
-  if(profile){ try{ await privateApiJson(profile, messagesBuildPushRequest(profile,'push/unsubscribe',{endpoint})); }catch(e){} }
-  return true;
-}
-
 function messagesNotify(item){
   try{
     if(typeof Notification==='undefined'||Notification.permission!=='granted') return false;
@@ -7146,48 +7089,26 @@ function messagesBody(){
     if(!text||sendBtn.disabled) return;
     sendBtn.disabled=true; status.textContent='';
     try{
-      const item=await companionTimeout(messagesSend(text), 20000, 'Sending');
+      const item=await messagesSend(text);
       input.value='';
       if(item) messagesMerge({items:[item], latestId:item.id});
       messagesMarkSeen(); messagesRenderList();
     }catch(e){ status.textContent=String(e&&e.message||e); }
     finally{ sendBtn.disabled=false; }
   }
-  let alertsBtn=null;
-  if(messagesPushSupported()){
-    alertsBtn=h('button',{class:'navbtn ghost', type:'button'},'🔔 …');
-    let pushOn=false, busy=false;
-    const refresh=async()=>{
-      const sub=await messagesPushSubscription();
-      pushOn=!!sub;
-      alertsBtn.textContent=pushOn?'🔕 Turn off push alerts':'🔔 Turn on push alerts';
-    };
-    alertsBtn.onclick=async()=>{
-      if(busy) return;
-      busy=true; alertsBtn.disabled=true; status.textContent='';
-      try{
-        if(pushOn){ await messagesPushDisable(); status.textContent='Push alerts are off on this device.'; }
-        else{ await messagesPushEnable(); status.textContent='Push alerts are on — this device will buzz even when the journal is closed.'; }
-        await refresh();
-      }catch(e){ status.textContent=String(e&&e.message||e); }
-      finally{ busy=false; alertsBtn.disabled=false; }
-    };
-    refresh().catch(()=>{ alertsBtn.textContent='🔔 Turn on push alerts'; });
-  }else if(typeof Notification!=='undefined'&&Notification.permission==='default'){
-    // No push here (file:// copy, or an http page) — offer the foreground-only alerts.
-    alertsBtn=h('button',{class:'navbtn ghost', type:'button', onclick:async function(){
-      try{ await Notification.requestPermission(); }catch(e){}
-      this.remove&&this.remove();
-    }},'🔔 Turn on alerts');
-  }
+  const canAskPermission=typeof Notification!=='undefined'&&Notification.permission==='default';
+  const permBtn=canAskPermission?h('button',{class:'navbtn ghost', type:'button', onclick:async function(){
+    try{ await Notification.requestPermission(); }catch(e){}
+    this.remove&&this.remove();
+  }},'🔔 Turn on alerts'):null;
   messagesMarkSeen();
   messagesPoll();
   return h('div',{class:'companion-body companion-messages'},
     list,
     h('div',{class:'companion-inputrow'}, input, sendBtn),
     status,
-    h('div',{class:'companion-footrow'}, alertsBtn, back),
-    (!messagesPushSupported()&&typeof Notification==='undefined')?h('p',{class:'hint', style:{margin:'0'}},'For alerts when the journal is closed, open the installed Home-Screen journal and tap 🔔 there — this copy can only show notes while it’s open.'):null);
+    h('div',{class:'companion-footrow'}, permBtn, back),
+    (typeof Notification==='undefined')?h('p',{class:'hint', style:{margin:'0'}},'On iPhone/iPad, new notes only show while the journal is open — real push alerts are a planned follow-up.'):null);
 }
 /* ========================================================================== *
    COMPANION — the floating guide chat + bug-report mode.
@@ -7400,27 +7321,14 @@ function companionRefreshContext(){
   if(chip) chip.textContent=companionContext().line;
 }
 
-// Race a send against a deadline. The underlying fetch isn't aborted (matching
-// aiFetch's style) — the point is that the UI's busy/disabled state can never be
-// pinned forever by one black-holed request, because that silently swallows every
-// send after it with no error anywhere.
-function companionTimeout(promise, ms, what){
-  return Promise.race([promise, new Promise((resolve,reject)=>setTimeout(()=>reject(new Error(what+' took too long — check the connection and try again.')), ms))]);
-}
-
 async function companionSend(inputEl){
   const question=String(inputEl.value||'').trim();
   if(!question||COMPANION.busy) return;
   inputEl.value='';
   COMPANION.log.push({role:'you', text:question});
   COMPANION.busy=true; companionRenderLog();
-  let answer;
-  try{ answer=await companionTimeout(companionAnswer(question), 90000, 'The engine'); }
-  catch(e){
-    const fallback=companionHeuristicAnswer(question);
-    answer={text:'(The engine never answered, so the built-in guide stepped in.) '+fallback.text, action:fallback.action||null};
-  }
-  finally{ COMPANION.busy=false; }
+  const answer=await companionAnswer(question);
+  COMPANION.busy=false;
   COMPANION.log.push({role:'guide', text:answer.text, action:answer.action||null});
   companionRenderLog();
 }
@@ -14798,7 +14706,6 @@ const CAMP_PLAY_MODES=[
   {id:'act', label:'Player action', hint:'Resolve what I do', temperature:0.75, prompt:'The user is declaring a player action. Resolve uncertainty with consequences, opportunity, pressure, and a clear next situation. Do not decide the player character\'s intent or next action.'},
   {id:'ask', label:'Table question', hint:'Plain answer', temperature:0.25, prompt:'The user is asking an out-of-fiction table question. Answer clearly, separate canon facts from table suggestions, then offer a practical next step.'},
   {id:'scene', label:'Frame scene', hint:'Set stakes', temperature:0.8, prompt:'Frame the current scene with sensory detail, immediate stakes, visible choices, and one or two quiet world pressures. End with a grounded prompt for the player.'},
-  {id:'sessionzero', label:'New character', hint:'Session Zero', temperature:0.7, prompt:'Run Session Zero: guide the player through creating their character before any scene begins. Follow the SESSION ZERO block — complete the meta (lottery, race, Arkborne-weighting) before you touch the story, and never narrate the death or run the dream until the meta is done.'},
   {id:'oracle', label:'Oracle options', hint:'2-3 possibilities', temperature:0.85, prompt:'Act as an oracle for uncertain table direction. Offer 2-3 plausible answers, mark which are canon-grounded and which are table suggestions, and do not force one answer.'},
   {id:'fate', label:'Yes / No oracle', hint:'Lean + twist', prompt:'Answer one uncertain yes/no table question as an oracle. Open with a clear Yes or No that leans on how likely it felt, then add one unexpected twist or detail that complicates it. Keep it felt, not numeric — no dice or percentages in the prose. Mark canon-grounded parts versus table suggestion.'},
   {id:'interrupt', label:'Something intrudes', hint:'The world acts', prompt:'Introduce an unprompted complication from the living world: a faction move, a spirit\'s attention, a thread escalating, weather, hunger, or a rumor spreading. Tie it to an existing live thread or canon tension when you can, render it as fiction, and end with the pressure it puts on the player. Do not resolve the player\'s response.'},
@@ -14847,30 +14754,6 @@ const CAMP_PLAY_TABLE_PROTOCOL=[
   'Clocks and table tools are suggestions until the user records them in the ledger or applies a reviewed state update.',
   'Canon remains read-only. Promoted canon can ground play, but campaign-only inventions must be labeled as table suggestions.',
 ].join('\n');
-// Session Zero. On a brand-new campaign the character does not exist yet, so the GM must
-// run character creation BEFORE framing a scene. The procedure lives in canon — the Creation
-// Flow in the 30_GODLINGS_AND_SYSTEM.md domain doc (tagged [WORKING], order still open) and the
-// Session Zero notes in campaign/README.md. We paraphrase the SHAPE here so the flow works
-// offline, but point the model at the grounded canon as the real authority (it may have moved on).
-const CAMP_PLAY_SESSION_BOOT=[
-  'SESSION ZERO — NEW CHARACTER (run this before any scene):',
-  'This campaign has no started character yet. Before you frame a scene, narrate a death, or run the dream, walk the player through character creation. The canonical procedure is the Creation Flow in the 30_GODLINGS_AND_SYSTEM.md domain doc (its "Creation Flow" section, tagged [WORKING] — follow it, but the order is still open to rearrangement) and the Session Zero notes in campaign/README.md. Treat the retrieved/grounded canon as the authority; the outline below is only the shape, in case the canon text is not in front of you.',
-  'META side (out of fiction, do this first): build the beginning character through the lottery choices; choose a race or leave it undecided for now; then ask the questions that WEIGHT what their Arkborne could become, with ghostly, half-formed apparitions previewing their people and their new-race self.',
-  'NARRATIVE side (in fiction, only after the meta): a peek at the character\'s last moments; little peeks at their defining Weights; a pulling sensation; maybe light god-contact with no serious reveal; the dream; maybe deeper god-contact and a more serious reveal, or not; a few race calls, or one; then arrival, with the godling clock already running.',
-  'HARD RULE: do NOT begin the story — do not narrate how the character died, and do not run the dream — until the meta is complete. Previews during the meta are fine; the story waits for the meta.',
-  'Keep it collaborative and felt-not-numbers. Anything you invent beyond promoted canon is a table suggestion, and canon stays read-only. Once the character exists and arrival lands, hand off into normal scene framing.',
-].join('\n');
-
-// A campaign is "unstarted" (Session Zero not yet done) when nothing about a live scene or
-// story exists yet — no scene/summary/day/location and no live threads. Brand-new campaigns
-// scaffold a tracker but carry no such state until the first session plays.
-function campPlayIsUnstarted(parsed, threads){
-  const t=parsed||{}, th=threads||{};
-  const hasState=!!(t.scene||t.summary||t.day||t.location);
-  const live=(th&&th.LIVE)||[];
-  const hasThreads=Array.isArray(live)&&live.length>0;
-  return !hasState && !hasThreads;
-}
 
 function campPlayLogPath(name){ return `${CAMP_DIR}/${name}/${CAMP_PLAY_LOG_PREFIX} ${name}.md`; }
 
@@ -14899,10 +14782,6 @@ function campPlayDetectMode(text){
 
   // Explicit table/out-of-character markers win before fiction-facing intent.
   if(/^(?:ooc\b|out of character\b|\/|\()/.test(s)) return 'ooc';
-
-  // Making a new character routes to Session Zero before any scene framing (checked ahead
-  // of the scene lens so "begin session zero" / "start a new campaign" don't read as "frame scene").
-  if(/\b(?:new character|new campaign|create (?:a |my )?character|character creation|make (?:a |my )?character|roll up a character|session zero|start a new campaign)\b/.test(s)) return 'sessionzero';
 
   // Session navigation asks should recap or frame before ordinary Q&A.
   if(/\b(?:recap|where were we|remind me|catch me up)\b/.test(s)) return 'recap';
@@ -14942,7 +14821,6 @@ function campPlayModeStarterPrompts(mode){
     act:['I step forward and...','I look for a way to...'],
     ask:['What does the table know about...','Can I do this with what we have established?'],
     scene:['Set the scene from the live state.','Start the session and give me my options.'],
-    sessionzero:['Start a new character with Session Zero.','Walk me through creating my godling.'],
     oracle:['What might be true here?','Give me 2-3 plausible options.'],
     fate:['Is this true here?','Does the world answer yes or no?'],
     interrupt:['Something intrudes from the living world.'],
@@ -15012,11 +14890,9 @@ function campPlayBuildSystem(opts){
   const personaSystem=typeof assistantBuildPersonaSystem==='function'
     ? assistantBuildPersonaSystem(persona, opts.groundingSystem, {groundingMode:opts.groundingMode})
     : [persona.system, String(opts.groundingSystem||'').trim()].filter(Boolean).join('\n\n');
-  const sessionBoot=(mode.id==='sessionzero')||campPlayIsUnstarted(opts.parsed, opts.threads);
   return [
     personaSystem,
     'CAMPAIGN PLAY MODE:\n'+mode.label+'\n'+mode.prompt,
-    sessionBoot?CAMP_PLAY_SESSION_BOOT:'',
     (opts.draftResolution||mode.draftResolution)?CAMP_PLAY_DRAFT_3D6_CONTEXT:'',
     'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(opts.campaignName||'', opts.parsed||{}, opts.threads||{}),
     CAMP_PLAY_TABLE_PROTOCOL,

@@ -1,6 +1,6 @@
 /* The Vael Field Journal — service worker (cache-first app shell, offline-capable).
    Canon/GitHub requests are never cached; they must stay live. */
-const CACHE = 'vfj-addf8a50';
+const CACHE = 'vfj-663166cb';
 const ASSETS = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-180.png', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -35,28 +35,4 @@ self.addEventListener('fetch', e => {
       return res;
     }).catch(() => caches.match('./index.html')))
   );
-});
-
-// Web Push: the private backend posts an end-to-end-encrypted payload when a
-// household note lands (subscribe flow in src/ui/messages.js; sender in
-// backend/app.py). Payloads arrive even with the app closed; tapping the
-// notification focuses an open journal or opens a fresh one.
-self.addEventListener('push', e => {
-  let data = {};
-  try { data = e.data ? e.data.json() : {}; } catch (_) {}
-  e.waitUntil(self.registration.showNotification(data.title || 'Field Journal', {
-    body: data.body || 'A new note is waiting.',
-    tag: 'vfj-message',
-    icon: './icon-192.png',
-    badge: './icon-192.png',
-    data: { url: data.url || './' },
-  }));
-});
-self.addEventListener('notificationclick', e => {
-  e.notification.close();
-  const url = (e.notification.data && e.notification.data.url) || './';
-  e.waitUntil(self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-    for (const client of list) { if ('focus' in client) return client.focus(); }
-    return self.clients.openWindow ? self.clients.openWindow(url) : null;
-  }));
 });
