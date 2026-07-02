@@ -8703,6 +8703,12 @@ function studioGraph(host){
 const CANON_RAG_MAX_GROUNDING_ENTRIES=5;
 const CANON_RAG_MAX_ENTRY_CHARS=1200;
 const CANON_RAG_GROUNDING_CHAR_BUDGET=4000;
+// Hybrid retrieval blend: fraction of the ranking decision that comes from the semantic
+// (embedding-cosine) score; the rest comes from the keyword score. 0 = keyword only,
+// 1 = vector only. Vector-leaning by default — semantic recall is the reason to embed at all —
+// while still letting a strong exact-term/canon-id match surface. Tunable per call via
+// opts.vectorWeight.
+const CANON_RAG_VECTOR_WEIGHT=0.7;
 const CANON_EMBED_TEXT_CHARS=3000;
 const CANON_EMBED_DB='vfj-canon-embeddings';
 const CANON_EMBED_STORE='vectors';
@@ -9064,27 +9070,41 @@ async function canonEmbedQuery(engine, question){
   return vector;
 }
 
-// Named for what it actually does, not what "hybrid" might suggest: ranking is
-// vector-score-first, with keywordScore only as a tie-break for entries whose cosine
-// similarity is exactly equal — which real embeddings essentially never produce, so in
-// practice this is vector-only ranking. Falls back to pure keyword retrieval (canonRetrieve)
-// when there's no query vector or no embedding index at all. If a genuine blended score is
-// ever wanted, that's a different function, not a rename of this one.
-function canonRetrieveVectorFirst(question, corpus, index, queryVector, opts){
+// Real hybrid retrieval: rank by a weighted blend of the semantic (embedding-cosine) and
+// keyword scores, each MAX-NORMALIZED to [0,1] across the candidate set so the weight is
+// meaningful — CANON_RAG_VECTOR_WEIGHT of the decision comes from vectors, the rest from
+// keywords, regardless of the raw scales (cosine is ~[0,1]; keyword score is unbounded).
+// Replaces the earlier vector-first ranking, whose keyword tie-break only fired on exactly
+// equal cosines (never, in practice). Falls back to pure keyword retrieval (canonRetrieve)
+// when there is no query vector or embedding index. An entry with a keyword hit but no
+// embedding record still surfaces (its vector score is 0, but the keyword half carries it) —
+// strictly better than vector-first, which sank anything unembedded. Negative cosines are
+// clamped to 0 so a semantically-opposite entry can only surface on keyword, never as a
+// spurious positive vector signal.
+function canonRetrieveHybrid(question, corpus, index, queryVector, opts){
   opts=typeof opts==='number'?{k:opts}:(opts||{});
   const limit=opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES;
+  const vectorWeight=(typeof opts.vectorWeight==='number')?Math.min(1,Math.max(0,opts.vectorWeight)):CANON_RAG_VECTOR_WEIGHT;
   const records=(index&&index.records)||index||[], byRef={};
   records.forEach(record=>{ byRef[record.ref||canonEntryRef(record.entry)]=record; });
   const terms=canonRagTerms(question), qv=canonVector(queryVector);
   if(!qv.length||!records.length) return canonRetrieve(question,corpus,opts);
-  const ranked=(corpus||[]).map((entry,order)=>{
+  const scored=(corpus||[]).map((entry,order)=>{
     const record=byRef[canonEntryRef(entry)];
-    const vectorScore=record?canonCosine(qv,record.vector):0;
+    const vectorScore=record?Math.max(0,canonCosine(qv,record.vector)):0;
     const keywordScore=canonScoreEntry(terms,entry);
     return {entry,order,vectorScore,keywordScore};
-  }).filter(x=>x.vectorScore>0||x.keywordScore>0)
-    .sort((a,b)=>b.vectorScore-a.vectorScore||b.keywordScore-a.keywordScore||canonEntrySortKey(a.entry)-canonEntrySortKey(b.entry)||a.order-b.order);
-  return (ranked.length?ranked.map(x=>x.entry):canonRetrieve(question,corpus,opts)).slice(0,limit);
+  }).filter(x=>x.vectorScore>0||x.keywordScore>0);
+  if(!scored.length) return canonRetrieve(question,corpus,opts);
+  const maxV=scored.reduce((m,x)=>Math.max(m,x.vectorScore),0);
+  const maxK=scored.reduce((m,x)=>Math.max(m,x.keywordScore),0);
+  scored.forEach(x=>{
+    const normV=maxV>0?x.vectorScore/maxV:0;
+    const normK=maxK>0?x.keywordScore/maxK:0;
+    x.blend=vectorWeight*normV+(1-vectorWeight)*normK;
+  });
+  scored.sort((a,b)=>b.blend-a.blend||b.vectorScore-a.vectorScore||canonEntrySortKey(a.entry)-canonEntrySortKey(b.entry)||a.order-b.order);
+  return scored.slice(0,limit).map(x=>x.entry);
 }
 
 async function canonGroundingForQuestion(cfg, engine, question, opts){
@@ -9095,7 +9115,7 @@ async function canonGroundingForQuestion(cfg, engine, question, opts){
     try{
       const index=await canonEnsureEmbeddingIndex(cfg,engine,corpus,{force:opts.forceIndex,onStatus:opts.onStatus});
       const queryVector=await canonEmbedQuery(engine,question);
-      entries=canonRetrieveVectorFirst(question,corpus,index,queryVector,opts);
+      entries=canonRetrieveHybrid(question,corpus,index,queryVector,opts);
       embeddingStatus='ready';
     }catch(e){
       warning=e&&e.message?e.message:String(e);
