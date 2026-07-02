@@ -5112,6 +5112,7 @@ function prcCriticPrompt(){ const d=prcCurDrill();
     'Flag any: raw new/delete, magic numbers, uninitialized variables, or a class whose invariant could be broken. Then ask me ONE "what happens if…" question (e.g., a negative or empty input) so I check my own logic.'].filter(Boolean).join('\n'); }
 function prcUE5Prompt(){
   return ['I am learning standard C++ but heading to Unreal Engine 5 C++. For the concept in my code below, show the direct UE5 equivalent as a short mapping (e.g., std::vector→TArray, std::string→FString, std::cout→UE_LOG), with one gotcha each.','',
+    pppScopeNote(),'UE5 names are the exception to the "not yet introduced" rule above — this mode names UE5 types/macros on purpose, even ones the book hasn\'t covered, since that\'s the whole point of the mapping.','',
     'Concept / code:', prcCodeBlock(),'','Keep it a mapping, not a rewrite of my program.'].join('\n'); }
 function practiceCoachModes(){
   return [
