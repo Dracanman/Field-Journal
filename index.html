@@ -935,6 +935,35 @@
     .play-input{ min-height:76px; }
   }
   @media (max-width:480px){ .play-msg.you,.play-msg.gm{ max-width:100%; } }
+
+  /* ---------- the GM in the companion panel (mode 'gm') ----------
+     The chat's .play-* DNA is unchanged; these overrides fit it into the narrow
+     floating panel / phone bottom sheet: transcript flexes to the panel instead
+     of claiming viewport-height, the input card stops being sticky, and the page
+     media rules above (62–74vh stacks) are explicitly neutralized. */
+  .companion-gm{ padding:10px; }
+  .companion-gm .play-chat-stack, .companion-gm .play-chat-stack.lens-collapsed{
+    display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:8px;
+  }
+  .companion-gm .play-transcript-card{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; padding:8px; }
+  .companion-gm .play-log, .companion-gm .play-chat-stack.lens-collapsed .play-log{
+    flex:1 1 auto; min-height:120px; max-height:none;
+  }
+  .companion-gm .play-input-card{ position:static; padding:9px; gap:7px; }
+  .companion-gm .play-input{ min-height:56px; }
+  .companion-gm .play-grounding{ font-size:11px; margin:0 2px; }
+  .companion-gm .play-msg.you, .companion-gm .play-msg.gm{ max-width:100%; }
+  .companion-gm .play-mode-chip{ flex:1 1 120px; max-width:none; }
+  .companion-gm .play-mode-chip small{ display:none; }
+  .companion-gm .play-lens-panel:not(.lens-collapsed){ max-height:34vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+
+  /* ---------- the Play tab as the TABLE (chat rides the companion) ---------- */
+  .play-head-actions{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+  .play-table-stage.table-only{ grid-template-columns:minmax(0,1fr); }
+  .play-table-stage.table-only .play-tools-wrap{ position:static; max-height:none; }
+  .play-table-stage.table-only .play-tools{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; align-items:start;
+  }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
 .region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
@@ -1154,9 +1183,20 @@
 .companion-msg-btn{ padding:2px 8px; }
 .messages-meta{ font-size:11px; margin:0 0 2px; opacity:.72; }
 .companion-messages .companion-msg{ max-width:92%; }
+/* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
+.companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
 @media (max-width:700px){
   .companion-fab{ bottom:calc(136px + env(safe-area-inset-bottom)); padding:7px 12px; }
-  .companion-panel{ right:max(10px, env(safe-area-inset-right)); left:max(10px, env(safe-area-inset-left)); width:auto; bottom:calc(178px + env(safe-area-inset-bottom)); max-height:60vh; }
+  /* …the bubble steps aside while the sheet is up (it would sit on the input row) */
+  .companion-fab.panel-open{ display:none; }
+  /* phone: a true bottom sheet — compact by default so the page stays visible
+     behind it, over the bottom nav (closing restores it), ⤢ grows it to read. */
+  .companion-panel{
+    left:0; right:0; bottom:0; width:auto; z-index:61;
+    border-radius:16px 16px 0 0; border-left:none; border-right:none; border-bottom:none;
+    max-height:46vh; padding-bottom:env(safe-area-inset-bottom);
+  }
+  .companion-panel.tall{ max-height:88vh; }
 }
 @media print{ .companion-fab, .companion-panel{ display:none !important; } }
 /* ---------- Spaces: iPad-friendly front door ------------------------------ */
@@ -7560,7 +7600,13 @@ function companionRenderLog(){
 
 function companionRefreshContext(){
   const chip=COMPANION.panel&&COMPANION.panel._context;
-  if(chip) chip.textContent=companionContext().line;
+  if(!chip) return;
+  if(COMPANION.mode==='gm'){
+    const s=typeof campPlaySession==='function'?campPlaySession():null;
+    chip.textContent=s?('♟ '+s.name+' · live state + canon'):'♟ no table seated';
+    return;
+  }
+  chip.textContent=companionContext().line;
 }
 
 // Race a send against a deadline. The underlying fetch isn't aborted (matching
@@ -7597,26 +7643,46 @@ function companionChatBody(){
   return h('div',{class:'companion-body'}, log, h('div',{class:'companion-inputrow'}, input, send), h('div',{class:'companion-footrow'}, report));
 }
 
+const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master'};
 function companionSetMode(mode){
   COMPANION.mode=mode;
   const body=COMPANION.panel&&COMPANION.panel._body;
   if(!body) return;
-  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():companionChatBody());
+  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():companionChatBody());
+  const title=COMPANION.panel._title;
+  if(title) title.textContent=COMPANION_TITLES[mode]||COMPANION_TITLES.chat;
+  companionRefreshContext();
   if(mode==='chat') companionRenderLog();
+}
+
+// One toggle serves both shapes: on the phone the bottom sheet grows from ~46vh
+// to nearly full height; on desktop the panel gets wider and taller. Reading a
+// long GM turn is the reason this exists.
+function companionSetTall(force){
+  const panel=companionEnsurePanel();
+  COMPANION.tall=force==null?!COMPANION.tall:!!force;
+  panel.className='companion-panel glass no-print'+(COMPANION.tall?' tall':'');
+  const btn=panel._sizeBtn;
+  if(btn){ btn.setAttribute('aria-pressed',COMPANION.tall?'true':'false'); btn.textContent=COMPANION.tall?'⤡':'⤢'; }
 }
 
 function companionEnsurePanel(){
   if(COMPANION.panel) return COMPANION.panel;
+  const title=h('b',null,'✦ Guide');
   const context=h('span',{class:'companion-context'}, companionContext().line);
   const body=h('div',{class:'companion-panel-body'});
+  const gmBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Game Master', title:'The campaign table',
+    onclick:()=>companionSetMode(COMPANION.mode==='gm'?'chat':'gm')}, '♟');
   const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
     onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
+  const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
+    title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
   const panel=h('div',{class:'companion-panel glass no-print', role:'dialog', 'aria-label':'Guide'},
-    h('div',{class:'companion-head'}, h('b',null,'✦ Guide'), context, msgBtn, closeBtn),
+    h('div',{class:'companion-head'}, title, context, gmBtn, msgBtn, sizeBtn, closeBtn),
     body);
   panel.style.display='none';
-  panel._context=context; panel._body=body;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn;
   COMPANION.panel=panel;
   companionSetMode('chat');
   return panel;
@@ -7626,7 +7692,18 @@ function companionToggle(open){
   const panel=companionEnsurePanel();
   COMPANION.open=open==null?!COMPANION.open:!!open;
   panel.style.display=COMPANION.open?'flex':'none';
+  // On the phone the open panel is a bottom sheet over the nav — the bubble would
+  // float on top of its input row, so it steps aside while the panel is up.
+  const fab=COMPANION.fab;
+  if(fab) fab.className='companion-fab navbtn no-print'+(COMPANION.open?' panel-open':'');
   if(COMPANION.open){ companionRefreshContext(); if(COMPANION.mode==='chat') companionRenderLog(); }
+}
+
+// The Play tab (or the ♟ header button) seats the Game Master in the panel.
+function companionOpenGm(){
+  companionEnsurePanel();
+  companionSetMode('gm');
+  companionToggle(true);
 }
 
 // Mounted by render() on every navigation: (re)attach the persistent panel to
@@ -7638,7 +7715,9 @@ function companionMount(){
   }
   companionRefreshContext();
   messagesEnsurePolling();
-  return h('button',{class:'companion-fab navbtn no-print', type:'button', 'aria-label':'Ask the guide', onclick:()=>companionToggle()}, messagesFabLabel());
+  const fab=h('button',{class:'companion-fab navbtn no-print'+(COMPANION.open?' panel-open':''), type:'button', 'aria-label':'Ask the guide', onclick:()=>companionToggle()}, messagesFabLabel());
+  COMPANION.fab=fab;
+  return fab;
 }
 
 /* ---- bug-report mode -------------------------------------------------------- */
@@ -15323,28 +15402,71 @@ async function campPlayCaptureBeat(cfg, files, body){
   }), 'Play beat to ledger', {guard:assertLedger});
 }
 
+/* ---- the seated session ------------------------------------------------------
+   The GM chat lives in the floating companion (mode 'gm'), not in the page — the
+   Play tab is the TABLE (controls + tools), and this module-level session is what
+   lets the chat survive navigation: wander to the region map mid-scene and the
+   conversation is still there. One session at a time; opening Play for a
+   different campaign seats a fresh one (the old one's debounced save still
+   lands — its closure stays alive until the write fires). */
+let CAMP_PLAY_SESSION=null;
+function campPlaySession(){ return CAMP_PLAY_SESSION; }
+function campPlaySeat(session){ CAMP_PLAY_SESSION=session||null; }
+
+// What the companion panel shows in 'gm' mode: the seated chat, or a gentle seat hint.
+function campPlayCompanionBody(){
+  const s=campPlaySession();
+  if(!s) return h('div',{class:'companion-body companion-gm'},
+    h('p',{class:'hint companion-hello'},'No table is seated yet. Open a campaign’s ▶ Play tab and the Game Master sits here — then the chat follows you anywhere in the app.'),
+    h('div',{class:'companion-footrow'}, h('button',{class:'navbtn', type:'button', onclick:()=>{ go('campaigns'); }},'♟ Campaigns')));
+  return h('div',{class:'companion-body companion-gm'}, s.chatNode);
+}
+
+// The Play tab page: command card + full-width table tools. The chat is deliberately
+// NOT here — it rides the companion so it can't cover half the screen.
+function campPlayMountTable(host, s){
+  host.replaceChildren(
+    h('div',{class:'play-shell'},
+      s.commandCard,
+      h('div',{class:'play-table-stage table-only'}, s.toolsWrap)
+    )
+  );
+}
+
 async function campPlay(host, name){
-  const cfg=ghCfg();
   const profiles=(typeof assistantEngineProfiles==='function')?assistantEngineProfiles():[];
   if(!profiles.length){
     const btn=h('button',{class:'navbtn primary', onclick:()=>openEngineSettings()},'Open Engine settings');
     host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Add an AI engine profile first, then come back to play. The Game Master uses your chosen engine.'), h('div',{class:'toolrow', style:{justifyContent:'center'}},btn));
     return;
   }
-  host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
+  // Re-entering the same campaign reuses the seated session — transcript, scroll,
+  // half-typed input and all. A different campaign seats fresh.
+  const seated=campPlaySession();
+  if(!(seated&&seated.name===name)){
+    host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the save…'));
+    const built=await campPlayBuildSession(name, profiles);
+    if(built.error){ host.replaceChildren(h('p',{class:'hint'},built.error)); return; }
+    campPlaySeat(built);
+  }
+  campPlayMountTable(host, campPlaySession());
+  companionOpenGm();
+}
 
+async function campPlayBuildSession(name, profiles){
+  const cfg=ghCfg();
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
   let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null;
   try{
     files=await campaignFiles(cfg,name);
-    if(!files.tracker){ host.replaceChildren(h('p',{class:'hint'},'No state tracker for '+name+' yet — start play once the campaign is scaffolded.')); return; }
+    if(!files.tracker){ return {error:'No state tracker for '+name+' yet — start play once the campaign is scaffolded.'}; }
     const tr=await ghGetText(cfg, files.tracker); const th=files.threads?await ghGetText(cfg, files.threads):null; const ca=files.cast?await ghGetText(cfg, files.cast):null;
     if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); }
     if(th) threads=parseThreads(th.text);
     if(ca&&typeof parseCast==='function') cast=parseCast(ca.text);
     const log=await campPlayLoadLog(cfg, name);
     messages=log.messages; logLoadFailed=log.failed;
-  }catch(e){ host.replaceChildren(h('p',{class:'hint'},'Error: '+e.message)); return; }
+  }catch(e){ return {error:'Error: '+e.message}; }
 
   const defaultEngine=assistantDefaultEngine(profiles);
   const engineSel=h('select',{class:'play-engine'},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' · '+p.type)));
@@ -15382,7 +15504,9 @@ async function campPlay(host, name){
   const transcriptCard=h('div',{class:'play-transcript-card'}, transcript);
   const chatStack=h('section',{class:'play-chat-stack'}, groundingLine, transcriptCard, inputCard);
   const lensMedia=(typeof window!=='undefined'&&typeof window.matchMedia==='function')?window.matchMedia('(max-width:560px)'):null;
-  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=!!(lensMedia&&lensMedia.matches);
+  // The chat lives in the narrow companion panel now — the lens rack starts folded
+  // everywhere (one line: "Lens: Auto → …"), not just on small screens.
+  let busy=false, streamNode=null, saveTimer=null, modeHelpTimer=null, activeMode=CAMP_PLAY_DEFAULT_MODE_ID, lensCollapsed=true;
 
   async function reloadState(){
     try{ const tr=await ghGetText(cfg, files.tracker); if(tr){ parsed=parseTracker(tr.text); runtime=parseRuntime(tr.text); } }catch(e){}
@@ -15583,33 +15707,28 @@ async function campPlay(host, name){
 
   applyLensCollapse();
   drawModeRow(); drawTools(); drawTranscript();
-  host.replaceChildren(
-    h('div',{class:'play-shell'},
-      h('div',{class:'play-command-card'},
-        h('div',{class:'play-head'},
-          h('div',{class:'play-control-row'},
-            h('label',{class:'play-select-label'},'Engine',engineSel),
-            h('label',{class:'play-select-label'},'Persona',personaSel),
-            h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel)
-          ),
-          usageMeter()
-        ),
-        h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn.'),
-        h('p',{class:'play-note'},'The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
-        logLoadFailed?h('p',{class:'play-note', role:'status'},'⚠ Could not load the previous session transcript (a network or read error, not a missing file) — this view is starting empty as a precaution. Your saved transcript on disk is untouched, and saving here is paused; reload this tab once the connection is back.'):null,
+  const openChatBtn=h('button',{class:'navbtn primary', type:'button', onclick:()=>companionOpenGm()},'✦ Open the GM chat');
+  const commandCard=h('div',{class:'play-command-card'},
+    h('div',{class:'play-head'},
+      h('div',{class:'play-control-row'},
+        h('label',{class:'play-select-label'},'Engine',engineSel),
+        h('label',{class:'play-select-label'},'Persona',personaSel),
+        h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel)
       ),
-      h('div',{class:'play-table-stage'},
-        h('aside',{class:'play-tools-wrap'},
-          h('div',{class:'play-tools-head'},
-            h('b',null,'Table tools'),
-            h('span',{class:'hint'},'template-backed')
-          ),
-          tablePanel
-        ),
-        chatStack
-      )
-    )
+      h('div',{class:'play-head-actions'}, usageMeter(), openChatBtn)
+    ),
+    h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn.'),
+    h('p',{class:'play-note'},'The Game Master chats in the floating ✦ panel — it follows you across the app, and this table stays visible behind it. The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
+    logLoadFailed?h('p',{class:'play-note', role:'status'},'⚠ Could not load the previous session transcript (a network or read error, not a missing file) — this view is starting empty as a precaution. Your saved transcript on disk is untouched, and saving here is paused; reload this tab once the connection is back.'):null,
   );
+  const toolsWrap=h('aside',{class:'play-tools-wrap'},
+    h('div',{class:'play-tools-head'},
+      h('b',null,'Table tools'),
+      h('span',{class:'hint'},'template-backed')
+    ),
+    tablePanel
+  );
+  return { name, chatNode:chatStack, commandCard, toolsWrap };
 }
 
 // The one campaign write with no content guard until now: the transform ignores the
