@@ -7261,6 +7261,18 @@ function buildDomainBlock(card, date){
   L.push('', '*Promoted from the Promotion Queue on '+date+' ('+card.id+').*');
   return L.join('\n');
 }
+// The domain-file write in the promotion pipeline, made idempotent: if a prior promotion
+// attempt already appended this id's block (a later step then failed — network drop, etc. —
+// and the button re-enabled), the natural retry must not duplicate the canon block. Every
+// buildDomainBlock always closes with "…(<id>)." — treat that as the promotion stamp and
+// skip the append if it's already present. destFile is the chosen write target (which the
+// human can change in the modal — it isn't necessarily card.destFile).
+function buildDomainPromotionText(dom, card, destFile, date){
+  const promotionStamp='('+card.id+').';
+  if(dom && dom.includes(promotionStamp)) return dom;
+  const head=dom ? dom.replace(/\s*$/,'')+'\n\n' : '# '+String(destFile||'').replace('domains/','')+'\n\n';
+  return head+buildDomainBlock(card, date)+'\n';
+}
 function leanQueueMarker(card, destFile, date){ return ['## '+card.title, '', '**Status:** PROMOTED — '+card.id+' → '+destFile+' ('+date+')'].join('\n'); }
 function promoteInQueue(text, id, destFile, date){
   const c=getQueueCard(text, id); if(!c) return text; const lines=text.split('\n');
@@ -7340,7 +7352,7 @@ function parsePromotedDomainEntries(text,file){
     entries.push({kind,id:id||'',title:title.trim(),file,domain:canonGraphDomainLabel(file),line,start,end:lines.length,body:''});
   };
   for(let i=0;i<lines.length;i++){
-    const idHead=/^##\s+([A-Z]{3}-\d{3})\s+[—-]\s+(.+?)\s*$/.exec(lines[i]);
+    const idHead=/^##\s+([A-Z]{3}-\d{3})\s+[\-–—]\s+(.+?)\s*$/.exec(lines[i]);
     const foundation=/^###\s+(.+?)\s*$/.exec(lines[i]);
     if(idHead) startEntry('id',idHead[2],idHead[1],i+1,i+1);
     else if(foundation) startEntry('foundation',foundation[1],'',i+1,i+1);
@@ -9469,14 +9481,10 @@ function promoteCardModal(id){
           const qf=await ghGetText(cfg, QUEUE_PATH); assertQueue(qf.text);
           const c=getQueueCard(qf.text, id); if(!c) throw new Error('card no longer in the queue');
           if(!validCanonId(id)) throw new Error('that card id looks wrong ('+id+')');
-          // each write is conflict-safe (re-reads + re-applies if the file moved) and guarded
+          // each write is conflict-safe (re-reads + re-applies if the file moved) and guarded;
+          // buildDomainPromotionText (canon-parse.js) makes the domain write idempotent on retry
           status.textContent='Writing canon…';
-          // Idempotent on retry: if a prior attempt's domain write landed but a later step
-          // failed (network drop, etc.), the button re-enables and the natural retry must
-          // not append the same canon block a second time. buildDomainBlock always closes
-          // with "…(<id>)." — treat that as the promotion stamp for this id.
-          const promotionStamp='('+id+').';
-          await ghUpdate(cfg, destFile, dom=> (dom&&dom.includes(promotionStamp))? dom : (dom? dom.replace(/\s*$/,'')+'\n\n' : '# '+destFile.replace('domains/','')+'\n\n')+buildDomainBlock(c, date)+'\n', 'Promote '+id+' → '+destFile, {guard:assertDomain, create:true});
+          await ghUpdate(cfg, destFile, dom=>buildDomainPromotionText(dom, c, destFile, date), 'Promote '+id+' → '+destFile, {guard:assertDomain, create:true});
           await ghUpdate(cfg, INDEX_PATH, ix=>markIndexPromoted(ix, id, c.desc, destFile, date), 'Mark '+id+' promoted in the index', {guard:assertIndex});
           await ghUpdate(cfg, QUEUE_PATH, q=>promoteInQueue(q, id, destFile, date), 'Queue hygiene: '+id+' promoted', {guard:assertQueue});
           try{ await ghUpdate(cfg, 'legacy/99_CHANGELOG.md', cl=> cl.replace(/\s*$/,'')+'\n- '+date+' — PROMOTED '+id+' — '+c.desc+' → '+destFile+'.\n', 'Log '+id+' promotion'); }catch(e){}
