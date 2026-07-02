@@ -7937,6 +7937,15 @@ function canonRagTerms(text){
   return Array.from(new Set(String(text||'').toLowerCase().replace(/[`*_~#[\](){}>"']/g,' ').replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(t=>t.length>2&&!CANON_RAG_STOPWORDS[t])));
 }
 
+// Clamp preserving internal whitespace/line breaks (trims only the ends) + an ellipsis
+// marker. Shared beyond RAG grounding — assistant.js reuses this directly rather than
+// keeping its own byte-identical copy (the two were exact duplicates until this cleanup).
+// campPlayShortText (campaign-play.js) and regionForgeAiClampText (region-forge.js) look
+// similar but aren't duplicates of this one: both collapse internal whitespace to a single
+// line (for one-line summaries / compact AI-prompt input), and the region-forge variant
+// omits the ellipsis (its output goes into a prompt, not something a human reads as
+// visibly truncated) — different enough to keep separate rather than force into one
+// do-everything function.
 function canonRagClampText(text, max){
   const s=String(text||'').trim();
   if(s.length<=max) return s;
@@ -8261,7 +8270,13 @@ async function canonEmbedQuery(engine, question){
   return vector;
 }
 
-function canonRetrieveHybrid(question, corpus, index, queryVector, opts){
+// Named for what it actually does, not what "hybrid" might suggest: ranking is
+// vector-score-first, with keywordScore only as a tie-break for entries whose cosine
+// similarity is exactly equal — which real embeddings essentially never produce, so in
+// practice this is vector-only ranking. Falls back to pure keyword retrieval (canonRetrieve)
+// when there's no query vector or no embedding index at all. If a genuine blended score is
+// ever wanted, that's a different function, not a rename of this one.
+function canonRetrieveVectorFirst(question, corpus, index, queryVector, opts){
   opts=typeof opts==='number'?{k:opts}:(opts||{});
   const limit=opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES;
   const records=(index&&index.records)||index||[], byRef={};
@@ -8286,7 +8301,7 @@ async function canonGroundingForQuestion(cfg, engine, question, opts){
     try{
       const index=await canonEnsureEmbeddingIndex(cfg,engine,corpus,{force:opts.forceIndex,onStatus:opts.onStatus});
       const queryVector=await canonEmbedQuery(engine,question);
-      entries=canonRetrieveHybrid(question,corpus,index,queryVector,opts);
+      entries=canonRetrieveVectorFirst(question,corpus,index,queryVector,opts);
       embeddingStatus='ready';
     }catch(e){
       warning=e&&e.message?e.message:String(e);
@@ -8603,12 +8618,6 @@ if(typeof window!=='undefined'){
   window.__sqlQuery.embed=privateSqlEmbed;
 }
 const ASSISTANT_MAX_TOKENS=900;
-
-function assistantClampText(text, max){
-  const s=String(text||'').trim();
-  if(s.length<=max) return s;
-  return s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...';
-}
 
 function assistantIdsText(ids){
   ids=(Array.isArray(ids)?ids:[]).filter(Boolean);
@@ -8941,7 +8950,7 @@ function assistantAnswerToCard(state){
   const answer=String(state&&state.answer||'').trim();
   const grounding=assistantNormalizeGrounding(state&&state.grounding);
   const ids=assistantIdsText(grounding.ids);
-  const title=assistantClampText(question||'Canon assistant suggestion',60);
+  const title=canonRagClampText(question||'Canon assistant suggestion',60);
   const domainHints=Array.from(new Set(grounding.entries.map(e=>e.domain||e.file).filter(Boolean))).join(', ');
   // Derived from the top-ranked grounding entry's domain file rather than hardcoded, so
   // drafting a card from a Cosmology/Vael/etc. answer reserves the right tag instead of
@@ -8953,7 +8962,7 @@ function assistantAnswerToCard(state){
     title:title,
     category:domainHints,
     source:'Canon-grounded AI assistant',
-    claim:assistantClampText(answer,900),
+    claim:canonRagClampText(answer,900),
     means:'Grounded on: '+ids,
     donot:'Do not treat this as promoted canon until it is reviewed and promoted through the normal pipeline.',
     notes:'Suggestion only. Drafted from an assistant answer for the question: '+question
