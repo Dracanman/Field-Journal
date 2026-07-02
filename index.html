@@ -1103,6 +1103,62 @@
   .usage-breakdown-row{grid-template-columns:1fr 1fr;gap:5px 8px}.usage-breakdown-row b{grid-column:1 / -1}
   .engine-form .toolrow{align-items:stretch;flex-direction:column}.engine-form .toolrow .navbtn{width:100%}
 }
+/* COMPANION — the floating guide bubble + panel. Glass chrome (it's the app
+   looking at the world, not an in-world artifact). Calm budget: no ambient
+   motion — the panel simply is or isn't. */
+.companion-fab{
+  position:fixed; right:max(18px, env(safe-area-inset-right)); bottom:max(64px, calc(46px + env(safe-area-inset-bottom)));
+  z-index:58; display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  box-shadow:0 18px 42px -28px var(--glow), 0 0 0 1px var(--glass-border);
+}
+.companion-panel{
+  position:fixed; right:max(14px, env(safe-area-inset-right)); bottom:max(112px, calc(94px + env(safe-area-inset-bottom)));
+  z-index:57; width:min(380px, calc(100vw - 28px)); max-height:min(560px, 72vh);
+  display:flex; flex-direction:column; overflow:hidden;
+  background:var(--glass-solid, var(--paper-card)); border:1.5px solid var(--glass-border); border-radius:16px;
+  -webkit-backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12); backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12);
+  box-shadow:0 24px 60px -30px var(--glow), 0 0 0 1px var(--glass-border);
+}
+.companion-head{
+  display:flex; align-items:center; gap:8px; padding:10px 12px;
+  border-bottom:1px solid var(--glass-border);
+}
+.companion-head b{ color:var(--ink); }
+.companion-context{
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:12px; color:var(--ink-soft);
+}
+.companion-close{ padding:2px 9px; line-height:1; }
+.companion-panel-body{ display:flex; flex-direction:column; min-height:0; flex:1; }
+.companion-body{ display:flex; flex-direction:column; gap:10px; padding:12px; min-height:0; flex:1; overflow:auto; }
+.companion-log{ display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:120px; }
+.companion-msg{ max-width:88%; padding:8px 11px; border-radius:12px; border:1px solid var(--glass-border); }
+.companion-msg p{ margin:0; font-size:14px; line-height:1.45; color:var(--ink); }
+.companion-msg.guide{ align-self:flex-start; background:var(--glass-bg); }
+.companion-msg.you{ align-self:flex-end; background:var(--paper-card); }
+.companion-msg .toolrow{ margin-top:6px; }
+.companion-busy p{ color:var(--ink-soft); font-style:italic; }
+.companion-hello{ margin:auto 0; }
+.companion-inputrow{ display:flex; gap:8px; }
+.companion-input, .companion-area{
+  flex:1; width:100%; box-sizing:border-box; border:1.5px solid var(--glass-border); border-radius:10px;
+  padding:8px 10px; background:var(--glass-bg); color:var(--ink); font:inherit; font-size:14px;
+}
+.companion-area{ resize:vertical; }
+.companion-preview{ font-size:12.5px; line-height:1.4; }
+.companion-footrow{ display:flex; justify-content:flex-end; }
+.companion-report-link{ font-size:12.5px; }
+.companion-report{ gap:8px; }
+.companion-clarify{ display:grid; gap:5px; color:var(--ink); font-weight:600; font-size:13px; }
+.companion-report-status{ min-height:16px; margin:0; }
+.companion-msg-btn{ padding:2px 8px; }
+.messages-meta{ font-size:11px; margin:0 0 2px; opacity:.72; }
+.companion-messages .companion-msg{ max-width:92%; }
+@media (max-width:700px){
+  .companion-fab{ bottom:calc(136px + env(safe-area-inset-bottom)); padding:7px 12px; }
+  .companion-panel{ right:max(10px, env(safe-area-inset-right)); left:max(10px, env(safe-area-inset-left)); width:auto; bottom:calc(178px + env(safe-area-inset-bottom)); max-height:60vh; }
+}
+@media print{ .companion-fab, .companion-panel{ display:none !important; } }
 /* ---------- Spaces: iPad-friendly front door ------------------------------ */
 .spaces-front{max-width:940px;margin:24px auto 0}
 .spaces-intro{
@@ -3326,6 +3382,7 @@ function render(){
   try{ $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW)); }
   catch(e){ $app.append(errorCard(e)); }
   $app.append(quickCaptureButton());
+  $app.append(companionMount());
   $app.append(bottomNav());
   ensureSpaceStatusDots();
 }
@@ -3499,14 +3556,16 @@ function moreMenu(){
   let close;
   const item=(label, fn)=> h('button',{class:'navbtn', style:{justifyContent:'flex-start', textAlign:'left'}, onclick:()=>{ close(); fn(); }}, label);
   const advanced=DB.profile!=='maker'||DB.mode==='full';
+  const syncStale=typeof syncLastError==='function'&&syncLastError();
   const sheet=h('div',{class:'moremenu'},
-    advanced?item('☁ My file', ()=>openGitHubPanel()):null,
+    advanced?item('☁ My file'+(syncStale?' ⚠':''), ()=>openGitHubPanel()):null,
     advanced?item('⚙ Engine', ()=>openEngineSettings()):null,
     item('⌂ On open', ()=>openOpenToSettings()),
     item('◐ Theme: '+themeModeLabel(), ()=>cycleThemeMode()),
     item((DB.fxRich?'✦ Atmospherics: on':'✧ Atmospherics: off'), ()=>setAtmospherics(!DB.fxRich)),
     item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
+    item('🐞 Report a problem', ()=>companionOpenReport()),
     item('⇄ Switch space', ()=>switchProfileSheet()),
   );
   close=showModalNode('More', null, sheet);
@@ -5667,8 +5726,14 @@ function syncPayload(){
   if(DB.syncPractice) payload.practice=practiceSyncSettings(DB.practice);
   return payload;
 }
-let syncTimer=null, syncing=false, _lastSyncedJSON=null;
+let syncTimer=null, syncing=false, _lastSyncedJSON=null, _lastSyncError=null;
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
+// E-2: background (silent) syncs used to swallow every failure with no trace — a device
+// whose token expired, or that always 429/5xxs, would just quietly never sync again, with
+// nothing surfaced until "My file" happened to be opened and still said "Saved" from last
+// time. Tracks the last failure so the UI (moreMenu's "My file" label, the My-file panel)
+// can show a small stale-sync signal instead of staying silent forever.
+function syncLastError(){ return _lastSyncError; }
 async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; } if(syncing) return;
   const payload = JSON.stringify(syncPayload(), null, 1);
   if(opts.silent && payload===_lastSyncedJSON) return;            // nothing actually changed — don't spam commits
@@ -5683,7 +5748,8 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
     // the human-readable .md only re-renders on an explicit save, so background syncs stay one commit
     if(!opts.silent){ const mdPath=`${base}/${stem}.md`; await ghUpdate(cfg, mdPath, ()=>renderJournalMarkdown(), `Update ${stem} journal (readable)`, {create:true}); }
     if(!opts.silent) toast('Saved to your file in the world.');
-  }catch(e){ if(!opts.silent) toast('Sync failed: '+e.message); }
+    _lastSyncError=null;
+  }catch(e){ _lastSyncError={message:e&&e.message?e.message:String(e), at:Date.now()}; if(!opts.silent) toast('Sync failed: '+e.message); }
   finally{ syncing=false; }
 }
 function stripForBackup(db){
@@ -5765,6 +5831,95 @@ async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silen
 }
 function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
 
+/* ========================================================================== *
+   GITHUB OAUTH — "Sign in with GitHub" via the device flow (Auth Tier-2).
+
+   GitHub's device-flow endpoints send no CORS headers, so a browser page can't
+   call them directly. A tiny relay Del hosts (the private tailnet backend)
+   forwards exactly two calls and holds no secret — spec + setup in
+   docs/GITHUB_OAUTH_RELAY.md. The relay base URL lives in DB.github.oauthProxy
+   (device-local; DB.github never enters syncPayload). Unset → the sign-in
+   button stays hidden and the manual PAT paste remains the only path; the PAT
+   paste is never removed either way. A token obtained here is stored exactly
+   like a pasted PAT: DB.github.token, this device only.
+ * ========================================================================== */
+
+function ghOauthProxy(){
+  return String((DB.github&&DB.github.oauthProxy)||'').trim().replace(/\/+$/,'');
+}
+
+function ghOauthErr(status, detail){
+  const message=
+    status===0?'The sign-in relay could not be reached — check the relay URL and that this device can see it (Tailscale on?).':
+    status===503?'The relay is up but has no GitHub OAuth app configured yet (GITHUB_OAUTH_CLIENT_ID on the backend).':
+    status===403?'Sign-in was declined on GitHub.':
+    status===410?'That code expired before it was entered — start the sign-in again.':
+    'Sign-in hit a snag (relay said '+status+').';
+  const extra=String(detail||'').replace(/\s+/g,' ').trim().slice(0,120);
+  const e=new Error(message+(extra?' '+extra:''));
+  e.status=status; e.provider='github-oauth';
+  return e;
+}
+
+async function ghOauthRelayPost(path, body){
+  const proxy=ghOauthProxy();
+  if(!proxy) throw new Error('Set the sign-in relay URL first.');
+  let r;
+  try{ r=await fetch(proxy+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body||{})}); }
+  catch(e){ throw ghOauthErr(0); }
+  if(!r.ok) throw ghOauthErr(r.status, await r.text().catch(()=>''));
+  return r.json().catch(()=>({}));
+}
+
+async function ghOauthRequestCode(){
+  const data=await ghOauthRelayPost('/oauth/device/code',{});
+  if(!data||!data.device_code||!data.user_code) throw ghOauthErr(502,'unexpected reply shape from the relay');
+  return data;
+}
+
+// Poll for the access token. Returns {promise, cancel()} so the panel can offer
+// a working Cancel; honours GitHub's interval / slow_down / expired_token flow.
+function ghOauthPoll(code){
+  let cancelled=false, timer=null, rejectNow=null;
+  const promise=new Promise((resolve,reject)=>{
+    rejectNow=reject;
+    const sec=Number(code&&code.interval);
+    let interval=Number.isFinite(sec)&&sec>=0?sec:5;
+    const deadline=Date.now()+Math.min(Number(code&&code.expires_in)||900,900)*1000;
+    async function tick(){
+      if(cancelled) return reject(Object.assign(new Error('Sign-in cancelled.'),{cancelled:true}));
+      if(Date.now()>deadline) return reject(ghOauthErr(410));
+      let data;
+      try{ data=await ghOauthRelayPost('/oauth/device/token',{device_code:code.device_code}); }
+      catch(e){ return reject(e); }
+      if(cancelled) return reject(Object.assign(new Error('Sign-in cancelled.'),{cancelled:true}));
+      if(data.access_token) return resolve(data);
+      const errCode=String(data.error||'');
+      if(errCode==='authorization_pending'){ timer=setTimeout(tick, interval*1000); return; }
+      if(errCode==='slow_down'){ interval+=5; timer=setTimeout(tick, interval*1000); return; }
+      if(errCode==='expired_token') return reject(ghOauthErr(410));
+      if(errCode==='access_denied') return reject(ghOauthErr(403));
+      return reject(ghOauthErr(502, errCode||'unexpected reply from the relay'));
+    }
+    tick();
+  });
+  // cancel() must settle the promise itself — a wait between polls means no tick
+  // is in flight to notice the flag (clearing the timer would otherwise strand it).
+  return {promise, cancel(){
+    if(cancelled) return;
+    cancelled=true; clearTimeout(timer);
+    if(rejectNow) rejectNow(Object.assign(new Error('Sign-in cancelled.'),{cancelled:true}));
+  }};
+}
+
+// "Connected as …" — best-effort; an empty string just means the label stays generic.
+async function ghOauthWhoAmI(token){
+  let r;
+  try{ r=await fetch('https://api.github.com/user',{headers:ghHeaders(token)}); }catch(e){ return ''; }
+  if(!r.ok) return '';
+  const user=await r.json().catch(()=>({}));
+  return String(user&&user.login||'');
+}
 /* ---------- local backup file (a safety net against data eviction) --------- */
 // the journal travels with its images inline; device secrets (GitHub token,
 // engine key, engine endpoint, engine model, usage ledger) are never written
@@ -5802,19 +5957,63 @@ function creationMarkdown(c){
   L.push(''); return L;
 }
 function openGitHubPanel(){
-  const g=Object.assign({owner:'Dracanman', repo:'godling-universe-canon-workbench', branch:'main', path:'kit/journal/', token:'', displayName:'', makerStem:'field-journal'}, DB.github||{});
+  const g=Object.assign({owner:'Dracanman', repo:'godling-universe-canon-workbench', branch:'main', path:'kit/journal/', token:'', displayName:'', makerStem:'field-journal', oauthProxy:''}, DB.github||{});
   const nameIn=h('input',{value:g.displayName, placeholder:'your name (names your file)'});
   const tokenIn=h('input',{type:'password', value:g.token, placeholder:'fine-grained token — Contents: read & write'});
   const ownerIn=h('input',{value:g.owner}), repoIn=h('input',{value:g.repo}), branchIn=h('input',{value:g.branch}), pathIn=h('input',{value:g.path});
   const makerIn=h('input',{value:g.makerStem, placeholder:'field-journal'});
+  const relayIn=h('input',{value:g.oauthProxy, placeholder:'sign-in relay URL (optional)', oninput:()=>refreshOauth()});
   const syncChk=h('input',{type:'checkbox'}); syncChk.checked=!!DB.syncOnOpen; syncChk.onchange=()=>{ DB.syncOnOpen=syncChk.checked; save(); };
   const practiceChk=h('input',{type:'checkbox'}); practiceChk.checked=!!DB.syncPractice; practiceChk.onchange=()=>{ DB.syncPractice=practiceChk.checked; save(); };
   const status=h('div',{class:'hint', style:{marginTop:'10px'}});
-  function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal' }; }
+  function collect(){ return { displayName:nameIn.value.trim(), token:tokenIn.value.trim(), owner:ownerIn.value.trim(), repo:repoIn.value.trim(), branch:branchIn.value.trim()||'main', path:pathIn.value.trim()||'kit/journal/', makerStem:makerIn.value.trim()||'field-journal', oauthProxy:relayIn.value.trim() }; }
   function persist(){ DB.github=collect(); if(typeof rememberPersonFile==='function') rememberPersonFile(); save(); }
+
+  // "Sign in with GitHub" (device flow via the relay — github-oauth.js). Only shown
+  // when a relay URL is set; the PAT paste below always keeps working as the fallback.
+  const oauthStatus=h('div',{class:'hint', style:{marginTop:'6px'}});
+  let poller=null;
+  const signBtn=h('button',{class:'navbtn primary', type:'button', onclick:async()=>{
+    persist();
+    signBtn.disabled=true; oauthStatus.textContent='Asking GitHub for a code…';
+    try{
+      const code=await ghOauthRequestCode();
+      poller=ghOauthPoll(code);
+      oauthStatus.replaceChildren(
+        h('div',{class:'gh-oauth-code', style:{fontSize:'22px', fontWeight:'700', letterSpacing:'3px', margin:'6px 0'}}, code.user_code),
+        h('p',{class:'hint', style:{margin:'0 0 6px'}},'Enter this code at ', h('a',{href:code.verification_uri||'https://github.com/login/device', target:'_blank', rel:'noopener'}, code.verification_uri||'github.com/login/device'), ' — waiting…'),
+        h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ if(poller) poller.cancel(); }}, 'Cancel'));
+      const result=await poller.promise;
+      tokenIn.value=String(result.access_token||'');
+      persist();
+      const login=await ghOauthWhoAmI(tokenIn.value);
+      oauthStatus.replaceChildren(h('p',{class:'hint'},'Connected as '+(login||'you')+' ✓ — the token lives on this device only.'));
+      toast('Signed in with GitHub.');
+      refreshOauth();
+    }catch(e){ oauthStatus.textContent=(e&&e.cancelled)?'Sign-in cancelled.':String(e&&e.message||e); }
+    finally{ signBtn.disabled=false; poller=null; }
+  }}, 'Sign in with GitHub');
+  const signOutBtn=h('button',{class:'navbtn ghost', type:'button', onclick:()=>{
+    tokenIn.value=''; persist(); oauthStatus.textContent='Signed out — the token on this device was cleared.'; refreshOauth();
+  }}, 'Sign out');
+  const oauthRow=h('div',{class:'toolrow gh-oauth-row', style:{marginTop:'6px'}}, signBtn, signOutBtn);
+  function refreshOauth(){
+    oauthRow.style.display=relayIn.value.trim()?'flex':'none';
+    signOutBtn.style.display=tokenIn.value.trim()?'inline-flex':'none';
+  }
+  refreshOauth();
+  // E-2: background syncs are silent by design (no toast per attempt), so a device with a
+  // dead token or a persistent 5xx would otherwise never surface that its automatic saves
+  // stopped working. Surface the last failure here, where the user would look to check.
+  const staleError=typeof syncLastError==='function'?syncLastError():null;
+  const staleNotice=staleError?h('div',{class:'warn'},'⚠ Background saving has been failing: '+staleError.message+'. Tap "Save to my file now" below to retry.'):null;
   const panel=h('div',{class:'gh'},
     h('p',{class:'hint'},'Save your whole journal to your own file in the world, so it’s safe and you can open it on any device.'),
+    staleNotice,
     h('label',null,'Your name'), nameIn,
+    h('label',null,'Sign-in relay (optional)'), relayIn,
+    h('p',{class:'hint', style:{margin:'2px 0 0'}},'A tiny relay you host that lets this device sign in with a code instead of pasting a token — see docs/GITHUB_OAUTH_RELAY.md.'),
+    oauthRow, oauthStatus,
     h('label',null,'Access token'), tokenIn,
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Owner'),ownerIn), h('div',null,h('label',null,'Repo'),repoIn)),
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Branch'),branchIn), h('div',null,h('label',null,'Folder'),pathIn)),
@@ -6740,6 +6939,590 @@ function usageMeter(){
   usageMeterRefreshers.push(draw);
   draw();
   return root;
+}
+/* ========================================================================== *
+   MESSAGES — household texting (Del ↔ Liz) over the private tailnet backend.
+
+   A tiny message board: rows live in the backend's SQLite (app data, never
+   canon), every device with the Private tailnet backend profile polls for new
+   rows and can send. Surfaced as the 💬 mode of the floating companion panel;
+   the ✦ Ask bubble carries the unread count.
+
+   Notifications are best-effort and honest about platforms: while the journal
+   is open but not the front window, desktop browsers show a system
+   notification (Notification API, permission asked in the panel). iPhone/iPad
+   pages get no Notification API at all — true background push (Web Push +
+   installed PWA) is a captured follow-up in docs/IDEAS_INBOX.md, not promised
+   here. DB.messagesSeen is device-local (not in syncPayload).
+ * ========================================================================== */
+
+const MESSAGES={items:[], latestId:0, unread:0, timer:null, busy:false, listHost:null};
+const MESSAGES_POLL_MS=60000;
+
+function messagesProfile(){
+  return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
+}
+function messagesSeenId(){ return Number(DB.messagesSeen)||0; }
+function messagesMarkSeen(){
+  if(MESSAGES.latestId>messagesSeenId()) { DB.messagesSeen=MESSAGES.latestId; save(); }
+  MESSAGES.unread=0;
+}
+function messagesSenderName(){
+  const who=typeof companionPerson==='function'?companionPerson().name:'';
+  return who||String(DB.who||'').trim()||'someone';
+}
+function messagesBuildListRequest(profile, after){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'messages')+'?after='+(Number(after)||0),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+function messagesBuildSendRequest(profile, sender, body){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'messages'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({sender:String(sender||''),body:String(body||'')})},
+  };
+}
+async function messagesFetch(after){
+  const profile=messagesProfile();
+  if(!profile) return null;
+  const raw=await privateApiJson(profile, messagesBuildListRequest(profile, after));
+  return {items:Array.isArray(raw&&raw.items)?raw.items:[], latestId:Number(raw&&raw.latest_id)||0};
+}
+async function messagesSend(text){
+  const profile=messagesProfile();
+  if(!profile) throw new Error('Messages ride your private backend — add the Private tailnet backend profile under ⚙ Engine first.');
+  const raw=await privateApiJson(profile, messagesBuildSendRequest(profile, messagesSenderName(), text));
+  return raw&&raw.item?raw.item:null;
+}
+
+function messagesNotify(item){
+  try{
+    if(typeof Notification==='undefined'||Notification.permission!=='granted') return false;
+    if(typeof document!=='undefined'&&document.visibilityState==='visible') return false;
+    new Notification((item&&item.sender||'someone')+' · Field Journal', {body:String(item&&item.body||'').slice(0,140), tag:'vfj-message'});
+    return true;
+  }catch(e){ return false; }
+}
+
+function messagesMerge(result){
+  result.items.forEach(item=>{ if(item&&item.id&&!MESSAGES.items.some(m=>m.id===item.id)) MESSAGES.items.push(item); });
+  MESSAGES.items.sort((a,b)=>a.id-b.id);
+  if(MESSAGES.items.length>200) MESSAGES.items=MESSAGES.items.slice(-200);
+  MESSAGES.latestId=Math.max(MESSAGES.latestId, result.latestId);
+}
+
+async function messagesPoll(){
+  if(MESSAGES.busy) return;
+  MESSAGES.busy=true;
+  try{
+    const result=await messagesFetch(MESSAGES.latestId);
+    if(result){
+      messagesMerge(result);
+      const unseen=MESSAGES.items.filter(m=>m.id>messagesSeenId());
+      const hadUnread=MESSAGES.unread;
+      MESSAGES.unread=unseen.length;
+      if(MESSAGES.unread>hadUnread) messagesNotify(unseen[unseen.length-1]);
+      messagesRefreshUi();
+    }
+  }catch(e){ /* quiet — the board simply tries again next tick */ }
+  MESSAGES.busy=false;
+}
+
+function messagesEnsurePolling(){
+  if(MESSAGES.timer||!messagesProfile()) return;
+  MESSAGES.timer=setInterval(()=>{ messagesPoll(); }, MESSAGES_POLL_MS);
+  messagesPoll();
+}
+
+function messagesTimeLabel(iso){
+  const d=new Date(iso);
+  return isNaN(d.getTime())?'':d.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+}
+
+function messagesRenderList(){
+  const host=MESSAGES.listHost;
+  if(!host) return;
+  const mine=messagesSenderName().toLowerCase();
+  const items=MESSAGES.items.slice(-100).map(m=>{
+    const own=mine&&String(m.sender||'').toLowerCase()===mine;
+    return h('div',{class:'companion-msg '+(own?'you':'guide')},
+      h('p',{class:'messages-meta hint'},(m.sender||'someone')+' · '+messagesTimeLabel(m.created_at)),
+      h('p',null,m.body));
+  });
+  host.replaceChildren(...(items.length?items:[h('p',{class:'hint companion-hello'},'No notes yet — write the first one!')]));
+  try{ host.scrollTop=host.scrollHeight||0; }catch(e){}
+}
+
+// New rows arrived: live-update whichever surface is showing — the open board
+// reads them (and marks seen); otherwise the ✦ bubble carries the count.
+function messagesRefreshUi(){
+  if(COMPANION.mode==='messages'){
+    if(COMPANION.open) messagesMarkSeen();
+    messagesRenderList();
+  }
+  try{
+    const fab=typeof document!=='undefined'&&document.querySelector?document.querySelector('.companion-fab'):null;
+    if(fab) fab.textContent=messagesFabLabel();
+  }catch(e){}
+}
+function messagesFabLabel(){
+  return MESSAGES.unread?('✦ Ask · '+MESSAGES.unread):'✦ Ask';
+}
+
+function messagesBody(){
+  const profile=messagesProfile();
+  const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')},'Back to chat');
+  if(!profile){
+    return h('div',{class:'companion-body companion-messages'},
+      h('p',{class:'hint'},'Messages ride your private backend. Add the Private tailnet backend profile under ⋯ More → ⚙ Engine on this device, then come back.'),
+      h('div',{class:'toolrow'}, back));
+  }
+  const list=h('div',{class:'companion-log messages-list'});
+  MESSAGES.listHost=list;
+  messagesRenderList();
+  const status=h('p',{class:'hint companion-report-status'},'');
+  const input=h('input',{class:'companion-input', placeholder:'Write a note home…', onkeydown:e=>{ if(e.key==='Enter') sendNow(); }});
+  const sendBtn=h('button',{class:'navbtn primary', type:'button', onclick:()=>sendNow()},'Send');
+  async function sendNow(){
+    const text=String(input.value||'').trim();
+    if(!text||sendBtn.disabled) return;
+    sendBtn.disabled=true; status.textContent='';
+    try{
+      const item=await messagesSend(text);
+      input.value='';
+      if(item) messagesMerge({items:[item], latestId:item.id});
+      messagesMarkSeen(); messagesRenderList();
+    }catch(e){ status.textContent=String(e&&e.message||e); }
+    finally{ sendBtn.disabled=false; }
+  }
+  const canAskPermission=typeof Notification!=='undefined'&&Notification.permission==='default';
+  const permBtn=canAskPermission?h('button',{class:'navbtn ghost', type:'button', onclick:async function(){
+    try{ await Notification.requestPermission(); }catch(e){}
+    this.remove&&this.remove();
+  }},'🔔 Turn on alerts'):null;
+  messagesMarkSeen();
+  messagesPoll();
+  return h('div',{class:'companion-body companion-messages'},
+    list,
+    h('div',{class:'companion-inputrow'}, input, sendBtn),
+    status,
+    h('div',{class:'companion-footrow'}, permBtn, back),
+    (typeof Notification==='undefined')?h('p',{class:'hint', style:{margin:'0'}},'On iPhone/iPad, new notes only show while the journal is open — real push alerts are a planned follow-up.'):null);
+}
+/* ========================================================================== *
+   COMPANION — the floating guide chat + bug-report mode.
+
+   A small pop-up chat that follows every space (render() mounts its bubble like
+   the quick-capture FAB) and reads its context from DB.profile + VIEW, so "how do
+   I make a creature?" is answered from wherever you're standing. The panel lives
+   on document.body — it stays open while you navigate, and its context chip
+   follows along.
+
+   Answering: the ACTIVE engine when one is configured (getActiveEngine + aiSend),
+   otherwise a built-in keyless guide (keyword map over the app's real surfaces —
+   never invents features). Canon/lore questions are pointed at the Studio
+   assistant, which is the grounded one; this bubble only navigates.
+
+   Bug reports: a short form (plus up to two AI clarifying questions when an
+   engine is on) composed into markdown and filed as a GitHub Issue on the sync
+   repo via the existing token — with copy/email fallbacks when GitHub isn't
+   connected. Read-only everywhere else: never writes canon, campaign, or journal
+   state.
+ * ========================================================================== */
+
+const COMPANION={open:false, mode:'chat', busy:false, log:[], report:null, panel:null, attached:false};
+
+const COMPANION_SPACE_LABELS={maker:'Maker', worldbuilder:'Worldbuilder', game:'Game', learner:'Apprentice'};
+
+function companionViewLabel(view){
+  const v=view||(typeof VIEW!=='undefined'?VIEW:{})||{};
+  const labels={
+    home:'the making shelves', tour:'the welcome tour', gallery:'the journal gallery',
+    worksheet:'a worksheet page', naming:'the Vael Naming Tree', studio:'the Canon Studio'+(v.tab?' ('+v.tab+' tab)':''),
+    campaigns:'the campaigns hub', campaign:'a campaign'+(v.tab?' ('+v.tab+' tab)':''),
+    practice:'code practice', spaces:'the space switcher',
+  };
+  return labels[v.name]||('the '+String(v.name||'home')+' screen');
+}
+
+function companionContext(){
+  const profile=(typeof DB!=='undefined'&&DB&&DB.profile)||'maker';
+  const v=(typeof VIEW!=='undefined'&&VIEW)||{name:'home'};
+  const space=COMPANION_SPACE_LABELS[profile]||'Maker';
+  return {space:profile, view:v.name||'home', line:space+' space · '+companionViewLabel(v)};
+}
+
+// The guide is flavored per person, like every other surface: same abilities,
+// different voice (identity blueprint — "between them it's flavor, not restriction").
+function companionPerson(){
+  const p=typeof activePerson==='function'?activePerson():null;
+  const tone=typeof whoFlavor==='function'?whoFlavor().tone:'plain';
+  return {name:p?String(p.name||'').trim().split(/\s+/)[0]:'', tone};
+}
+
+function companionHello(){
+  const who=companionPerson();
+  const name=who.name?(', '+who.name):'';
+  if(who.tone==='keeper') return 'At your service'+name+'. Ask about any surface — "where do I promote a card?" works.';
+  if(who.tone==='warm') return 'Hello'+name+'! Ask me anything about finding your way around — "how do I make a creature?" is a lovely start.';
+  return 'Hello'+name+'. Ask me anything about finding your way around — "how do I make a creature?" is a fine start.';
+}
+
+/* ---- the built-in guide (keyless fallback + the engine's app map) ---------- */
+// First match wins; keep the report entry early so "something's broken" never
+// falls through to a generic answer. Answers only describe surfaces that exist.
+const COMPANION_GUIDE=[
+  {id:'report', match:/\b(bug|broken|glitch|crash|error|wrong|not working|report a problem)\b/i,
+    text:'Oh no — let’s write that down properly so it gets fixed. I can put together a little report with you.',
+    action:{label:'Report a problem', open:'report'}},
+  {id:'creature', match:/\b(creature|animal|beast|critter|character|make (a |an )?(new )?(thing|something)|worksheet)\b/i,
+    text:'A creature begins on a worksheet page. From the making shelves, pick a card on the Field Journal shelf (Creature is right there), fill it in at your own pace, and Save — it lands in your Journal.',
+    action:{label:'Take me to the shelves', go:{view:'home'}}},
+  {id:'naming', match:/\b(name|naming|suffix|vael word)\b/i,
+    text:'Names grow on the Vael Naming Tree. Open it and tap "Grow your tree" to add a suffix bud — no wrong answers there.',
+    action:{label:'Open the Naming Tree', go:{view:'naming'}}},
+  {id:'journal', match:/\b(journal|gallery|my (stuff|things|creations)|find (my|the)|where.*saved)\b/i,
+    text:'Everything you make lives in your Journal. It’s the "My Journal" button up top — your creations, keepsakes, and doodles are all there.',
+    action:{label:'Open my Journal', go:{view:'gallery'}}},
+  {id:'sync', match:/\b(save|sync|github|token|backup|cloud|my file|another device)\b/i,
+    text:'Your work saves on this device by itself. To share it across devices it syncs to your GitHub file: tap ⋯ More → ☁ My file to connect or check it.',
+    action:{label:'Open More → My file', open:'github'}},
+  {id:'engine', match:/\b(engine|ai|assistant setup|api key|ollama|model)\b/i,
+    text:'AI engines are set up under ⋯ More → ⚙ Engine. Add a profile (local Ollama or an API key), mark it ACTIVE, and every helper in the app uses it — including me.',
+    action:{label:'Open Engine settings', open:'engine'}},
+  {id:'game', match:/\b(campaign|game|play|adventure|dice|gm)\b/i,
+    text:'Adventures live in the Game space — the ♨ tab at the bottom. The campaigns hub has your stories; Play is where a session happens, one turn at a time.',
+    action:{label:'Go to the Game space', open:'game'}},
+  {id:'practice', match:/\b(practice|code|c\+\+|lesson|drill|flashcard|apprentice)\b/i,
+    text:'Code practice is the Apprentice space — the ✶ tab at the bottom. Lessons follow the book chapter by chapter, and drills open in Compiler Explorer.',
+    action:{label:'Go to practice', open:'learner'}},
+  {id:'canon', match:/\b(canon|lore|promote|studio|worldbuild|domain|card)\b/i,
+    text:'Canon work happens in the Worldbuilder’s Canon Studio. For lore questions, the Studio assistant is the grounded expert — it answers from promoted canon only.',
+    action:{label:'Go to the Studio', open:'worldbuilder'}},
+  {id:'capture', match:/\b(idea|capture|jot|inbox|remember th)\b/i,
+    text:'See the "＋ idea" button in the corner? Tap it from anywhere and your raw idea drops into the inbox — no need to leave what you’re doing.'},
+  {id:'spaces', match:/\b(space|switch|tabs at the bottom|where am i|lost)\b/i,
+    text:'The tabs along the bottom are the four spaces — Maker, Worldbuilder, Game, and Apprentice. Right now you’re in the '+'SPACE_LINE'+'. Tap ⌂ Spaces up top to see them all laid out.',
+    action:{label:'Show me the spaces', go:{view:'spaces'}}},
+  {id:'who', match:/\b(pin|lock|who|person|profile|liz|del)\b/i,
+    text:'The little name chip up top is who the journal thinks is here. Tap it to switch people; after a long quiet stretch it gently asks for a PIN, just to be sure.'},
+  {id:'tour', match:/\b(tour|welcome|start|begin|first|new here|how does this work)\b/i,
+    text:'The welcome tour is the friendliest place to start — it walks the world and the journal at a stroll.',
+    action:{label:'Start the tour', go:{view:'tour'}}},
+];
+
+function companionGuideMatch(question){
+  const q=String(question||'');
+  return COMPANION_GUIDE.find(entry=>entry.match.test(q))||null;
+}
+
+function companionHeuristicAnswer(question){
+  const ctx=companionContext();
+  const hit=companionGuideMatch(question);
+  if(hit) return {text:hit.text.replace('SPACE_LINE', ctx.line), action:hit.action||null, matched:hit.id};
+  return {
+    text:'I’m not sure about that one — I’m a simple guide. The welcome tour covers most corners, or tell me in other words what you’d like to do.',
+    action:{label:'Start the tour', go:{view:'tour'}}, matched:'',
+  };
+}
+
+/* ---- engine path ----------------------------------------------------------- */
+function companionEngine(){
+  let engine=null;
+  try{ engine=typeof getActiveEngine==='function'?getActiveEngine():null; }catch(e){ engine=null; }
+  if(!engine) return null;
+  if(typeof engineIsPrivateBackendType==='function'&&engineIsPrivateBackendType(engine.type)) return null;
+  try{ aiProvider(engine); }catch(e){ return null; }
+  return engine;
+}
+
+function companionAppMap(){
+  return 'THE APP MAP (the only surfaces that exist — never invent others):\n'
+    +'- Four spaces on the bottom tabs: Maker (journal + making shelves), Worldbuilder (Canon Studio), Game (campaigns + Play), Apprentice (code practice). "⌂ Spaces" up top shows them all.\n'
+    +'- Maker: making shelves ("Make something") → worksheet cards (Creature etc.) → fill in → Save → it lands in "My Journal" (gallery). The Vael Naming Tree grows name suffixes ("Grow your tree").\n'
+    +'- "＋ idea" floating button (every space): quick-capture a raw idea to the inbox.\n'
+    +'- ⋯ More menu: ☁ My file (GitHub sync setup), ⚙ Engine (AI engines; the ACTIVE one powers all helpers), ⌂ On open, theme, atmospherics, replay welcome, switch space.\n'
+    +'- Worldbuilder Canon Studio tabs include the assistant (grounded canon Q&A), drafter, board, query. Canon questions belong there.\n'
+    +'- Game: campaigns hub → a campaign → Play tab for sessions.\n'
+    +'- Apprentice: lessons + drills (drills open in Compiler Explorer), a coach chat.\n'
+    +'- This bubble also files bug reports ("Report a problem" button).';
+}
+
+function companionSystemPrompt(){
+  const ctx=companionContext();
+  const who=companionPerson();
+  const voiceLine=who.tone==='keeper'
+    ?'Voice: direct, brief, workmanlike — this is the canon-keeper, skip the hand-holding.'
+    :'Voice: gentle, warm, encouraging — short sentences, zero jargon, never scold.';
+  return 'You are the Guide — a small floating helper bubble inside "The Vael Field Journal", a private offline-first journal app for a two-person household. You help people find their way around the app.\n'
+    +companionAppMap()+'\n'
+    +'Right now the person is in: '+ctx.line+'.\n'
+    +(who.name?'You are talking with '+who.name+'. Address them by name only when it feels natural, never every message.\n':'')
+    +voiceLine+'\n'
+    +'Rules: under 110 words; give tap-by-tap steps using the exact button names from the map; never invent features or settings; for canon/lore content questions, point to the Studio assistant in the Worldbuilder space; you only guide — you cannot press buttons, change, or save anything yourself.';
+}
+
+function companionChatMessages(){
+  return COMPANION.log.slice(-8).map(msg=>({role:msg.role==='you'?'user':'assistant', content:msg.text}));
+}
+
+async function companionAnswer(question){
+  const engine=companionEngine();
+  if(!engine){
+    const fallback=companionHeuristicAnswer(question);
+    if(!fallback.matched) fallback.text+=' (I’m the built-in guide — add an engine under ⋯ More → ⚙ Engine for smarter answers.)';
+    return fallback;
+  }
+  try{
+    const result=await aiSend(engine,{system:companionSystemPrompt(), messages:companionChatMessages(), maxTokens:420});
+    const text=String(result&&result.text||'').trim();
+    if(text) return {text, action:null, matched:'engine'};
+  }catch(e){ /* fall through to the built-in guide */ }
+  const fallback=companionHeuristicAnswer(question);
+  fallback.text='(The engine hiccuped, so the built-in guide is answering.) '+fallback.text;
+  return fallback;
+}
+
+/* ---- panel ------------------------------------------------------------------ */
+function companionRunAction(action){
+  if(!action) return;
+  if(action.go){ go(action.go.view, action.go.params); companionRefreshContext(); return; }
+  if(action.open==='report'){ companionOpenReport(); return; }
+  if(action.open==='engine'){ if(typeof openEngineSettings==='function') openEngineSettings(); return; }
+  if(action.open==='github'){ if(typeof openGitHubPanel==='function') openGitHubPanel(); return; }
+  if(action.open==='game'||action.open==='worldbuilder'||action.open==='learner'||action.open==='maker'){
+    if(typeof setProfile==='function') setProfile(action.open);
+    companionRefreshContext();
+  }
+}
+
+function companionMsgNode(msg){
+  const bubble=h('div',{class:'companion-msg '+(msg.role==='you'?'you':'guide')}, h('p',null,msg.text));
+  if(msg.action){
+    const btn=h('button',{class:'navbtn companion-action', type:'button', onclick:()=>companionRunAction(msg.action)}, msg.action.label);
+    bubble.append(h('div',{class:'toolrow'},btn));
+  }
+  return bubble;
+}
+
+function companionRenderLog(){
+  const logHost=COMPANION.panel&&COMPANION.panel._log;
+  if(!logHost) return;
+  const items=COMPANION.log.map(companionMsgNode);
+  if(!items.length) items.push(h('p',{class:'hint companion-hello'},companionHello()));
+  if(COMPANION.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,'thinking…')));
+  logHost.replaceChildren(...items);
+  try{ logHost.scrollTop=logHost.scrollHeight||0; }catch(e){}
+}
+
+function companionRefreshContext(){
+  const chip=COMPANION.panel&&COMPANION.panel._context;
+  if(chip) chip.textContent=companionContext().line;
+}
+
+async function companionSend(inputEl){
+  const question=String(inputEl.value||'').trim();
+  if(!question||COMPANION.busy) return;
+  inputEl.value='';
+  COMPANION.log.push({role:'you', text:question});
+  COMPANION.busy=true; companionRenderLog();
+  const answer=await companionAnswer(question);
+  COMPANION.busy=false;
+  COMPANION.log.push({role:'guide', text:answer.text, action:answer.action||null});
+  companionRenderLog();
+}
+
+function companionChatBody(){
+  const input=h('input',{class:'companion-input', placeholder:'Ask the guide…', onkeydown:e=>{ if(e.key==='Enter') companionSend(input); }});
+  const send=h('button',{class:'navbtn primary', type:'button', onclick:()=>companionSend(input)}, 'Send');
+  const report=h('button',{class:'navbtn ghost companion-report-link', type:'button', onclick:()=>companionOpenReport()}, '🐞 Report a problem');
+  const log=h('div',{class:'companion-log'});
+  COMPANION.panel._log=log;
+  return h('div',{class:'companion-body'}, log, h('div',{class:'companion-inputrow'}, input, send), h('div',{class:'companion-footrow'}, report));
+}
+
+function companionSetMode(mode){
+  COMPANION.mode=mode;
+  const body=COMPANION.panel&&COMPANION.panel._body;
+  if(!body) return;
+  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():companionChatBody());
+  if(mode==='chat') companionRenderLog();
+}
+
+function companionEnsurePanel(){
+  if(COMPANION.panel) return COMPANION.panel;
+  const context=h('span',{class:'companion-context'}, companionContext().line);
+  const body=h('div',{class:'companion-panel-body'});
+  const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
+    onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
+  const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
+  const panel=h('div',{class:'companion-panel glass no-print', role:'dialog', 'aria-label':'Guide'},
+    h('div',{class:'companion-head'}, h('b',null,'✦ Guide'), context, msgBtn, closeBtn),
+    body);
+  panel.style.display='none';
+  panel._context=context; panel._body=body;
+  COMPANION.panel=panel;
+  companionSetMode('chat');
+  return panel;
+}
+
+function companionToggle(open){
+  const panel=companionEnsurePanel();
+  COMPANION.open=open==null?!COMPANION.open:!!open;
+  panel.style.display=COMPANION.open?'flex':'none';
+  if(COMPANION.open){ companionRefreshContext(); if(COMPANION.mode==='chat') companionRenderLog(); }
+}
+
+// Mounted by render() on every navigation: (re)attach the persistent panel to
+// document.body once, keep its context chip current, and hand back the bubble.
+function companionMount(){
+  const panel=companionEnsurePanel();
+  if(!COMPANION.attached&&typeof document!=='undefined'&&document.body&&document.body.append){
+    document.body.append(panel); COMPANION.attached=true;
+  }
+  companionRefreshContext();
+  messagesEnsurePolling();
+  return h('button',{class:'companion-fab navbtn no-print', type:'button', 'aria-label':'Ask the guide', onclick:()=>companionToggle()}, messagesFabLabel());
+}
+
+/* ---- bug-report mode -------------------------------------------------------- */
+function companionReportContext(){
+  const ctx=companionContext();
+  let ua='unknown'; try{ ua=String(navigator.userAgent||'unknown').slice(0,140); }catch(e){}
+  const engine=companionEngine();
+  return [
+    '- Where: '+ctx.line,
+    '- When: '+new Date().toISOString(),
+    '- Device: '+ua,
+    '- GitHub sync: '+((typeof ghReady==='function'&&ghReady())?'connected':'not connected'),
+    '- Engine: '+(engine?String(engine.type||'configured'):'none'),
+  ].join('\n');
+}
+
+function companionComposeReport(report){
+  report=report||{};
+  const lines=['## What happened','',String(report.what||'').trim()||'(not written)','','## What I expected','',String(report.expected||'').trim()||'(not written)'];
+  if(String(report.steps||'').trim()) lines.push('','## Steps to get there','',report.steps.trim());
+  (report.clarifications||[]).forEach(pair=>{
+    if(String(pair.answer||'').trim()) lines.push('','## '+pair.question,'',pair.answer.trim());
+  });
+  lines.push('','## Context','',companionReportContext(),'','_Filed from the in-app guide._');
+  return lines.join('\n');
+}
+
+function companionReportTitle(report){
+  const first=String(report&&report.what||'').trim().split('\n')[0].slice(0,64);
+  return 'Bug: '+(first||'something went wrong');
+}
+
+async function companionClarifyingQuestions(report){
+  const engine=companionEngine();
+  if(!engine) return [];
+  try{
+    const result=await aiSend(engine,{
+      system:'You help finish a bug report for a small journal app. Given the draft, reply with ONLY a JSON array of at most 2 short clarifying questions (plain strings) that would make the report easier to fix. Reply [] if none are needed.',
+      messages:[{role:'user', content:companionComposeReport(report)}],
+      maxTokens:160,
+    });
+    const text=String(result&&result.text||'').trim();
+    const jsonMatch=text.match(/\[[\s\S]*\]/);
+    const parsed=JSON.parse(jsonMatch?jsonMatch[0]:text);
+    return (Array.isArray(parsed)?parsed:[]).map(q=>String(q||'').trim()).filter(Boolean).slice(0,2);
+  }catch(e){ return []; }
+}
+
+async function companionSubmitIssue(title, bodyText){
+  const cfg=typeof ghCfg==='function'?ghCfg():null;
+  if(!cfg||!(typeof ghReady==='function'&&ghReady())) throw new Error('GitHub is not connected on this device.');
+  const url='https://api.github.com/repos/'+cfg.owner+'/'+cfg.repo+'/issues';
+  const r=await ghFetch(url,{method:'POST', headers:ghHeaders(cfg.token), body:JSON.stringify({title, body:bodyText})});
+  if(!r.ok){
+    if(r.status===403||r.status===404) throw new Error('This token can’t open issues on '+cfg.owner+'/'+cfg.repo+' (it needs Issues access) — use Copy or Email below instead.');
+    throw ghErr(r.status, await r.text().catch(()=>''));
+  }
+  const data=await r.json();
+  return {number:data.number, url:data.html_url};
+}
+
+function companionMailtoLink(title, bodyText){
+  return 'mailto:?subject='+encodeURIComponent(title)+'&body='+encodeURIComponent(String(bodyText).slice(0,1600));
+}
+
+function companionReportBody(){
+  const report=COMPANION.report||(COMPANION.report={what:'', expected:'', steps:'', clarifications:[]});
+  const status=h('p',{class:'hint companion-report-status'},'');
+  const what=h('textarea',{class:'companion-area', rows:'3', placeholder:'What happened?', value:report.what});
+  const expected=h('input',{class:'companion-input', placeholder:'What did you expect instead?', value:report.expected});
+  const steps=h('textarea',{class:'companion-area', rows:'2', placeholder:'Steps to get there (optional)', value:report.steps});
+  const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')}, 'Back to chat');
+
+  function readForm(){ report.what=what.value; report.expected=expected.value; report.steps=steps.value; }
+
+  function previewStage(){
+    readForm();
+    const md=companionComposeReport(report);
+    const title=companionReportTitle(report);
+    const preview=h('textarea',{class:'companion-area companion-preview', rows:'9', value:md});
+    const ready=(typeof ghReady==='function'&&ghReady());
+    const dest=h('p',{class:'hint'}, ready?('This will open an issue in '+(ghCfg().owner+'/'+ghCfg().repo)+'.'):'GitHub isn’t connected on this device — copy the report or send it by email.');
+    const submit=ready?h('button',{class:'navbtn primary', type:'button', onclick:async()=>{
+      submit.disabled=true; status.textContent='Sending…';
+      try{
+        const issue=await companionSubmitIssue(title, preview.value);
+        status.textContent='Filed! Issue #'+issue.number+' — thank you.';
+        toast('Bug report filed — issue #'+issue.number);
+        COMPANION.report=null;
+      }catch(e){ status.textContent=String(e&&e.message||e); submit.disabled=false; }
+    }}, 'Submit to GitHub'):null;
+    const copy=h('button',{class:'navbtn', type:'button', onclick:async()=>{
+      try{ await navigator.clipboard.writeText(preview.value); toast('Report copied.'); }
+      catch(e){ status.textContent='Copy failed — select the text above and copy it by hand.'; }
+    }}, 'Copy');
+    const email=h('a',{class:'navbtn', href:companionMailtoLink(title, md), target:'_blank', rel:'noopener'}, 'Email');
+    const body=COMPANION.panel._body;
+    body.replaceChildren(h('div',{class:'companion-body companion-report'},
+      h('p',{class:'hint'},'Here’s the report — tweak anything, then send it on its way.'),
+      preview, dest, status,
+      h('div',{class:'toolrow'}, submit, copy, email, back)));
+  }
+
+  function clarifyStage(questions){
+    const answers=questions.map(q=>({question:q, input:h('input',{class:'companion-input', placeholder:'(optional)'})}));
+    const onward=h('button',{class:'navbtn primary', type:'button', onclick:()=>{
+      report.clarifications=answers.map(a=>({question:a.question, answer:a.input.value}));
+      previewStage();
+    }}, 'Continue');
+    const skip=h('button',{class:'navbtn ghost', type:'button', onclick:()=>previewStage()}, 'Skip');
+    const body=COMPANION.panel._body;
+    body.replaceChildren(h('div',{class:'companion-body companion-report'},
+      h('p',{class:'hint'},'Two quick questions to make it easier to fix:'),
+      ...answers.map(a=>h('label',{class:'companion-clarify'}, a.question, a.input)),
+      status,
+      h('div',{class:'toolrow'}, onward, skip, back)));
+  }
+
+  const next=h('button',{class:'navbtn primary', type:'button', onclick:async()=>{
+    readForm();
+    if(!String(report.what||'').trim()){ status.textContent='Tell me what happened first.'; return; }
+    next.disabled=true; status.textContent=companionEngine()?'One moment — thinking of anything worth asking…':'';
+    const questions=await companionClarifyingQuestions(report);
+    next.disabled=false; status.textContent='';
+    if(questions.length) clarifyStage(questions); else previewStage();
+  }}, 'Next');
+
+  return h('div',{class:'companion-body companion-report'},
+    h('p',{class:'hint'},'Something misbehaving? Tell me and I’ll shape it into a proper report.'),
+    h('label',{class:'companion-clarify'},'What happened?', what),
+    h('label',{class:'companion-clarify'},'What did you expect?', expected),
+    h('label',{class:'companion-clarify'},'Steps (optional)', steps),
+    status,
+    h('div',{class:'toolrow'}, next, back));
+}
+
+function companionOpenReport(){
+  companionToggle(true);
+  companionSetMode('report');
 }
 /* ========================================================================== *
    THE VAEL NAMING TREE — an illustrated plate (ported faithfully from the
