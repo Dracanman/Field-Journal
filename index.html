@@ -7159,6 +7159,35 @@ function parseContradictionLog(text){
   flush(); return out;
 }
 
+// Drop BARE [OPEN]/[DESTINATION]/[UNAUDITED]/[QUESTION] lines — a marker with no
+// established passage attached, just an unresolved question — from text that will be
+// presented as promoted canon. Does NOT drop a marker used as a section/passage status
+// tag (the same position [ESTABLISHED] occupies): when a ```text fence follows the
+// marker's own note, real decided content is attached (e.g. "### The First-Arkborne
+// Quest" / [DESTINATION] / a whole passage of design canon) — that content is kept in
+// full, tag included, same as any [ESTABLISHED] passage. Only a marker with nothing
+// established below it (no fence — just the next heading/---/marker/EOF) is a bare
+// question and gets dropped, marker + its own continuation lines (the same shape
+// findOpenThreads walks below). Does not touch the domain files themselves;
+// findOpenThreads still reads them raw so the Threads board keeps surfacing every
+// marker for Del to resolve.
+function stripOpenThreadLines(text){
+  const lines=String(text||'').split('\n'), out=[];
+  for(let i=0;i<lines.length;i++){
+    if(THREAD_RE.test(lines[i].trim())){
+      let j=i+1;
+      while(j<lines.length && lines[j].trim() && !/^#{1,4}\s/.test(lines[j]) && !/^---\s*$/.test(lines[j]) && !THREAD_RE.test(lines[j].trim())) j++;
+      let k=j; while(k<lines.length && !lines[k].trim()) k++;
+      if(k<lines.length && /^```/.test(lines[k].trim())){
+        for(let m=i;m<j;m++) out.push(lines[m]);   // status tag + its own note — keep, content follows
+        i=j-1; continue;
+      }
+      i=j-1; continue;   // bare question, nothing established attached — drop it
+    }
+    out.push(lines[i]);
+  }
+  return out.join('\n');
+}
 /* ---- open threads in the domains ---- */
 function findOpenThreads(text, file){
   const lines=text.split('\n'); const out=[]; let heading='';
@@ -7318,7 +7347,7 @@ function parsePromotedDomainEntries(text,file){
   entries.forEach((entry,index)=>{
     const next=entries[index+1];
     entry.end=next?next.start-1:lines.length;
-    entry.body=lines.slice(entry.start,entry.end).join('\n').trim();
+    entry.body=stripOpenThreadLines(lines.slice(entry.start,entry.end).join('\n')).trim();
     entry.nodeId=entry.id || file+'#'+canonGraphSlug(entry.title);
     entry.shortId=entry.id || canonGraphSlug(entry.title);
   });
@@ -7976,6 +8005,7 @@ function canonGrounding(question, entries, opts){
     system:[
       'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
       'Treat any new wording as a suggestion for the human promotion pipeline, never as canon.',
+      'Bare [OPEN]/[UNAUDITED]/[QUESTION] lines are unresolved questions - not canon. [DESTINATION] tags mark committed-but-not-fully-locked direction - do not invent the missing specifics.',
       question?'Question: '+String(question||'').trim():'',
       'GROUNDING:',
       canonGroundingText(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET)
