@@ -6449,7 +6449,11 @@ async function aiFetch(url, opts, meta, tries){
 async function aiSend(engine,chat){
   const request=aiBuildRequest(engine,chat||{});
   const secret=engine&&engine.key;
-  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},1);
+  // A non-streaming answer failing outright on one transient 429/5xx blip is a worse user
+  // experience than one quiet retry (aiFetch's exponential backoff was dead code until now —
+  // every caller passed tries:1). Streaming stays at 1: a retry mid-stream can't resume from
+  // where a partial answer left off.
+  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},2);
   if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
   const result=aiParseResponse(request.provider,await r.json(),request.model);
   if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
@@ -6545,7 +6549,7 @@ async function aiStream(engine,chat,onChunk){
 async function aiEmbed(engine,request){
   const built=aiBuildOpenAIEmbeddingRequest(engine,request||{});
   const secret=engine&&engine.key;
-  const r=await aiFetch(built.url,built.opts,{provider:built.provider,secret},1);
+  const r=await aiFetch(built.url,built.opts,{provider:built.provider,secret},2);
   if(!r.ok) throw aiErr(r.status,built.url,built.provider,await r.text().catch(()=>''),secret);
   return aiParseEmbeddingResponse(await r.json(),built.model);
 }
@@ -6555,7 +6559,7 @@ async function aiListModels(engine){
   if(aiProvider(engine)!=='openai') return [];
   const request=aiBuildOpenAIModelsRequest(engine);
   const secret=engine&&engine.key;
-  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},1);
+  const r=await aiFetch(request.url,request.opts,{provider:request.provider,secret},2);
   if(!r.ok) throw aiErr(r.status,request.url,request.provider,await r.text().catch(()=>''),secret);
   let raw=null; try{ raw=await r.json(); }catch(e){}
   const data=raw&&Array.isArray(raw.data)?raw.data:[];
@@ -7347,7 +7351,10 @@ function parseCanonIndexPromotedIds(indexText){
   return out;
 }
 function parsePromotedDomainEntries(text,file){
-  const lines=String(text||'').split('\n'), entries=[];
+  // Domain files are CRLF; normalize once here so corpus bodies and matched headings never
+  // carry a trailing \r (harmless today since guards use \s*$/.trim(), but a trap for any
+  // future exact-match on a body line).
+  const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n'), entries=[];
   const startEntry=(kind,title,id,line,start)=>{
     entries.push({kind,id:id||'',title:title.trim(),file,domain:canonGraphDomainLabel(file),line,start,end:lines.length,body:''});
   };
@@ -7378,7 +7385,8 @@ function parsePromotedDomainEntries(text,file){
 // subsections (e.g. "Moral Physics" under §2) already fold into their parent everywhere
 // else in this app (domain files never use #### at all — checked).
 function parseCanonHomeSettingCanon(text){
-  const lines=String(text||'').split('\n');
+  // Same CRLF normalization as parsePromotedDomainEntries, for the same reason.
+  const lines=String(text||'').replace(/\r\n?/g,'\n').split('\n');
   const headingIdx=lines.findIndex(l=>/^##\s+Setting Canon\b/.test(l.trim()));
   if(headingIdx<0) return [];
   let spanEnd=lines.length;
@@ -8420,9 +8428,19 @@ function privateApiRows(raw){
   return Array.isArray(raw.rows)?raw.rows:(Array.isArray(raw.items)?raw.items:[]);
 }
 
+function privateApiIngestedAt(raw){
+  const iso=raw&&typeof raw==='object'&&raw.ingested_at?String(raw.ingested_at):'';
+  if(!iso) return '';
+  const when=new Date(iso);
+  return isNaN(when.getTime())?'':when.toLocaleString();
+}
+
 async function privateApiJson(profile, request){
   const secret=profile&&profile.key;
-  const r=await privateApiFetch(request.url,request.opts,{secret},1);
+  // One quiet retry on a transient blip (privateApiFetch's exponential backoff was dead code
+  // until now — its one caller always passed tries:1), matching the same fix applied to the
+  // AI layer's non-streaming calls (aiSend/aiEmbed/aiListModels in sync/ai.js).
+  const r=await privateApiFetch(request.url,request.opts,{secret},2);
   if(!r.ok) throw privateApiErr(r.status,request.url,await r.text().catch(()=>''),secret);
   return r.json();
 }
@@ -8547,7 +8565,9 @@ function studioQuery(host){
     searchBtn.disabled=true;
     try{
       const result=await privateApiSearch(selectedProfile(),q,{limit:12});
-      status.textContent='Returned '+result.items.length+' result'+(result.items.length===1?'':'s')+'.';
+      const ingested=privateApiIngestedAt(result.raw);
+      status.textContent='Returned '+result.items.length+' result'+(result.items.length===1?'':'s')+'.'
+        +(ingested?' Canon ingested '+ingested+' - re-ingest after promotions.':'');
       privateRenderRows(results,result.items);
     }catch(e){
       status.textContent=e&&e.message?e.message:String(e);
