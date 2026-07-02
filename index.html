@@ -7027,6 +7027,7 @@ const DOMAIN_FILES = [
 ];
 const CANON_TAGS = ['COS','GOD','GLG','SYS','VAE','PEO','ARK','SED','MAG','PLC','HIS'];
 const QUEUE_PATH = '02_PROMOTION_QUEUE.md', INDEX_PATH = '01_CANON_INDEX.md';
+const CANON_HOME_PATH = '00_CANON_HOME.md';
 const THREAD_RE=/^\[(OPEN|DESTINATION|UNAUDITED|QUESTION)\]\s*(.*)$/;
 
 /* ---- markdown -> safe html (for the Canon Browser) ---- */
@@ -7352,6 +7353,34 @@ function parsePromotedDomainEntries(text,file){
     entry.shortId=entry.id || canonGraphSlug(entry.title);
   });
   return entries.filter(entry=>entry.title && entry.body);
+}
+// 00_CANON_HOME.md mixes real canon (the §1-2 "Setting Canon" span: Project Priority,
+// Genre/Tone/Rating, Moral Physics) with a LOT of process/governance prose (AI modes,
+// workflow, promotion rules, card templates) under plain ## headings. Deliberately does
+// NOT reuse parsePromotedDomainEntries here: that parser only breaks entries on ### or
+// ##-ID headings, so a plain ## heading like "## Authority Rule" would never end the
+// preceding entry — it would silently absorb everything from §2 to the end of the file
+// (every governance section) into one giant corpus entry. This scoped extractor instead
+// explicitly bounds itself to the "## Setting Canon" span (stopping at the next ##
+// heading, whatever it is) and only splits on ### within that span, matching how ####
+// subsections (e.g. "Moral Physics" under §2) already fold into their parent everywhere
+// else in this app (domain files never use #### at all — checked).
+function parseCanonHomeSettingCanon(text){
+  const lines=String(text||'').split('\n');
+  const headingIdx=lines.findIndex(l=>/^##\s+Setting Canon\b/.test(l.trim()));
+  if(headingIdx<0) return [];
+  let spanEnd=lines.length;
+  for(let i=headingIdx+1;i<lines.length;i++){ if(/^##\s+/.test(lines[i])){ spanEnd=i; break; } }
+  const span=lines.slice(headingIdx+1,spanEnd);
+  const starts=[];
+  for(let i=0;i<span.length;i++){ const m=/^###\s+(.+?)\s*$/.exec(span[i]); if(m) starts.push({title:m[1].trim(),start:i+1}); }
+  return starts.map((s,idx)=>{
+    const end=idx+1<starts.length?starts[idx+1].start-1:span.length;
+    const body=stripOpenThreadLines(span.slice(s.start,end).join('\n')).trim();
+    const line=headingIdx+2+s.start;
+    return {kind:'foundation', id:'', title:s.title, file:CANON_HOME_PATH, domain:canonGraphDomainLabel(CANON_HOME_PATH), line, start:line, end:line,
+      body, nodeId:CANON_HOME_PATH+'#'+canonGraphSlug(s.title), shortId:canonGraphSlug(s.title)};
+  }).filter(entry=>entry.title && entry.body);
 }
 function canonCitationRefs(text){
   const refs=[], re=/\(([^()\n—-]{2,50})\s+[—-]\s+([^()\n]{2,120})\)/g;
@@ -7914,7 +7943,12 @@ function canonCorpusFromDocs(indexText, domainDocs){
   const out=[];
   (domainDocs||[]).forEach(doc=>{
     const file=doc&&doc.file||'';
-    parsePromotedDomainEntries(doc&&doc.text||'',file).forEach(entry=>{
+    // 00_CANON_HOME.md is mostly process/governance prose; only its §1-2 "Setting Canon"
+    // span (Project Priority, Genre/Tone/Rating, Moral Physics) is live promoted canon, so
+    // it gets its own scoped extractor rather than the domain-file parser (see that
+    // function's comment for why reusing the domain parser here would be unsafe).
+    const parsed=file===CANON_HOME_PATH ? parseCanonHomeSettingCanon(doc&&doc.text||'') : parsePromotedDomainEntries(doc&&doc.text||'',file);
+    parsed.forEach(entry=>{
       if(entry.id&&!byId[entry.id]) return;
       const indexed=entry.id?byId[entry.id]:null;
       const ref=entry.id||entry.nodeId||file+'#'+canonGraphSlug(entry.title);
@@ -8026,6 +8060,8 @@ async function loadCanonCorpus(cfg, force){
   if(canonCorpusCache&&canonCorpusCache.key===key&&!force) return canonCorpusCache.entries;
   const index=await ghGetText(cfg,INDEX_PATH);
   const docs=await Promise.all(DOMAIN_FILES.map(d=>ghGetText(cfg,d.file).then(r=>({file:d.file,text:r&&r.text||''}))));
+  const home=await ghGetText(cfg,CANON_HOME_PATH).catch(()=>null);
+  if(home&&home.text) docs.push({file:CANON_HOME_PATH,text:home.text});
   const entries=canonCorpusFromDocs(index&&index.text||'',docs);
   canonCorpusCache={key,entries};
   return entries;
