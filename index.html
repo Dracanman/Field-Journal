@@ -1134,6 +1134,14 @@
 .region-world-pill.major{border-color:#e1b8aa;background:#fff4ef;color:#8b4b3d}
 .region-world-timeline{margin-top:10px}
 .region-world-history-entry{padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
+.region-regenerate{display:grid;gap:12px}
+.region-regenerate-entry{justify-content:flex-end}
+.region-regenerate-compare{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.region-regenerate-map{display:grid;gap:8px;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
+.region-regenerate-map .region-map-svg{height:220px}
+.region-regenerate-diff{display:grid;gap:8px}
+.region-regenerate-scope{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:start;padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
+.region-regenerate-scope small{grid-column:2}
 @media(max-width:620px){
   .region-map{padding:12px}.region-map-svg{height:54vh}
   .region-editor{padding:12px}.region-edit-create,.region-edit-inspector{align-items:stretch;flex-direction:column}
@@ -13316,6 +13324,10 @@ function worldTurnChanges(region, ctx){
 function regionWorldFindById(list, id){ return (Array.isArray(list) ? list : []).find(item => item && item.id === id) || null; }
 function regionWorldReadTarget(region, target){
   if (!regionIsRecord(target)) return null;
+  if (target.kind === 'regionField'){
+    const field = String(target.field || '');
+    return Object.prototype.hasOwnProperty.call(region, field) ? regionClone(region[field]) : null;
+  }
   if (target.kind === 'ambientMana') return regionClone(region.ambientMana || regionNeutralAmbientMana());
   if (target.kind === 'element'){
     const weights = target.layerId ? region.elementalInfluence.localLayers[target.layerId] : region.elementalInfluence.region;
@@ -13334,6 +13346,13 @@ function regionWorldReadTarget(region, target){
 }
 function regionWorldWriteTarget(region, target, value){
   if (!regionIsRecord(target)) return false;
+  if (target.kind === 'regionField'){
+    const field = String(target.field || '');
+    if (!field || field === 'id' || field === 'campaign' || field === 'schemaVersion') return false;
+    if (value == null) delete region[field];
+    else region[field] = regionClone(value);
+    return true;
+  }
   if (target.kind === 'ambientMana'){
     if (!regionIsRecord(value)) return false;
     region.ambientMana = regionClone(value);
@@ -13442,6 +13461,10 @@ function worldHistoryNormalizeEntry(entry){
   if(regionIsRecord(entry.resolution)) out.resolution={
     accepted:worldHistoryNormalizeRefs(entry.resolution.accepted),
     rejected:worldHistoryNormalizeRefs(entry.resolution.rejected),
+  };
+  if(regionIsRecord(entry.merge)) out.merge={
+    scopes:(Array.isArray(entry.merge.scopes)?entry.merge.scopes:[]).map(scope=>String(scope||'')).filter(Boolean),
+    heldBack:(Array.isArray(entry.merge.heldBack)?entry.merge.heldBack:[]).map(item=>String(item||'')).filter(Boolean),
   };
   if(Number.isInteger(entry.rollbackOf) && entry.rollbackOf>=0) out.rollbackOf=entry.rollbackOf;
   return out;
@@ -16482,6 +16505,8 @@ campRegion=async function(host,name){
       if(selected){
         wrap.append(h('section',{class:'region-opened'},h('div',{class:'region-editor-head'},h('h3',null,'Open region'),h('span',{class:'hint'},selected.json.name))));
         wrap.append(regionStatusCard(selected));
+        const regenAction=typeof regionRegenerateAction==='function'?regionRegenerateAction(selected,name):null;
+        if(regenAction) wrap.append(regenAction);
         wrap.append(typeof regionEditableMapPanel==='function'?regionEditableMapPanel(selected,cfg,name):regionMapPanel(selected));
         const worldPanel=typeof regionWorldHubPanel==='function'?regionWorldHubPanel(selected,cfg,name,()=>campRegion(host,name)):null;
         if(worldPanel) wrap.append(worldPanel);
@@ -16709,6 +16734,294 @@ function regionWorldHubPanel(entry, cfg, campaignName, refresh){
   loadHistory();
   return section;
 }
+/* ========================================================================== *
+   REGION REGENERATE - candidate compare, scoped merge, history snapshot.
+ * ========================================================================== */
+
+const REGION_REGENERATE_SCOPES = [
+  {id:'terrain', label:'Terrain / local layers', fields:['localLayers','terrain']},
+  {id:'elements', label:'Elements + mana', fields:['ambientMana','elementalInfluence']},
+  {id:'features', label:'Features', fields:['features']},
+  {id:'routes', label:'Routes / connections', fields:['connections']},
+];
+
+function regionRegenerateScopeIds(scopes){
+  const allowed=new Set(REGION_REGENERATE_SCOPES.map(scope=>scope.id));
+  return (Array.isArray(scopes)?scopes:[]).map(scope=>String(scope||'')).filter(scope=>allowed.has(scope));
+}
+function regionRegenerateScope(scopeId){ return REGION_REGENERATE_SCOPES.find(scope=>scope.id===scopeId)||null; }
+function regionRegenerateStateFromRegion(region){
+  const valid=assertRegion(region);
+  const meta=regionIsRecord(valid.metadata)?valid.metadata:{}, visible=regionIsRecord(meta.visibleInputs)?meta.visibleInputs:{};
+  const forgeUi=regionIsRecord(visible.forgeUi)?visible.forgeUi:{};
+  const size=regionIsRecord(visible.size)?visible.size:{};
+  const blend=regionIsRecord(valid.cosmicBlend)&&valid.cosmicBlend.active?valid.cosmicBlend:{};
+  return {
+    role:visible.role||meta.regionRole||'outer',
+    id:valid.id,
+    title:valid.title,
+    width:Number(size.width)||REGION_FORGE_DEFAULT_WIDTH,
+    height:Number(size.height)||REGION_FORGE_DEFAULT_HEIGHT,
+    cosmicLayer:visible.cosmicLayer||valid.cosmicLayer||'middle',
+    neighborLayer:blend.neighborLayer||'',
+    blendStrength:Number.isFinite(Number(blend.strength))?Number(blend.strength):0.25,
+    terrainCharacter:forgeUi.terrainCharacter||'',
+    elementEmphasis:forgeUi.elementEmphasis||'',
+    ambientMana:forgeUi.ambientMana||'recommended',
+    danger:forgeUi.danger||'recommended',
+    direction:forgeUi.direction||'',
+    seed:meta.seed||'',
+    rerollStep:1,
+  };
+}
+function regionRegenerateBundleFromRegion(region, campaignName){
+  const meta=regionIsRecord(region&&region.metadata)?region.metadata:{}, visible=regionIsRecord(meta.visibleInputs)?meta.visibleInputs:{};
+  const source=regionIsRecord(visible.source)?visible.source:{};
+  return {
+    campaign:{name:campaignName, premise:source.campaign&&source.campaign.premise||source.premise||''},
+    setup:regionClone(source.setup||{}),
+    character:regionClone(source.character||null),
+    gm:regionClone(source.gm||null),
+    hiddenDigest:'',
+  };
+}
+function regionRegenerateBuildInput(state, bundle, campaignName){
+  const input=regionForgeBuildInput(state,bundle,campaignName);
+  if(state&&state.seed){
+    input.seed=state.seed;
+    input.outerSeed=state.seed;
+    if(input.role==='starter') input.setup={...(input.setup||{}), regenerateSeed:state.seed};
+  }
+  return input;
+}
+function regionRegenerateGenerateCandidate(state, bundle, campaignName){
+  const generated=regionForgeGenerateRegion(regionRegenerateBuildInput(state,bundle,campaignName));
+  const withOverrides=regionForgeApplyUiOverrides(generated,state);
+  return regionForgeInitialReveal(withOverrides,{campaignName});
+}
+function regionRegenerateSame(a,b){ return JSON.stringify(regionStableValue(a))===JSON.stringify(regionStableValue(b)); }
+function regionRegenerateProtectedSet(protection,key){
+  return new Set((protection&&Array.isArray(protection[key])?protection[key]:[]).map(String));
+}
+function regionRegenerateMergeById(liveList,candidateList,protectedIds,label,heldBack){
+  const protectedSet=new Set(protectedIds||[]), liveById=new Map(), out=[], used=new Set();
+  (Array.isArray(liveList)?liveList:[]).forEach(item=>{ if(item&&item.id) liveById.set(item.id,item); });
+  (Array.isArray(candidateList)?candidateList:[]).forEach(item=>{
+    if(!item||!item.id) return;
+    used.add(item.id);
+    if(protectedSet.has(item.id) && liveById.has(item.id)){
+      out.push(regionClone(liveById.get(item.id)));
+      heldBack.push(label+' '+item.id+' kept from live region');
+    }else out.push(regionClone(item));
+  });
+  liveById.forEach((item,id)=>{
+    if(protectedSet.has(id) && !used.has(id)){
+      out.push(regionClone(item));
+      heldBack.push(label+' '+id+' preserved because candidate omitted it');
+    }
+  });
+  return out;
+}
+function regionRegenerateMergeTerrain(live,candidate,protection,heldBack){
+  const terrain=regionClone(candidate.terrain||{layers:{}});
+  const localLayers=regionClone(candidate.localLayers||[]);
+  const layerIds=new Set(localLayers.map(layer=>layer&&layer.id).filter(Boolean));
+  regionRegenerateProtectedSet(protection,'cells').forEach(key=>{
+    const parts=String(key).split(':'), layerId=parts[0], index=Number(parts[1]);
+    const liveLayer=live.terrain&&live.terrain.layers&&live.terrain.layers[layerId];
+    if(!liveLayer || !Number.isInteger(index)) return;
+    if(!terrain.layers[layerId]){
+      terrain.layers[layerId]=regionClone(liveLayer);
+      const liveLocal=(live.localLayers||[]).find(layer=>layer&&layer.id===layerId);
+      if(liveLocal&&!layerIds.has(layerId)){ localLayers.push(regionClone(liveLocal)); layerIds.add(layerId); }
+      heldBack.push('revealed terrain layer '+layerId+' preserved');
+      return;
+    }
+    if(Array.isArray(liveLayer.cells)&&Array.isArray(terrain.layers[layerId].cells)&&index<liveLayer.cells.length&&index<terrain.layers[layerId].cells.length){
+      terrain.layers[layerId].cells[index]=regionClone(liveLayer.cells[index]);
+      if(Array.isArray(liveLayer.occupancy)&&Array.isArray(terrain.layers[layerId].occupancy)) terrain.layers[layerId].occupancy[index]=regionClone(liveLayer.occupancy[index]);
+      heldBack.push('revealed terrain cell '+key+' preserved');
+    }
+  });
+  return {terrain,localLayers};
+}
+function regionRegenerateMerge(liveRegion, candidateRegion, selectedScopes){
+  const live=assertRegion(liveRegion), candidate=assertRegion(candidateRegion,{expectedCampaign:live.campaign,expectedId:live.id});
+  const scopes=regionRegenerateScopeIds(selectedScopes), next=regionClone(live), heldBack=[];
+  if(!regionHasGenerationProvenance(live)){
+    scopes.forEach(scope=>heldBack.push('manual region locked scope '+scope));
+    return {region:live, scopes, heldBack};
+  }
+  const protection=regionProtectedTargets(live);
+  scopes.forEach(scope=>{
+    if(scope==='terrain'){
+      const merged=regionRegenerateMergeTerrain(live,candidate,protection,heldBack);
+      next.localLayers=merged.localLayers; next.terrain=merged.terrain;
+    }else if(scope==='elements'){
+      next.ambientMana=regionClone(candidate.ambientMana);
+      next.elementalInfluence=regionClone(candidate.elementalInfluence);
+    }else if(scope==='features'){
+      next.features=regionRegenerateMergeById(live.features,candidate.features,protection.features,'feature',heldBack);
+    }else if(scope==='routes'){
+      next.connections=regionRegenerateMergeById(live.connections,candidate.connections,protection.connections,'route',heldBack);
+    }
+  });
+  if(scopes.length){
+    next.metadata={...(next.metadata||{}), ...(candidate.metadata||{})};
+    next.metadata.regenerateScopes=scopes.slice();
+  }
+  return {region:assertRegion(next,{expectedCampaign:live.campaign,expectedId:live.id}), scopes, heldBack};
+}
+function regionRegenerateChanges(before, after, scopes, turn){
+  const changes=[];
+  regionRegenerateScopeIds(scopes).forEach(scopeId=>{
+    const scope=regionRegenerateScope(scopeId);
+    (scope&&scope.fields||[]).forEach(field=>{
+      if(regionRegenerateSame(before[field],after[field])) return;
+      changes.push({
+        id:'regenerate-t'+turn+'-'+scopeId+'-'+field,
+        turn,
+        trigger:'regenerate-merge',
+        scope:scopeId,
+        severity:'major',
+        target:{kind:'regionField',field},
+        before:regionClone(before[field]),
+        after:regionClone(after[field]),
+        note:'Regenerate merge applied '+scope.label+'.',
+      });
+    });
+  });
+  if(!regionRegenerateSame(before.metadata,after.metadata)){
+    changes.push({
+      id:'regenerate-t'+turn+'-metadata',
+      turn,
+      trigger:'regenerate-merge',
+      scope:'metadata',
+      severity:'minor',
+      target:{kind:'regionField',field:'metadata'},
+      before:regionClone(before.metadata),
+      after:regionClone(after.metadata),
+      note:'Regenerate provenance updated for applied scopes.',
+    });
+  }
+  return changes;
+}
+async function regionRegenerateApplyMerge(cfg, campaignName, regionId, candidateRegion, selectedScopes){
+  const regionState=await worldTurnLoadRegion(cfg,campaignName,regionId);
+  const historyState=await worldTurnLoadHistory(cfg,campaignName,regionId);
+  const turn=historyState.history.turn+1;
+  const merged=regionRegenerateMerge(regionState.region,candidateRegion,selectedScopes);
+  const changes=regionRegenerateChanges(regionState.region,merged.region,merged.scopes,turn);
+  if(!changes.length) return {turn:historyState.history.turn, applied:[], reverse:[], heldBack:merged.heldBack, region:regionState.region, history:historyState.history};
+  const applied=worldTurnApply(regionState.region,changes);
+  const entry={
+    turn,
+    trigger:'regenerate-merge',
+    at:worldHistoryNow(cfg),
+    applied:applied.applied,
+    reverse:applied.reverse,
+    pending:[],
+    merge:{scopes:merged.scopes,heldBack:merged.heldBack},
+  };
+  const nextHistory=worldHistoryAppend(historyState.history,entry,turn);
+  await worldTurnWriteHistory(cfg,campaignName,historyState.path,nextHistory,historyState.text,'Regenerate merge history '+turn+' for '+regionId);
+  await worldTurnWriteRegion(cfg,campaignName,regionState.path,applied.region,regionState.text,'Regenerate merge '+turn+' for '+regionId);
+  return {turn, applied:applied.applied, reverse:applied.reverse, heldBack:merged.heldBack, region:applied.region, history:nextHistory};
+}
+function regionRegenerateAction(entry,campaignName){
+  const region=entry&&entry.region;
+  if(!region || (entry.errors&&entry.errors.length)) return null;
+  return h('div',{class:'toolrow region-regenerate-entry'},
+    h('button',{class:'navbtn primary',type:'button',onclick:()=>go('regionRegenerate',{camp:campaignName,region:region.id})},'Regenerate'),
+    h('span',{class:'hint'},'Creates an in-memory candidate; the live region changes only after a scoped merge.'));
+}
+function regionRegenerateMiniMap(title, region){
+  const layer=(region.localLayers||[]).find(item=>item&&item.id);
+  return h('div',{class:'region-regenerate-map'},
+    h('b',null,title),
+    layer?regionMapSvg(region,layer.id,{scale:1,panX:0,panY:0},{view:'gm'}):h('p',{class:'hint'},'No mappable layer.'));
+}
+function regionRegenerateDiffList(live,candidate,onchange){
+  return h('div',{class:'region-regenerate-diff'},
+    ...REGION_REGENERATE_SCOPES.map(scope=>{
+      const changed=scope.fields.filter(field=>!regionRegenerateSame(live[field],candidate[field]));
+      const input=h('input',{type:'checkbox',value:scope.id,onchange:onchange||null});
+      input.checked=!!changed.length;
+      return h('label',{class:'region-regenerate-scope'},
+        input,
+        h('span',null,scope.label),
+        h('small',{class:'hint'},changed.length?('Changes: '+changed.join(', ')):'No field difference'));
+    }));
+}
+function regionRegenerateWorkspace(host,cfg,campaignName,regionId){
+  let live=null, state=null, bundle=null, candidate=null, status='Loading region...', merging=false;
+  host.replaceChildren(h('p',{class:'hint',style:{textAlign:'center'}},status));
+  function makeCandidate(){ candidate=regionRegenerateGenerateCandidate(state,bundle,campaignName); }
+  function draw(){
+    if(!live){ host.replaceChildren(h('p',{class:'hint'},status)); return; }
+    const errors=validateRegion(candidate,{expectedCampaign:campaignName});
+    const diff=regionRegenerateDiffList(live,candidate,draw);
+    const checks=collectScopeChecks(diff);
+    const mergePreview=regionRegenerateMerge(live,candidate,checks.filter(item=>item.node.checked).map(item=>item.value));
+    const held=mergePreview.heldBack;
+    const seedInput=regionForgeInput(state.seed,value=>{ state.seed=value; makeCandidate(); draw(); });
+    const reroll=()=>{ state.seed=regionForgeRerollSeed(state.seed,++state.rerollStep); makeCandidate(); draw(); };
+    const merge=async()=>{
+      const scopes=checks.filter(item=>item.node.checked).map(item=>item.value);
+      if(!scopes.length){ status='Pick at least one scope to merge.'; draw(); return; }
+      merging=true; status='Writing snapshot, then merging selected scopes...'; draw();
+      try{
+        await regionRegenerateApplyMerge(cfg,campaignName,live.id,candidate,scopes);
+        toast('Regenerate merge saved.');
+        go('campaign',{camp:campaignName,tab:'region',region:live.id});
+      }catch(error){
+        merging=false; status='Merge failed: '+String(error&&error.message||error); draw();
+      }
+    };
+    host.replaceChildren(h('div',{class:'region-regenerate'},
+      regionForgeStage('Regenerate','candidate held in memory',
+        h('div',{class:'region-forge-grid'},
+          regionForgeField('Seed',seedInput,'Keep, edit, or reroll before generating the candidate.'),
+          h('div',{class:'toolrow region-forge-seed-actions'},
+            h('button',{class:'navbtn primary',type:'button',onclick:reroll},'Reroll'),
+            h('button',{class:'navbtn ghost',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region',region:live.id})},'Back to region'))),
+        h('p',{class:'hint'},'Candidate provenance: '+((candidate.metadata&&candidate.metadata.seed)||'none')+' · '+((candidate.metadata&&candidate.metadata.generatorVersion)||'unknown'))),
+      regionForgeStage('Compare','live beside candidate',
+        h('div',{class:'region-regenerate-compare'},regionRegenerateMiniMap('Live',live),regionRegenerateMiniMap('Candidate',candidate)),
+        errors.length?h('div',{class:'region-invalid'},h('b',null,'Candidate validation'),h('ul',null,...errors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},'Valid candidate region.')),
+      regionForgeStage('Scoped merge','choose what to take',
+        diff,
+        held.length?h('div',{class:'region-forge-summary'},h('b',null,'Held back by locks'),h('ul',null,...held.map(item=>h('li',null,item)))):h('p',{class:'hint'},'No locked live content would be held back for the current scope selection.'),
+        h('div',{class:'toolrow region-forge-accept'},
+          h('button',{class:'navbtn primary',type:'button',disabled:(merging||errors.length)?'true':null,onclick:merge},merging?'Merging...':'Merge selected scopes'),
+          h('span',{class:'hint',role:'status'},status)))));
+  }
+  function collectScopeChecks(root){
+    return Array.from((root&&root.children)||[]).map(label=>{
+      const input=(label.children||[]).find(child=>child&&child.tagName==='INPUT');
+      return {node:input,value:input&&input.value};
+    }).filter(item=>item.node&&item.value);
+  }
+  worldTurnLoadRegion(cfg,campaignName,regionId).then(result=>{
+    live=result.region;
+    state=regionRegenerateStateFromRegion(live);
+    bundle=regionRegenerateBundleFromRegion(live,campaignName);
+    makeCandidate();
+    status='';
+    draw();
+  }).catch(error=>{
+    status='Regenerate unavailable: '+String(error&&error.message||error);
+    draw();
+  });
+}
+function regionRegenerateView(campaignName, regionId){
+  const f=framed('Region Regenerate','candidate -> scoped merge','Live region stays unchanged until merge');
+  const body=f.querySelector('.framed-body');
+  if(!campaignName||!regionId){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Choose an accepted region first.')); return f; }
+  if(!ghReady()){ body.append(h('p',{class:'hint',style:{textAlign:'center'}},'Connect your GitHub file first.')); return f; }
+  const host=h('div'); body.append(host); regionRegenerateWorkspace(host,ghCfg(),campaignName,regionId); return f;
+}
+registerView('regionRegenerate',v=>regionRegenerateView(v.camp,v.region));
 /* ========================================================================== *
    CAMPAIGN DEMO — a read-only preview of the Game tools, populated with sample
    content so you can see the atlas, the maps (with GM/player fog), and the cast
