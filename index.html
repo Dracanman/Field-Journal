@@ -13352,8 +13352,10 @@ async function campaignRegionEntries(cfg,campaignName){
 }
 
 async function loadCampaignRegions(cfg,campaignName){
-  const discovered=await campaignRegionEntries(cfg,campaignName), loaded=[];
-  for(const entry of discovered.regions){
+  const discovered=await campaignRegionEntries(cfg,campaignName);
+  // One fetch per region, in PARALLEL — the serial version queued a full network
+  // round-trip per region, so a six-region atlas took six RTTs to open.
+  const loaded=await Promise.all(discovered.regions.map(async entry=>{
     let region=null, errors=[];
     try{
       const response=await ghGetText(cfg,entry.json.path);
@@ -13364,8 +13366,8 @@ async function loadCampaignRegions(cfg,campaignName){
       const message=String(error&&error.message||error);
       errors=[{path:entry.json.path,message,text:message}];
     }
-    loaded.push({...entry,region,errors});
-  }
+    return {...entry,region,errors};
+  }));
   const ids=new Map();
   loaded.forEach(entry=>{
     if(!entry.region||typeof entry.region.id!=='string'||!entry.region.id) return;
@@ -13874,8 +13876,17 @@ function regionMapPanel(entry, options){
 
   const switchRow = h('div', { class:'region-layer-switch', role:'group', 'aria-label':'Local layer' });
 
-  const zoom = f => { state.viewport.scale = regionClampScale(state.viewport.scale * f); draw(); };
-  const fit = () => { state.viewport = { scale:1, panX:0, panY:0 }; draw(); };
+  // The viewport is a viewBox, not content: zoom and pan re-aim the camera on the
+  // CURRENT svg instead of rebuilding every cell/pattern/feature node (draw() is
+  // the expensive path; live.bounds is captured by draw() below).
+  const live = { svg:null, bounds:null };
+  const aimCamera = () => {
+    if (!live.svg || !live.bounds) return false;
+    live.svg.setAttribute('viewBox', regionMapViewBox(live.bounds, state.viewport));
+    return true;
+  };
+  const zoom = f => { state.viewport.scale = regionClampScale(state.viewport.scale * f); if (!aimCamera()) draw(); };
+  const fit = () => { state.viewport = { scale:1, panX:0, panY:0 }; if (!aimCamera()) draw(); };
   const viewToggle = h('button', {
     class:'navbtn primary region-view-toggle',
     type:'button',
@@ -13905,15 +13916,15 @@ function regionMapPanel(entry, options){
   function attachPan(svg){
     if (opts.placementMode) return;
     let active = false, sx = 0, sy = 0, box = null;
-    svg.addEventListener('pointerdown', e => { active = true; sx = e.clientX; sy = e.clientY; box = svg.getBoundingClientRect && svg.getBoundingClientRect(); });
+    // Bounds are a property of the CONTENT, which cannot change mid-drag — the old
+    // handler recomputed grid+mask+features+items+bounds on every pointermove pixel.
+    svg.addEventListener('pointerdown', e => {
+      active = true; sx = e.clientX; sy = e.clientY;
+      box = svg.getBoundingClientRect && svg.getBoundingClientRect();
+    });
     svg.addEventListener('pointermove', e => {
-      if (!active || !box || !box.width || !box.height) return;
-      const grid = regionTerrainGrid(region, state.layerId);
-      const mask = regionMapMaskForView(region, state.layerId, state.view);
-      const features = regionMapVisibleFeatures(region, state.layerId, grid, mask, state.view);
-      const items = regionMapVisibleItems(region, state.layerId, grid, mask, state.view);
-      const bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
-      if (!bounds) return;
+      if (!active || !box || !box.width || !box.height || !live.bounds) return;
+      const bounds = live.bounds;
       const s = regionClampScale(state.viewport.scale);
       const w = (bounds.maxX - bounds.minX) / s, hh = (bounds.maxY - bounds.minY) / s;
       state.viewport.panX -= (e.clientX - sx) * (w / box.width);
@@ -13943,6 +13954,7 @@ function regionMapPanel(entry, options){
     viewToggle.setAttribute('aria-pressed', state.view === 'player' ? 'true' : 'false');
     viewToggle.setAttribute('title', 'Switch to ' + (state.view === 'gm' ? 'Player' : 'GM') + ' view');
     if (!state.layerId){
+      live.svg = null; live.bounds = null;
       stage.replaceChildren(h('p', { class:'region-map-no-layers hint' }, 'No player-visible local layers.'));
       meta.replaceChildren();
       textBox.style.display = 'none';
@@ -13957,6 +13969,9 @@ function regionMapPanel(entry, options){
       selected:opts.selected,
       onSelect:opts.placementMode === 'fog' ? null : opts.onSelect,
     });
+    // camera targets for zoom/pan (see aimCamera/attachPan) — same bounds math the svg used
+    live.svg = svg;
+    live.bounds = regionMapBounds(grid, features.concat(items.map(x => x.item)));
     if (opts.placementMode){
       svg.setAttribute('class', svg.getAttribute('class') + ' is-placing');
       svg.addEventListener('click', e => {
