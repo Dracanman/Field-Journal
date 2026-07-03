@@ -1036,6 +1036,7 @@
 .region-map.cosmic-middle .region-map-svg{background:#f1ecda}
 .region-map.cosmic-bottom .region-map-svg{background:radial-gradient(120% 92% at 50% 42%,#494559,#322f3e)}
 .region-layer-switch{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.region-open-air-hint{margin:-2px 0 8px;font-size:13px}
 .region-map-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
 .region-view-toggle{margin-left:auto}
 .region-view-toggle[aria-pressed="false"]{background:#efe5c8;border-color:#cdb25e;color:#5b4720;font-weight:700}
@@ -1045,7 +1046,18 @@
 .region-map-svg{display:block;width:100%;height:min(60vh,460px);background:#f4eedd;cursor:grab}
 .region-map-svg:active{cursor:grabbing}
 .region-cell{stroke:#00000010;stroke-width:.02}
+.region-air-cell{stroke:#ffffff66;stroke-width:.035}
+.region-air-ghost,.region-air-unknown{pointer-events:none;mix-blend-mode:multiply}
+.region-air-unknown{stroke:#ffffff80;stroke-width:.03;stroke-dasharray:.08 .08}
 .region-fog{fill:#cabfa4;opacity:.55}
+.region-cosmic-belts,.region-elements,.region-compass-rose,.region-parchment-vignette{pointer-events:none}
+.region-cosmic-belt{mix-blend-mode:multiply}
+.region-cosmic-route path{fill:none;stroke:currentColor;stroke-width:.055;stroke-linecap:round;stroke-linejoin:round;opacity:.7}
+.region-element-tint{mix-blend-mode:soft-light}
+.region-element-marker{stroke:var(--paper-card);stroke-width:.045}
+.region-element-spark{fill:none;stroke:currentColor;stroke-width:.045;stroke-linecap:round}
+.region-compass-rose{color:#6b5634;fill:none;stroke:currentColor;stroke-width:.045;stroke-linecap:round;stroke-linejoin:round;opacity:.82}
+.region-parchment-vignette{mix-blend-mode:multiply}
 .region-conn-line{stroke:#5a4a36;stroke-width:.08;stroke-linecap:round;stroke-dasharray:.22 .18;opacity:.85}
 .region-feature-dot{fill:#7a3b2e;stroke:#fff;stroke-width:.05}
 .region-feature-label{fill:#43331f;font-family:system-ui,sans-serif;font-size:.42px;paint-order:stroke;stroke:var(--paper-card);stroke-width:.12}
@@ -10014,6 +10026,67 @@ async function canonGroundingForQuestion(cfg, engine, question, opts){
   if(!entries) entries=canonRetrieve(question,corpus,opts);
   return Object.assign(canonGrounding(question,entries,opts),{embeddingStatus,warning});
 }
+
+/* ---- predictive grounding warmup (Slice 45) ------------------------------- *
+   Typing-time prediction so Send rarely waits on canon retrieval/embedding. On a long idle
+   debounce, warmup calls the SAME grounding source the Send path uses (the __canonRag hook
+   if present, else canonGroundingForQuestion) and memoizes the result by (normalized text +
+   drafts-lens). The Send path (assistantCanonGrounding) reads that memo and, on an exact
+   match with real content, reuses it instead of recomputing. Two hard guarantees:
+     - keystroke-safe: the grounding source only ever touches retrieval + the LOCAL embedding
+       endpoint (canonGroundingForQuestion gates embedding behind canonCanEmbed → local
+       engines only) and NEVER the chat model — a keystroke can't spend paid tokens.
+     - silent: failures evict themselves and never surface; warmup is an optimization, not a
+       feature. If it never fires, the app behaves exactly as before.
+   Deliberately small: no parallel keyword-preview retriever (the one memoized grounding call
+   already prefetches the query embedding and builds the corpus index as a side effect), so
+   this survives the later retrieval-quality rework (audit §O-7) untouched.                  */
+const CANON_WARMUP_DEBOUNCE_MS=600;
+const CANON_WARMUP_MEMO_MAX=24;            // cap so a long session's memo can't grow unbounded
+let canonWarmupTimer=null;
+let canonWarmupSeq=0;                       // bumps per scheduled run; a stale run won't fire onWarm
+let canonWarmupChain=Promise.resolve();     // serializes computations → at most one in flight
+const canonWarmupMemo=new Map();            // memoKey -> Promise<grounding>, insertion-ordered (LRU)
+
+function canonWarmupNormalize(text){ return String(text||'').trim().replace(/\s+/g,' ').toLowerCase(); }
+function canonWarmupKey(text, opts){ return (opts&&opts.includeDrafts?'drafts:':'promoted:')+canonWarmupNormalize(text); }
+// ≥2 non-stopword terms — below that, retrieval is too weak to be worth warming.
+function canonWarmupEligible(text){ return canonRagTerms(text).length>=2; }
+// The grounding source Send uses too, so warm and cold results are identical by construction.
+function canonWarmupGroundingFn(){
+  const hook=typeof window!=='undefined'&&window.__canonRag;
+  return (hook&&typeof hook.canonGroundingForQuestion==='function')?hook.canonGroundingForQuestion:canonGroundingForQuestion;
+}
+function canonWarmupRemember(key, promise){
+  canonWarmupMemo.set(key, promise);
+  while(canonWarmupMemo.size>CANON_WARMUP_MEMO_MAX) canonWarmupMemo.delete(canonWarmupMemo.keys().next().value);
+}
+// Synchronous memo lookup for the Send path — the in-flight/settled warm grounding promise
+// for this exact (normalized) text + drafts-lens, or null.
+function canonWarmupLookup(text, opts){ return canonWarmupMemo.get(canonWarmupKey(text,opts))||null; }
+
+function canonGroundingWarmup(cfg, engine, text, opts){
+  opts=opts||{};
+  if(canonWarmupTimer){ clearTimeout(canonWarmupTimer); canonWarmupTimer=null; }   // cancel the prior pending run
+  if(!engine||!canonWarmupEligible(text)) return;
+  const seq=++canonWarmupSeq, key=canonWarmupKey(text,opts), fresh=()=>seq===canonWarmupSeq;
+  const debounceMs=typeof opts.debounceMs==='number'?opts.debounceMs:CANON_WARMUP_DEBOUNCE_MS;
+  canonWarmupTimer=setTimeout(()=>{
+    canonWarmupTimer=null;
+    let promise=canonWarmupMemo.get(key);
+    if(!promise){
+      const groundingFn=canonWarmupGroundingFn();
+      // serialize behind any prior warmup so a first-time corpus-index build never runs twice
+      promise=canonWarmupChain.then(()=>groundingFn(cfg, engine, text, {includeDrafts:!!opts.includeDrafts}));
+      canonWarmupChain=promise.then(()=>{},()=>{});
+      canonWarmupRemember(key, promise);
+      // a failed warm evicts itself so a later keystroke retries (and Send falls through fresh)
+      promise.catch(()=>{ if(canonWarmupMemo.get(key)===promise) canonWarmupMemo.delete(key); });
+    }
+    // onWarm updates the quiet "likely:" line — only if this is still the latest keystroke
+    promise.then(g=>{ if(fresh()&&typeof opts.onWarm==='function') opts.onWarm((g&&g.ids)||[]); }, ()=>{});
+  }, debounceMs);
+}
 /* ========================================================================== *
    PRIVATE BACKEND QUERY CLIENT
 
@@ -10405,14 +10478,28 @@ async function assistantCanonGrounding(question, engine, opts){
   const cfg=ghCfg();
   const hook=typeof window!=='undefined'&&window.__canonRag?window.__canonRag:null;
   opts=opts||{};
-  let grounding;
-  if(hook&&typeof hook.canonGroundingForQuestion==='function') grounding=assistantNormalizeGrounding(await hook.canonGroundingForQuestion(cfg,engine,question,opts));
-  else if(hook&&typeof hook.loadCanonCorpus==='function'&&typeof hook.canonRetrieve==='function'&&typeof hook.canonGrounding==='function'){
-    const corpus=await hook.loadCanonCorpus(cfg);
-    const entries=hook.canonRetrieve(question,corpus);
-    grounding=assistantNormalizeGrounding(hook.canonGrounding(question,entries));
-  }else{
-    grounding=assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
+  let grounding=null;
+  // Slice 45: reuse a typing-time warm grounding for this exact (normalized) question +
+  // drafts-lens when one exists AND actually carried content — the local canon retrieval /
+  // embedding is then already done, so Send doesn't wait on it. A missing / empty / failed
+  // warm result falls through to the normal path below, unchanged. The private-backend merge
+  // at the end still runs fresh either way (only the local canon half is warmed).
+  const warm=typeof canonWarmupLookup==='function'?canonWarmupLookup(question,opts):null;
+  if(warm){
+    try{
+      const g=assistantNormalizeGrounding(await warm);
+      if(g&&(g.entries.length||g.ids.length||(g.system||'').trim())) grounding=g;
+    }catch(e){ grounding=null; }
+  }
+  if(!grounding){
+    if(hook&&typeof hook.canonGroundingForQuestion==='function') grounding=assistantNormalizeGrounding(await hook.canonGroundingForQuestion(cfg,engine,question,opts));
+    else if(hook&&typeof hook.loadCanonCorpus==='function'&&typeof hook.canonRetrieve==='function'&&typeof hook.canonGrounding==='function'){
+      const corpus=await hook.loadCanonCorpus(cfg);
+      const entries=hook.canonRetrieve(question,corpus);
+      grounding=assistantNormalizeGrounding(hook.canonGrounding(question,entries));
+    }else{
+      grounding=assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
+    }
   }
   return assistantMergeGrounding(grounding,await assistantPrivateBackendGrounding(question,opts));
 }
@@ -11809,8 +11896,9 @@ function sessionZeroHandoff(name){
    This module intentionally does NOT render maps or mutate campaign files.
    Cosmic Cloudsea placement and local traversable geography are independent.
  * ========================================================================== */
-const REGION_SCHEMA_VERSION = 2;
-const REGION_PREVIOUS_SCHEMA_VERSION = 1;
+const REGION_SCHEMA_VERSION = 3;
+const REGION_PREVIOUS_SCHEMA_VERSION = 2;
+const REGION_LEGACY_SCHEMA_VERSION = 1;
 const REGION_COSMIC_LAYERS = ['top','middle','bottom'];
 const REGION_REGION_ROLES = ['starter','outer'];
 const REGION_LOCAL_LAYER_TYPES = [
@@ -11825,6 +11913,7 @@ const REGION_LOCAL_LAYER_TYPES = [
 ];
 const REGION_ID_RE = /^[a-z0-9]+(?:[a-z0-9-]*[a-z0-9])?$/;
 const REGION_HIDDEN_VISIBILITIES = ['gm','gm-only','hidden','private'];
+const REGION_OCCUPANCY_VALUES = ['solid','air'];
 const REGION_TOP_LEVEL_ORDER = [
   'schemaVersion','id','title','campaign','cosmicLayer','cosmicBlend','ambientMana','localLayers','features',
   'connections','terrain','revealed','pins','markers','elementalInfluence','notes','metadata',
@@ -11925,6 +12014,23 @@ function regionNormalizeElementalInfluence(value){
   out.localLayers=layers;
   return out;
 }
+function regionNormalizeOccupancyValue(value){ return typeof value==='string' ? value.trim().toLowerCase() : value; }
+function regionNormalizeTerrainLayer(payload){
+  if(!regionIsRecord(payload)) return payload;
+  const out={...payload};
+  if(typeof out.format==='string') out.format=regionTrim(out.format);
+  ['width','height'].forEach(key=>{ if(key in out) out[key]=regionFiniteNumber(out[key]); });
+  if(Array.isArray(out.occupancy)) out.occupancy=out.occupancy.map(regionNormalizeOccupancyValue);
+  return out;
+}
+function regionNormalizeTerrain(value){
+  const out=regionOptionalRecord(value);
+  if(regionIsRecord(out.layers)){
+    out.layers={...out.layers};
+    Object.keys(out.layers).forEach(layerId=>{ out.layers[layerId]=regionNormalizeTerrainLayer(out.layers[layerId]); });
+  }
+  return out;
+}
 function regionNormalizeMetadata(value){
   const out=regionIsRecord(value)?{...value}:{};
   if('generated' in out) out.generated=regionNormalizeBoolean(out.generated);
@@ -11949,17 +12055,41 @@ function regionEnsureV2Defaults(region){
   if(!regionIsRecord(out.metadata)) out.metadata={};
   return out;
 }
-// Schema migration. Single-step today (v1 -> v2): there is exactly one prior version, so we
-// stamp the current version and let regionEnsureV2Defaults fill neutral values for the systems
-// v1 lacked (cosmicBlend, ambientMana, structured elementalInfluence, metadata). When a future
-// v3 lands, migrate in STEPS — bump v1->v2 here, then v2->v3 below — so each upgrade stays
-// independent rather than branching on the source version.
+function regionSolidOccupancyForLayer(payload){
+  if(!regionIsRecord(payload)) return [];
+  const width=payload.width, height=payload.height;
+  const count=Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0 ? width*height : 0;
+  if(!count || !Array.isArray(payload.cells) || payload.cells.length!==count) return [];
+  return Array(count).fill('solid');
+}
+function regionEnsureV3Occupancy(region){
+  if(!regionIsRecord(region)) return region;
+  const out={...region};
+  const terrain=regionIsRecord(out.terrain)?regionClone(out.terrain):{};
+  if(regionIsRecord(terrain.layers)){
+    Object.keys(terrain.layers).forEach(layerId=>{
+      const payload=terrain.layers[layerId];
+      if(!regionIsRecord(payload)) return;
+      const occupancy=regionSolidOccupancyForLayer(payload);
+      if(occupancy.length) terrain.layers[layerId]={...payload,occupancy};
+    });
+  }
+  out.terrain=terrain;
+  return out;
+}
+// Schema migration steps old saves forward in order. v1 gets the v2 neutral
+// defaults first, then v2 exact grids gain all-solid v3 occupancy.
 function migrateRegion(region){
   const src=regionClone(region);
   if(!regionIsRecord(src)) return src;
   let version='schemaVersion' in src ? regionFiniteNumber(src.schemaVersion) : src.schemaVersion;
-  if(version===REGION_PREVIOUS_SCHEMA_VERSION){ src.schemaVersion=REGION_SCHEMA_VERSION; version=REGION_SCHEMA_VERSION; }
-  if(version===REGION_SCHEMA_VERSION) return regionEnsureV2Defaults(src);
+  if(version===REGION_LEGACY_SCHEMA_VERSION){ src.schemaVersion=REGION_PREVIOUS_SCHEMA_VERSION; version=REGION_PREVIOUS_SCHEMA_VERSION; }
+  if(version===REGION_PREVIOUS_SCHEMA_VERSION){
+    const v2=regionEnsureV2Defaults(src);
+    v2.schemaVersion=REGION_SCHEMA_VERSION;
+    return regionEnsureV3Occupancy(v2);
+  }
+  if(version===REGION_SCHEMA_VERSION) return src;
   return src;
 }
 
@@ -12051,7 +12181,7 @@ function normalizeRegion(region){
     return next;
   });
 
-  out.terrain=regionOptionalRecord(out.terrain);
+  out.terrain=regionNormalizeTerrain(out.terrain);
   out.revealed=regionOptionalRecord(out.revealed);
   out.elementalInfluence=regionNormalizeElementalInfluence(out.elementalInfluence);
   out.metadata=regionNormalizeMetadata(out.metadata);
@@ -12109,7 +12239,12 @@ function regionVisibilityHidden(item){
 }
 function regionTerrainLayerComplete(layer){
   if(!regionIsRecord(layer) || typeof layer.format!=='string' || !layer.format.trim()) return false;
-  if(Array.isArray(layer.cells) && layer.cells.length) return true;
+  if(Array.isArray(layer.cells) && layer.cells.length){
+    if(layer.format==='cell-grid') return Array.isArray(layer.occupancy) &&
+      layer.occupancy.length===layer.cells.length &&
+      layer.occupancy.every(value=>REGION_OCCUPANCY_VALUES.includes(value));
+    return true;
+  }
   if(Array.isArray(layer.shapes) && layer.shapes.length) return true;
   if(Array.isArray(layer.tiles) && layer.tiles.length) return true;
   if(regionIsRecord(layer.data) && Object.keys(layer.data).length) return true;
@@ -12180,6 +12315,17 @@ function regionValidateElementalInfluence(errors,path,value,layerIds){
   Object.entries(value.localLayers).forEach(([layerId,weights])=>{
     if(!layerIds.has(layerId)) regionPushError(errors,path+'.localLayers.'+layerId,'references an unknown local layer');
     regionValidateElementWeights(errors,path+'.localLayers.'+layerId,weights);
+  });
+}
+function regionValidateOccupancy(errors,path,payload){
+  const gridLike=payload && (payload.format==='cell-grid' || Array.isArray(payload.cells));
+  if(!gridLike) return;
+  const width=payload.width, height=payload.height;
+  const count=Number.isInteger(width)&&Number.isInteger(height)&&width>0&&height>0 ? width*height : null;
+  if(!Array.isArray(payload.occupancy)){ regionPushError(errors,path+'.occupancy','is required for v3 cell-grid terrain'); return; }
+  if(count!==null && payload.occupancy.length!==count) regionPushError(errors,path+'.occupancy','length must equal width × height');
+  payload.occupancy.forEach((value,index)=>{
+    if(!REGION_OCCUPANCY_VALUES.includes(value)) regionPushError(errors,path+'.occupancy['+index+']','must be one of: '+REGION_OCCUPANCY_VALUES.join(', '));
   });
 }
 function regionValidateGenerationMetadata(errors,path,metadata){
@@ -12310,6 +12456,7 @@ function validateRegion(region,options){
         if(Array.isArray(payload.cells) && Number.isInteger(payload.width) && Number.isInteger(payload.height) && payload.cells.length!==payload.width*payload.height){
           regionPushError(errors,'terrain.layers.'+layerId+'.cells','length must equal width × height');
         }
+        regionValidateOccupancy(errors,'terrain.layers.'+layerId,payload);
       }
     });
   }
@@ -12417,15 +12564,15 @@ function assertRegionWriteTarget(path,campaignName,region,currentText){
 
    Pure logic only. No UI, no network, no clocks, no platform randomness. The seed is an
    input/provenance handle, never the save: every generated region includes full
-   schema-v2 serialized terrain that the existing renderer can draw.
+   schema-v3 serialized terrain that the existing renderer can draw.
 
    Namespace: this core and region-forge.js (the Forge UI) are the two halves of one
    feature and share the regionForge* / REGION_FORGE_* prefix in the concatenated
    single-file build — keep every top-level symbol unique across BOTH files.
  * ========================================================================== */
 const REGION_FORGE_GENERATOR_ID = 'region-forge';
-const REGION_FORGE_GENERATOR_VERSION = '2.0.0';
-const REGION_FORGE_CREATION_MARKER = 'region-forge-2';
+const REGION_FORGE_GENERATOR_VERSION = '3.0.0';
+const REGION_FORGE_CREATION_MARKER = 'region-forge-3';
 const REGION_FORGE_DEFAULT_WIDTH = 12;
 const REGION_FORGE_DEFAULT_HEIGHT = 8;
 const REGION_FORGE_HIDDEN_KEY_RE = /^(?:gm|gmOnly|gm_only|hidden|secret|private|author|authorSide|author_side|patron|patronGifts|patron_gifts|metadata)$/i;
@@ -12751,7 +12898,7 @@ function regionForgeElementalInfluence(profile,layers,scores){
   layers.forEach(layer=>{ localLayers[layer.id]=regionForgeLayerElementWeights(layer,scores.elements,profile); });
   return {region,localLayers};
 }
-function regionForgeTerrainCell(layer,x,y,w,h,scores,params){
+function regionForgeTerrainMetrics(layer,x,y,w,h,scores,params){
   const nx=w<=1?0.5:x/(w-1), ny=h<=1?0.5:y/(h-1);
   const forms=scores.forms||{};
   const ridge=Math.abs(ny-(params.ridgeBase+params.ridgeSlope*(nx-0.5)));
@@ -12763,22 +12910,33 @@ function regionForgeTerrainCell(layer,x,y,w,h,scores,params){
   const ravine=Math.abs(nx-params.ravineX);
   const caveLike=/cave|cavern|interiors/.test(layer.type);
   const aerial=/airspace|floating|peaks/.test(layer.type);
-  if(caveLike){
-    if(ravine<0.06+0.04*(forms.ravine||0)) return 'tunnel';
-    if(basin<0.9 && (scores.elements.water||0)>0.35) return 'water';
-    if(diagonal<0.08+0.03*(forms.storm||0)) return (scores.elements.crystal||0)>0.4?'crystal':'stone';
-    if(ridge<0.08) return 'cliff';
+  return {nx,ny,forms,ridge,diagonal,basin,island,ravine,caveLike,aerial,islandY:params.islandY};
+}
+function regionForgeTerrainCell(layer,x,y,w,h,scores,params){
+  const m=regionForgeTerrainMetrics(layer,x,y,w,h,scores,params), forms=m.forms;
+  if(m.caveLike){
+    if(m.ravine<0.06+0.04*(forms.ravine||0)) return 'tunnel';
+    if(m.basin<0.9 && (scores.elements.water||0)>0.35) return 'water';
+    if(m.diagonal<0.08+0.03*(forms.storm||0)) return (scores.elements.crystal||0)>0.4?'crystal':'stone';
+    if(m.ridge<0.08) return 'cliff';
     return (scores.elements.shadow||0)>0.55?'cave':'cave-floor';
   }
-  if(aerial && island>1.25) return profileSafeVoid(layer.type);
-  if(ravine<0.045+0.035*(forms.ravine||0)) return 'cliff';
-  if(ridge<0.075+0.025*(forms.ridge||0)) return 'stone';
-  if(diagonal<0.055+0.035*(forms.storm||0)) return (scores.elements.lightning||0)>0.45?'road':'stone';
-  if(basin<0.85 && (scores.elements.water||0)>0.25) return (scores.elements.wood||0)>0.45?'marsh':'water';
-  if((scores.elements.wood||0)>0.5 && ny>0.42 && ny<0.82) return 'forest';
-  if((scores.elements.fire||0)>0.65 && nx>0.65 && ny>0.45) return 'ash';
-  if(aerial) return (scores.elements.light||0)>0.55?'meadow':'grass';
+  if(m.aerial && m.island>1.25) return profileSafeVoid(layer.type);
+  if(m.ravine<0.045+0.035*(forms.ravine||0)) return 'cliff';
+  if(m.ridge<0.075+0.025*(forms.ridge||0)) return 'stone';
+  if(m.diagonal<0.055+0.035*(forms.storm||0)) return (scores.elements.lightning||0)>0.45?'road':'stone';
+  if(m.basin<0.85 && (scores.elements.water||0)>0.25) return (scores.elements.wood||0)>0.45?'marsh':'water';
+  if((scores.elements.wood||0)>0.5 && m.ny>0.42 && m.ny<0.82) return 'forest';
+  if((scores.elements.fire||0)>0.65 && m.nx>0.65 && m.ny>0.45) return 'ash';
+  if(m.aerial) return (scores.elements.light||0)>0.55?'meadow':'grass';
   return profileSafeBase(profileSafeLayerCosmic(layer),scores);
+}
+function regionForgeOccupancyCell(layer,x,y,w,h,scores,params){
+  const m=regionForgeTerrainMetrics(layer,x,y,w,h,scores,params), forms=m.forms;
+  if(m.aerial && m.island>1.25) return 'air';
+  if(m.aerial && m.island>0.95 && m.ny>m.islandY+0.1) return 'air';
+  if(!m.caveLike && m.ravine<0.025+0.018*(forms.ravine||0) && m.ny>0.3) return 'air';
+  return 'solid';
 }
 function profileSafeLayerCosmic(layer){
   if(/cave|cavern|ravine|interiors/.test(layer.type)) return 'bottom';
@@ -12802,9 +12960,12 @@ function regionForgeBuildTerrain(profile,layers,scores){
       diagOffset:(rng()-0.5)*0.35, basinX:0.25+rng()*0.5, basinY:0.25+rng()*0.5,
       islandX:0.35+rng()*0.3, islandY:0.35+rng()*0.3, ravineX:0.18+rng()*0.64,
     };
-    const cells=[];
-    for(let y=0;y<h;y++) for(let x=0;x<w;x++) cells.push(regionForgeTerrainCell(layer,x,y,w,h,scores,params));
-    terrain.layers[layer.id]={format:'cell-grid',width:w,height:h,cells};
+    const cells=[], occupancy=[];
+    for(let y=0;y<h;y++) for(let x=0;x<w;x++){
+      cells.push(regionForgeTerrainCell(layer,x,y,w,h,scores,params));
+      occupancy.push(regionForgeOccupancyCell(layer,x,y,w,h,scores,params));
+    }
+    terrain.layers[layer.id]={format:'cell-grid',width:w,height:h,cells,occupancy};
   });
   return terrain;
 }
@@ -13685,6 +13846,9 @@ const REGION_MAP_MIN_SCALE = 0.25;
 const REGION_MAP_MAX_SCALE = 8;
 const REGION_MAP_PAD = 0.5;            // cells of breathing room around content
 const REGION_MAP_NS = 'http://www.w3.org/2000/svg';
+const REGION_HEX_RADIUS_X = 0.5;
+const REGION_HEX_RADIUS_Y = 0.5;
+const REGION_AIR_GHOST_OPACITIES = [0.45, 0.22];
 const REGION_TERRAIN_COLORS = {
   grass:'#9bbf7a', meadow:'#a8c98a', plain:'#bcc98c', plains:'#bcc98c',
   forest:'#5f8c53', wood:'#5f8c53', jungle:'#4f7d45', swamp:'#6f7a4a', marsh:'#7c8551', mud:'#8a7350',
@@ -13755,8 +13919,50 @@ function regionTerrainGrid(region, layerId){
   const width = payload.width, height = payload.height;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
   if (!Array.isArray(payload.cells) || payload.cells.length !== width * height) return null;
-  const cells = payload.cells.map((value, i) => ({ index:i, x:i % width, y:Math.floor(i / width), value }));
-  return { width, height, format: payload.format, cells };
+  const occupancy = Array.isArray(payload.occupancy) && payload.occupancy.length === payload.cells.length ? payload.occupancy : null;
+  const cells = payload.cells.map((value, i) => ({ index:i, x:i % width, y:Math.floor(i / width), value, occupancy:occupancy ? occupancy[i] : 'solid' }));
+  return { width, height, format: payload.format, cells, occupancy:occupancy ? occupancy.slice() : Array(payload.cells.length).fill('solid') };
+}
+function regionGridCell(grid, x, y){
+  if (!grid || !Number.isInteger(x) || !Number.isInteger(y) || x < 0 || y < 0 || x >= grid.width || y >= grid.height) return null;
+  return grid.cells[y * grid.width + x] || null;
+}
+function regionCellOccupancy(cell){ return cell && cell.occupancy === 'air' ? 'air' : 'solid'; }
+function regionMapBelowLayers(region, layerId, view){
+  const layers = regionMapLayers(region, view);
+  const start = layers.findIndex(layer => layer.id === layerId);
+  return start < 0 ? [] : layers.slice(start + 1);
+}
+function regionMapAirCascade(region, layerId, cell, view){
+  if (regionCellOccupancy(cell) !== 'air') return [];
+  const out = [];
+  let depth = 0;
+  for (const layer of regionMapBelowLayers(region, layerId, view)){
+    if (depth >= REGION_AIR_GHOST_OPACITIES.length) break;
+    const below = regionGridCell(regionTerrainGrid(region, layer.id), cell.x, cell.y);
+    if (!below) continue;
+    const opacity = REGION_AIR_GHOST_OPACITIES[depth];
+    const mask = regionMapMaskForView(region, layer.id, view);
+    if (!regionCellRevealed(mask, below.index)){
+      out.push({ type:'unknown', depth:depth + 1, layer, cell:below, opacity });
+      break;
+    }
+    if (regionCellOccupancy(below) === 'air'){ depth++; continue; }
+    out.push({ type:'terrain', depth:depth + 1, layer, cell:below, opacity });
+    break;
+  }
+  return out;
+}
+function regionMapOpenAirHint(region, layerId, view){
+  const grid = regionTerrainGrid(region, layerId);
+  const mask = regionMapMaskForView(region, layerId, view);
+  if (!grid) return null;
+  for (const cell of grid.cells){
+    if (regionCellOccupancy(cell) !== 'air' || !regionCellRevealed(mask, cell.index)) continue;
+    const hit = regionMapAirCascade(region, layerId, cell, view).find(step => step.type === 'terrain');
+    if (hit) return { layerId:hit.layer.id, label:hit.layer.label || hit.layer.id };
+  }
+  return null;
 }
 
 // Reveal/fog mask for a layer. Explicit fog hides; the ABSENCE of a mask shows
@@ -13836,19 +14042,52 @@ function regionMapConnectionList(region, layerId, visibleFeatureIds, view){
     (c.from === layerId || c.to === layerId || ids.has(c.from) || ids.has(c.to)));
 }
 
-// Content bounding box (cells + features) with padding, for fit-to-view.
+function regionHexCenter(x, y){
+  const px = Number.isFinite(x) ? x : 0, py = Number.isFinite(y) ? y : 0;
+  return { cx:regionMapRound(px + (py % 2 ? 0.5 : 0)), cy:regionMapRound(py * 0.75) };
+}
+function regionHexPoints(){
+  return [[0, -0.5], [0.5, -0.25], [0.5, 0.25], [0, 0.5], [-0.5, 0.25], [-0.5, -0.25]];
+}
+function regionHexPath(){
+  return regionHexPoints().map((point, index) =>
+    (index ? 'L' : 'M') + regionMapRound(point[0]) + ' ' + regionMapRound(point[1])).join(' ') + ' Z';
+}
+function regionHexTransform(cell){
+  const center = regionHexCenter(cell && cell.x, cell && cell.y);
+  return 'translate(' + center.cx + ' ' + center.cy + ')';
+}
+function regionMapPositionCell(position){
+  if (!regionIsRecord(position) || !Number.isFinite(position.x) || !Number.isFinite(position.y)) return null;
+  return { x:Math.floor(position.x), y:Math.floor(position.y) };
+}
+function regionMapPositionCenter(position){
+  const cell = regionMapPositionCell(position);
+  return cell ? regionHexCenter(cell.x, cell.y) : null;
+}
+function regionMapExpandHexBounds(bounds, x, y){
+  const center = regionHexCenter(x, y);
+  bounds.minX = Math.min(bounds.minX, center.cx - REGION_HEX_RADIUS_X);
+  bounds.minY = Math.min(bounds.minY, center.cy - REGION_HEX_RADIUS_Y);
+  bounds.maxX = Math.max(bounds.maxX, center.cx + REGION_HEX_RADIUS_X);
+  bounds.maxY = Math.max(bounds.maxY, center.cy + REGION_HEX_RADIUS_Y);
+}
+
+// Content bounding box (hex cells + features) with padding, for fit-to-view.
 function regionMapBounds(grid, features){
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  if (grid){ minX = Math.min(minX, 0); minY = Math.min(minY, 0); maxX = Math.max(maxX, grid.width); maxY = Math.max(maxY, grid.height); }
+  const bounds = { minX:Infinity, minY:Infinity, maxX:-Infinity, maxY:-Infinity };
+  if (grid) grid.cells.forEach(cell => regionMapExpandHexBounds(bounds, cell.x, cell.y));
   (features || []).forEach(f => {
-    const p = f && f.position;
-    if (regionIsRecord(p) && Number.isFinite(p.x) && Number.isFinite(p.y)){
-      minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-      maxX = Math.max(maxX, p.x + 1); maxY = Math.max(maxY, p.y + 1);
-    }
+    const cell = regionMapPositionCell(f && f.position);
+    if (cell) regionMapExpandHexBounds(bounds, cell.x, cell.y);
   });
-  if (!Number.isFinite(minX)) return null;
-  return { minX:minX - REGION_MAP_PAD, minY:minY - REGION_MAP_PAD, maxX:maxX + REGION_MAP_PAD, maxY:maxY + REGION_MAP_PAD };
+  if (!Number.isFinite(bounds.minX)) return null;
+  return {
+    minX:regionMapRound(bounds.minX - REGION_MAP_PAD),
+    minY:regionMapRound(bounds.minY - REGION_MAP_PAD),
+    maxX:regionMapRound(bounds.maxX + REGION_MAP_PAD),
+    maxY:regionMapRound(bounds.maxY + REGION_MAP_PAD),
+  };
 }
 
 // Deterministic SVG viewBox string from content bounds + viewport state. Larger
@@ -13900,11 +14139,18 @@ function regionMapPoint(svg, event){
 function regionMapPlacementPosition(region, layerId, point){
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.y)) return null;
   const grid = regionTerrainGrid(region, layerId);
-  if (grid) return {
-    x:Math.min(grid.width - 1, Math.max(0, Math.floor(point.x))),
-    y:Math.min(grid.height - 1, Math.max(0, Math.floor(point.y))),
-  };
-  return { x:regionMapRound(point.x - 0.5), y:regionMapRound(point.y - 0.5) };
+  if (grid){
+    let best = null, bestDistance = Infinity;
+    grid.cells.forEach(cell => {
+      const center = regionHexCenter(cell.x, cell.y);
+      const dx = point.x - center.cx, dy = point.y - center.cy;
+      const distance = dx * dx + dy * dy;
+      if (distance < bestDistance){ bestDistance = distance; best = { x:cell.x, y:cell.y }; }
+    });
+    return best;
+  }
+  const y = Math.round(point.y / 0.75);
+  return { x:Math.round(point.x - (y % 2 ? 0.5 : 0)), y };
 }
 
 function regionMapTextSummary(region, view){
@@ -13981,8 +14227,8 @@ function regionTerrainMotif(family){
   }
 }
 // A <pattern> node (base colour + motif) for one terrain value, or null for
-// untextured terrain. The base rect carries no region-cell class, so the
-// cell-count tests still see exactly one region-cell rect per serialized cell.
+// untextured terrain. The base tile carries no region-cell class, so cell-count
+// tests still see exactly one region-cell path per serialized cell.
 function regionTerrainPatternNode(value){
   const motif = regionTerrainMotif(regionTerrainFamily(value));
   if (!motif) return null;
@@ -13991,6 +14237,254 @@ function regionTerrainPatternNode(value){
   pat.append(regionSvg('rect', { x:0, y:0, width:w, height:h, fill:regionCellColor(value) }));
   motif[2].forEach(spec => pat.append(regionSvg(spec[0], spec[1])));
   return pat;
+}
+
+// ---- Slice 37: read-only overworld dressing -------------------------------
+function regionMapNumber(value, fallback){
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim() !== ''){
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return fallback;
+}
+function regionMapClamp01(value, fallback){
+  const n = regionMapNumber(value, fallback);
+  return Math.min(1, Math.max(0, Number.isFinite(n) ? n : 0));
+}
+function regionMapIdPart(value){
+  return String(value == null ? 'region' : value).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'region';
+}
+function regionMapCosmicTint(layer){
+  switch (String(layer || '').toLowerCase()){
+    case 'top': return '#8fc7e6';
+    case 'bottom': return '#6f6076';
+    default: return '#cdb25e';
+  }
+}
+function regionMapCosmicAdjacent(primary, neighbor){
+  return (primary === 'top' && neighbor === 'middle') ||
+    (primary === 'middle' && (neighbor === 'top' || neighbor === 'bottom')) ||
+    (primary === 'bottom' && neighbor === 'middle');
+}
+function regionMapCosmicDefaultEdge(primary, neighbor){
+  if (primary === 'middle' && neighbor === 'top') return 'top';
+  if (primary === 'middle' && neighbor === 'bottom') return 'bottom';
+  if (primary === 'top' && neighbor === 'middle') return 'bottom';
+  if (primary === 'bottom' && neighbor === 'middle') return 'top';
+  return '';
+}
+function regionMapCosmicBandEdges(blend, primary, neighbor){
+  const add = (set, value) => {
+    const text = String(value == null ? '' : value).toLowerCase();
+    if (!text || /^(none|neutral|off|false)$/.test(text)) return;
+    if (/\b(north|top|up|upper)\b/.test(text)) set.add('top');
+    if (/\b(south|bottom|down|lower)\b/.test(text)) set.add('bottom');
+    if (/\b(west|left)\b/.test(text)) set.add('left');
+    if (/\b(east|right)\b/.test(text)) set.add('right');
+  };
+  const edges = new Set();
+  const band = blend && blend.band;
+  if (Array.isArray(band)) band.forEach(value => add(edges, value));
+  else if (regionIsRecord(band)){
+    ['edge','side','direction'].forEach(key => add(edges, band[key]));
+    ['edges','sides','directions'].forEach(key => {
+      if (Array.isArray(band[key])) band[key].forEach(value => add(edges, value));
+    });
+  } else add(edges, band);
+  if (!edges.size){
+    const fallback = regionMapCosmicDefaultEdge(primary, neighbor);
+    if (fallback) edges.add(fallback);
+  }
+  return Array.from(edges);
+}
+function regionMapCosmicRouteHint(blend){
+  const band = blend && blend.band;
+  const candidates = [];
+  if (regionIsRecord(band)) ['route','naturalRoute','path','current'].forEach(key => candidates.push(band[key]));
+  ['route','naturalRoute','path','current'].forEach(key => candidates.push(blend && blend[key]));
+  const tendencies = blend && blend.environmentalTendencies;
+  if (Array.isArray(tendencies)) candidates.push(...tendencies);
+  const hit = candidates.map(value => String(value == null ? '' : value).trim())
+    .find(text => /(route|path|current|updraft|descent|shelf|seam|trail|crossing)/i.test(text));
+  return hit || '';
+}
+function regionMapCosmicBlendBands(region, bounds){
+  const blend = region && region.cosmicBlend;
+  if (!regionIsRecord(blend) || !bounds) return [];
+  const primary = String(region && region.cosmicLayer || '').toLowerCase();
+  const neighbor = String(blend.neighborLayer || '').toLowerCase();
+  const strength = regionMapClamp01(blend.strength, blend.active ? 0.25 : 0);
+  if (!blend.active || !strength || !neighbor || !regionMapCosmicAdjacent(primary, neighbor)) return [];
+  const route = regionMapCosmicRouteHint(blend);
+  return regionMapCosmicBandEdges(blend, primary, neighbor).map(edge => ({
+    edge,
+    neighborLayer:neighbor,
+    strength,
+    color:regionMapCosmicTint(neighbor),
+    route,
+  }));
+}
+function regionMapManaDensity(region){
+  const ambient = region && region.ambientMana;
+  const bandTable = { quiet:0.12, steady:0.32, bright:0.5, charged:0.72, severe:0.92, neutral:0 };
+  let density = regionIsRecord(ambient)
+    ? regionMapClamp01(ambient.intensity, bandTable[String(ambient.band || '').toLowerCase()] || 0)
+    : 0;
+  const interp = region && region.cosmicBlend && region.cosmicBlend.ambientManaInterpolation;
+  if (regionIsRecord(interp)){
+    const nums = ['intensity','density','value','fromIntensity','toIntensity','fromMana','toMana','start','end']
+      .map(key => regionMapNumber(interp[key], NaN)).filter(Number.isFinite);
+    if (nums.length) density = regionMapClamp01(nums.reduce((sum, n) => sum + n, 0) / nums.length, density);
+  }
+  return density;
+}
+function regionMapElementTone(key){
+  switch (String(key || '').toLowerCase()){
+    case 'earth': return '#7d6a42';
+    case 'water': return '#4b8eb1';
+    case 'air': return '#8bb8c8';
+    case 'fire': return '#c9653f';
+    case 'wood': return '#548b5c';
+    case 'light': return '#d6ad42';
+    case 'shadow': return '#62506f';
+    case 'metal': return '#8a8f98';
+    case 'lightning': return '#9b72c7';
+    case 'ice': return '#99c9dc';
+    case 'crystal': return '#b46aa6';
+    case 'life': return '#ba5f80';
+    default: return '#b69045';
+  }
+}
+function regionMapElementInfluences(region, layerId){
+  const influence = region && region.elementalInfluence;
+  if (!regionIsRecord(influence)) return [];
+  const weights = {};
+  const add = (source, factor) => {
+    if (!regionIsRecord(source)) return;
+    Object.entries(source).forEach(([key, value]) => {
+      const amount = regionMapNumber(value, 0);
+      if (amount > 0) weights[key] = (weights[key] || 0) + amount * factor;
+    });
+  };
+  add(influence.region, 0.65);
+  if (regionIsRecord(influence.localLayers)) add(influence.localLayers[layerId], 0.85);
+  const max = Math.max(0, ...Object.values(weights));
+  if (!max) return [];
+  return Object.entries(weights)
+    .map(([key, value]) => ({ key, weight:value, strength:regionMapClamp01(value / max, 0) }))
+    .sort((a, b) => b.weight - a.weight || a.key.localeCompare(b.key))
+    .slice(0, 4);
+}
+function regionMapElementOpacity(density, strength){
+  return regionMapRound(0.035 + regionMapClamp01(density, 0) * 0.72 * regionMapClamp01(strength, 0));
+}
+function regionMapElementRadius(density, strength){
+  return regionMapRound(0.08 + regionMapClamp01(density, 0) * (0.18 + 0.08 * regionMapClamp01(strength, 0)));
+}
+function regionMapDressingIds(region, layerId){
+  const base = regionMapIdPart((region && region.id) || 'region') + '-' + regionMapIdPart(layerId);
+  return {
+    belt:index => 'region-belt-' + base + '-' + index,
+    vignette:'region-vignette-' + base,
+  };
+}
+function regionMapBeltGradientNode(id, band){
+  const attrs = { id, x1:0, y1:0, x2:0, y2:1 };
+  if (band.edge === 'bottom'){ attrs.y1 = 1; attrs.y2 = 0; }
+  else if (band.edge === 'left'){ attrs.x1 = 0; attrs.y1 = 0; attrs.x2 = 1; attrs.y2 = 0; }
+  else if (band.edge === 'right'){ attrs.x1 = 1; attrs.y1 = 0; attrs.x2 = 0; attrs.y2 = 0; }
+  const grad = regionSvg('linearGradient', attrs);
+  grad.append(
+    regionSvg('stop', { offset:'0%', 'stop-color':band.color, 'stop-opacity':0.58 }),
+    regionSvg('stop', { offset:'68%', 'stop-color':band.color, 'stop-opacity':0.18 }),
+    regionSvg('stop', { offset:'100%', 'stop-color':band.color, 'stop-opacity':0 }));
+  return grad;
+}
+function regionMapVignetteGradientNode(id){
+  const grad = regionSvg('radialGradient', { id, cx:'50%', cy:'48%', r:'72%' });
+  grad.append(
+    regionSvg('stop', { offset:'58%', 'stop-color':'#f4e8c6', 'stop-opacity':0 }),
+    regionSvg('stop', { offset:'84%', 'stop-color':'#c8a863', 'stop-opacity':0.16 }),
+    regionSvg('stop', { offset:'100%', 'stop-color':'#6d4d27', 'stop-opacity':0.32 }));
+  return grad;
+}
+function regionMapBlendBeltGroup(bounds, bands, ids){
+  if (!bands.length) return null;
+  const width = bounds.maxX - bounds.minX, height = bounds.maxY - bounds.minY;
+  const g = regionSvg('g', { class:'region-cosmic-belts', 'aria-hidden':'true' });
+  bands.forEach((band, index) => {
+    const depth = Math.min(width, height) * (0.12 + band.strength * 0.18);
+    const attrs = { class:'region-cosmic-belt region-cosmic-belt-' + band.edge, 'data-edge':band.edge, 'data-neighbor-layer':band.neighborLayer, fill:'url(#' + ids.belt(index) + ')', opacity:regionMapRound(0.42 + band.strength * 0.32) };
+    if (band.edge === 'top') Object.assign(attrs, { x:bounds.minX, y:bounds.minY, width, height:depth });
+    else if (band.edge === 'bottom') Object.assign(attrs, { x:bounds.minX, y:bounds.maxY - depth, width, height:depth });
+    else if (band.edge === 'left') Object.assign(attrs, { x:bounds.minX, y:bounds.minY, width:depth, height });
+    else Object.assign(attrs, { x:bounds.maxX - depth, y:bounds.minY, width:depth, height });
+    g.append(regionSvg('rect', attrs));
+    if (band.route){
+      const route = regionSvg('g', { class:'region-cosmic-route', style:'color:' + band.color });
+      for (let i = 0; i < 3; i++){
+        const along = 0.28 + i * 0.22;
+        if (band.edge === 'top' || band.edge === 'bottom'){
+          const x = bounds.minX + width * along;
+          const y = band.edge === 'top' ? bounds.minY + depth * 0.48 : bounds.maxY - depth * 0.48;
+          route.append(regionSvg('path', { d:'M' + regionMapRound(x - 0.18) + ' ' + regionMapRound(y + 0.04) + ' Q' + regionMapRound(x) + ' ' + regionMapRound(y - 0.12) + ' ' + regionMapRound(x + 0.18) + ' ' + regionMapRound(y + 0.04), title:band.route }));
+        } else {
+          const x = band.edge === 'left' ? bounds.minX + depth * 0.48 : bounds.maxX - depth * 0.48;
+          const y = bounds.minY + height * along;
+          route.append(regionSvg('path', { d:'M' + regionMapRound(x - 0.04) + ' ' + regionMapRound(y - 0.18) + ' Q' + regionMapRound(x + 0.12) + ' ' + regionMapRound(y) + ' ' + regionMapRound(x - 0.04) + ' ' + regionMapRound(y + 0.18), title:band.route }));
+        }
+      }
+      g.append(route);
+    }
+  });
+  return g;
+}
+function regionMapElementGroup(region, layerId, bounds){
+  const entries = regionMapElementInfluences(region, layerId);
+  if (!entries.length) return null;
+  const density = regionMapManaDensity(region);
+  const width = bounds.maxX - bounds.minX, height = bounds.maxY - bounds.minY;
+  const g = regionSvg('g', { class:'region-elements', 'aria-hidden':'true', 'data-mana-density':regionMapRound(density) });
+  const top = entries[0], tone = regionMapElementTone(top.key);
+  g.append(regionSvg('rect', {
+    x:bounds.minX, y:bounds.minY, width, height,
+    class:'region-element-tint region-element-' + regionMapIdPart(top.key),
+    fill:tone, opacity:regionMapRound(0.025 + density * 0.09 * top.strength),
+  }));
+  entries.forEach((entry, index) => {
+    const cx = bounds.maxX - 0.44 - (index % 2) * 0.44;
+    const cy = bounds.minY + 0.44 + Math.floor(index / 2) * 0.44;
+    const opacity = regionMapElementOpacity(density, entry.strength);
+    const radius = regionMapElementRadius(density, entry.strength);
+    const color = regionMapElementTone(entry.key);
+    const mark = regionSvg('g', { class:'region-element-mark', style:'color:' + color, 'data-element':entry.key });
+    mark.append(
+      regionSvg('circle', { cx, cy, r:radius, class:'region-element-marker region-element-' + regionMapIdPart(entry.key), fill:color, opacity, 'data-opacity':opacity }),
+      regionSvg('path', { d:'M' + regionMapRound(cx - radius * 0.75) + ' ' + regionMapRound(cy) + ' Q' + regionMapRound(cx) + ' ' + regionMapRound(cy - radius * 0.9) + ' ' + regionMapRound(cx + radius * 0.75) + ' ' + regionMapRound(cy), class:'region-element-spark', opacity:regionMapRound(Math.min(0.85, opacity + 0.08)) }));
+    g.append(mark);
+  });
+  return g;
+}
+function regionMapCompassNode(bounds){
+  const width = bounds.maxX - bounds.minX, height = bounds.maxY - bounds.minY;
+  const size = Math.max(0.74, Math.min(1.18, Math.min(width, height) * 0.22));
+  const x = bounds.minX + 0.5, y = bounds.minY + 0.5;
+  const g = regionSvg('g', { class:'region-compass-rose', 'aria-hidden':'true', transform:'translate(' + regionMapRound(x) + ' ' + regionMapRound(y) + ') scale(' + regionMapRound(size) + ')' });
+  g.append(
+    regionSvg('circle', { cx:0, cy:0, r:0.32 }),
+    regionSvg('path', { d:'M0 -.46 Q.06 -.18 0 0 Q-.05 -.18 0 -.46Z' }),
+    regionSvg('path', { d:'M0 .42 Q.05 .16 0 0 Q-.06 .17 0 .42Z' }),
+    regionSvg('path', { d:'M-.42 0 Q-.16 -.05 0 0 Q-.16 .06 -.42 0Z' }),
+    regionSvg('path', { d:'M.44 0 Q.16 -.06 0 0 Q.17 .05 .44 0Z' }),
+    regionSvg('path', { d:'M-.24 -.25 Q0 -.36 .25 -.22M.22 .25 Q0 .35 -.25 .22' }));
+  return g;
+}
+function regionMapVignetteNode(bounds, id){
+  return regionSvg('rect', {
+    x:bounds.minX, y:bounds.minY, width:bounds.maxX - bounds.minX, height:bounds.maxY - bounds.minY,
+    class:'region-parchment-vignette', fill:'url(#' + id + ')', 'aria-hidden':'true',
+  });
 }
 
 // Build the read-only SVG for one local layer at a given viewport. Pure of any
@@ -14014,42 +14508,88 @@ function regionMapSvg(region, layerId, viewport, options){
     return svg;
   }
   svg.setAttribute('viewBox', regionMapViewBox(bounds, viewport));
+  const dressingIds = regionMapDressingIds(region, layerId);
+  const blendBands = regionMapCosmicBlendBands(region, bounds);
+  const defs = regionSvg('defs');
+  let hasDefs = false;
+  const addDef = node => { if (node){ defs.append(node); hasDefs = true; } };
+  blendBands.forEach((band, index) => addDef(regionMapBeltGradientNode(dressingIds.belt(index), band)));
+  addDef(regionMapVignetteGradientNode(dressingIds.vignette));
   if (grid){
     // hand-drawn terrain textures: one <pattern> per distinct revealed terrain
     // value, painted over regionCellColor; smooth/unknown terrain keeps its flat colour.
-    const defs = regionSvg('defs'), patterned = new Set();
-    let hasPattern = false;
+    const patterned = new Set();
+    const addPattern = value => {
+      const key = String(value == null ? '' : value).toLowerCase();
+      if (patterned.has(key)) return; patterned.add(key);
+      const node = regionTerrainPatternNode(value);
+      addDef(node);
+    };
     grid.cells.forEach(cell => {
       if (!regionCellRevealed(mask, cell.index)) return;
-      const key = String(cell.value == null ? '' : cell.value).toLowerCase();
-      if (patterned.has(key)) return; patterned.add(key);
-      const node = regionTerrainPatternNode(cell.value);
-      if (node){ defs.append(node); hasPattern = true; }
+      if (regionCellOccupancy(cell) === 'air')
+        regionMapAirCascade(region, layerId, cell, view).forEach(step => {
+          if (step.type === 'terrain') addPattern(step.cell.value);
+        });
+      else addPattern(cell.value);
     });
-    if (hasPattern) svg.append(defs);
+  }
+  if (hasDefs) svg.append(defs);
+  if (grid){
     const g = regionSvg('g', { class:'region-cells' });
+    const hexPath = regionHexPath();
+    const openFill = regionMapCosmicTint(region && region.cosmicLayer);
+    const terrainFill = value => regionTerrainMotif(regionTerrainFamily(value))
+      ? 'url(#' + regionTerrainPatternId(value) + ')'
+      : regionCellColor(value);
+    const hexAttrs = (cell, attrs) => Object.assign({ d:hexPath, transform:regionHexTransform(cell) }, attrs);
     grid.cells.forEach(cell => {
       if (regionCellRevealed(mask, cell.index)){
-        const fill = regionTerrainMotif(regionTerrainFamily(cell.value))
-          ? 'url(#' + regionTerrainPatternId(cell.value) + ')'
-          : regionCellColor(cell.value);
-        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-cell', fill }));
+        if (regionCellOccupancy(cell) === 'air'){
+          g.append(regionSvg('path', hexAttrs(cell, {
+            class:'region-cell region-air-cell', fill:openFill, 'data-occupancy':'air',
+          })));
+          regionMapAirCascade(region, layerId, cell, view).forEach(step => {
+            if (step.type === 'terrain')
+              g.append(regionSvg('path', hexAttrs(cell, {
+                class:'region-air-ghost region-air-ghost-depth-' + step.depth,
+                fill:terrainFill(step.cell.value), opacity:step.opacity,
+                'data-layer-id':step.layer.id, 'data-depth':step.depth,
+              })));
+            else
+              g.append(regionSvg('path', hexAttrs(cell, {
+                class:'region-air-unknown region-air-ghost-depth-' + step.depth,
+                fill:openFill, opacity:step.opacity,
+                'data-layer-id':step.layer.id, 'data-depth':step.depth,
+              })));
+          });
+        } else
+          g.append(regionSvg('path', hexAttrs(cell, { class:'region-cell', fill:terrainFill(cell.value), 'data-occupancy':'solid' })));
       } else
-        g.append(regionSvg('rect', { x:cell.x, y:cell.y, width:1, height:1, class:'region-fog' }));
+        g.append(regionSvg('path', hexAttrs(cell, { class:'region-fog' })));
     });
     svg.append(g);
   }
+  const beltGroup = regionMapBlendBeltGroup(bounds, blendBands, dressingIds);
+  if (beltGroup) svg.append(beltGroup);
+  const elementGroup = regionMapElementGroup(region, layerId, bounds);
+  if (elementGroup) svg.append(elementGroup);
   const posById = {}; features.forEach(f => { posById[f.id] = f.position; });
   const lines = regionMapConnectionLines(region, layerId, posById, view);
   if (lines.length){
     const g = regionSvg('g', { class:'region-conns' });
-    lines.forEach(l => g.append(regionSvg('line', { x1:l.from.x + 0.5, y1:l.from.y + 0.5, x2:l.to.x + 0.5, y2:l.to.y + 0.5, class:'region-conn-line' })));
+    lines.forEach(l => {
+      const from = regionMapPositionCenter(l.from), to = regionMapPositionCenter(l.to);
+      if (from && to) g.append(regionSvg('line', { x1:from.cx, y1:from.cy, x2:to.cx, y2:to.cy, class:'region-conn-line' }));
+    });
     svg.append(g);
   }
   if (features.length){
     const g = regionSvg('g', { class:'region-features' });
     features.forEach(f => {
-      const cx = f.position.x + 0.5, cy = f.position.y + 0.5;
+      const center = regionMapPositionCenter(f.position);
+      if (!center) return;
+      const cx = center.cx, cy = center.cy;
       g.append(regionSvg('circle', { cx, cy, r:0.22, class:'region-feature-dot' }));
       if (f.label) g.append(regionSvg('text', { x:cx, y:cy - 0.35, 'text-anchor':'middle', class:'region-feature-label' }, f.label));
     });
@@ -14058,7 +14598,9 @@ function regionMapSvg(region, layerId, viewport, options){
   if (items.length){
     const g = regionSvg('g', { class:'region-map-items' });
     items.forEach(({ kind, item }) => {
-      const cx = item.position.x + 0.5, cy = item.position.y + 0.5;
+      const center = regionMapPositionCenter(item.position);
+      if (!center) return;
+      const cx = center.cx, cy = center.cy;
       const selected = opts.selected && opts.selected.kind === kind && opts.selected.id === item.id;
       const itemGroup = regionSvg('g', {
         class:'region-map-item region-' + kind + (selected ? ' selected' : ''),
@@ -14085,6 +14627,7 @@ function regionMapSvg(region, layerId, viewport, options){
     });
     svg.append(g);
   }
+  svg.append(regionMapVignetteNode(bounds, dressingIds.vignette), regionMapCompassNode(bounds));
   return svg;
 }
 
@@ -14108,6 +14651,7 @@ function regionMapPanel(entry, options){
   };
 
   const switchRow = h('div', { class:'region-layer-switch', role:'group', 'aria-label':'Local layer' });
+  const airHint = h('p', { class:'region-open-air-hint hint', style:{ display:'none' } });
 
   // The viewport is a viewBox, not content: zoom and pan re-aim the camera on the
   // CURRENT svg instead of rebuilding every cell/pattern/feature node (draw() is
@@ -14186,6 +14730,9 @@ function regionMapPanel(entry, options){
     viewToggle.textContent = 'GM view ⇄ Player view · ' + (state.view === 'gm' ? 'GM' : 'Player');
     viewToggle.setAttribute('aria-pressed', state.view === 'player' ? 'true' : 'false');
     viewToggle.setAttribute('title', 'Switch to ' + (state.view === 'gm' ? 'Player' : 'GM') + ' view');
+    const openAir = state.layerId ? regionMapOpenAirHint(region, state.layerId, state.view) : null;
+    airHint.textContent = openAir ? '↓ open air — ' + openAir.label + ' below' : '';
+    airHint.style.display = openAir ? '' : 'none';
     if (!state.layerId){
       live.svg = null; live.bounds = null;
       stage.replaceChildren(h('p', { class:'region-map-no-layers hint' }, 'No player-visible local layers.'));
@@ -14229,7 +14776,7 @@ function regionMapPanel(entry, options){
     } else { textBox.style.display = 'none'; }
   }
 
-  panel.append(switchRow, toolbar, stage, meta, textBox,
+  panel.append(switchRow, airHint, toolbar, stage, meta, textBox,
     h('p', { class:'region-readonly-note hint' }, opts.footerText ||
        'Read-only view of saved data. Pin/marker and reveal/fog tools can be layered around this map; terrain editing remains deferred.'));
   draw();
@@ -16058,6 +16605,7 @@ async function campPlayBuildSession(name, profiles){
   const cfg=ghCfg();
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
   let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null;
+  let warmPrediction=null;   // Slice 45: {text, ids} — the quiet typing-time canon prediction
   try{
     files=await campaignFiles(cfg,name);
     if(!files.tracker){ return {error:'No state tracker for '+name+' yet — start play once the campaign is scaffolded.'}; }
@@ -16109,7 +16657,7 @@ async function campPlayBuildSession(name, profiles){
   const draftsToggle=h('input',{type:'checkbox', class:'play-drafts-toggle',
     title:'Also retrieve Draft/Candidate/Ready cards from the promotion queue as labeled, experimental grounding. They are never presented as promoted canon.'});
   draftsToggle.checked=!!DB.playDraftLens;
-  draftsToggle.onchange=()=>{ DB.playDraftLens=draftsToggle.checked; saveLocal(); drawTools(); };
+  draftsToggle.onchange=()=>{ DB.playDraftLens=draftsToggle.checked; saveLocal(); drawTools(); scheduleWarmup(); };
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
   const starterRow=h('div',{class:'play-starters'});
@@ -16270,10 +16818,33 @@ async function campPlayBuildSession(name, profiles){
         list.length?h('ul',null,...list.slice(0,8).map(item=>h('li',null,item))):h('p',{class:'hint'},card.empty||'No notes yet.')
       );
     }));
+    paintGrounding();
+  }
+  function paintGrounding(){
     const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
     const override=groundingSel.value;
     const mode=campPlayGroundingMode(persona,override);
-    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+(draftsToggle.checked?' · drafts lens ON':'')+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'')));
+    let line='Grounding: '+mode+(override?' override':' via '+persona.label)+(draftsToggle.checked?' · drafts lens ON':'')+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'');
+    // Slice 45: a quiet typing-time prediction of what will ground the next turn — shown only
+    // while it still matches what's typed; the real turn's "Grounded on:" replaces it on Send.
+    if(warmPrediction&&warmPrediction.ids.length&&typeof canonWarmupNormalize==='function'&&warmPrediction.text===canonWarmupNormalize(input.value)){
+      line+=' · likely: '+warmPrediction.ids.slice(0,4).join(', ');
+    }
+    groundingLine.replaceChildren(document.createTextNode(line));
+  }
+  function currentEngine(){ return assistantEngineById(profiles, engineSel.value)||defaultEngine; }
+  // Slice 45: fire the debounced typing-time warmup so Send rarely waits on canon retrieval.
+  // The warmup layer never touches the chat model and only embeds on a local engine, so this
+  // is safe to call from every keystroke; it internally debounces + cancels stale runs.
+  function scheduleWarmup(){
+    if(typeof canonGroundingWarmup!=='function') return;   // warmup layer is optional
+    const engine=currentEngine();
+    if(!engine) return;
+    const text=input.value;
+    canonGroundingWarmup(cfg, engine, text, {
+      includeDrafts:draftsToggle.checked,
+      onWarm:ids=>{ warmPrediction={text:canonWarmupNormalize(text), ids:ids||[]}; paintGrounding(); },
+    });
   }
 
   async function runTurn(userText, forceModeId){
@@ -16317,6 +16888,7 @@ async function campPlayBuildSession(name, profiles){
   }
 
   input.addEventListener('input', queueModeHelp);
+  input.addEventListener('input', scheduleWarmup);
   personaSel.onchange=()=>{ drawTools(); drawStarters(); };
   groundingSel.onchange=drawTools;
   lensToggle.onclick=()=>setLensCollapsed(!lensCollapsed);
