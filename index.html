@@ -14477,6 +14477,22 @@ function regionForgeFactChips(bundle){
   if(!chips.length) chips.push('neutral defaults');
   return chips;
 }
+// Session cache for the campaign inputs (Del's call, 2026-07-02): opening the
+// Forge used to refetch four campaign files every time. Cached per repo+campaign
+// for this session; the "↻ Refresh inputs" button in the Source stage busts it.
+const REGION_FORGE_SOURCE_CACHE={};
+function regionForgeSourceKey(cfg,campaignName){
+  const g=cfg||{};
+  return [g.owner||'',g.repo||'',g.branch||'',campaignName||''].join('/');
+}
+function regionForgeSourceBundle(cfg,campaignName,opts){
+  const key=regionForgeSourceKey(cfg,campaignName);
+  if(!(opts&&opts.fresh)&&REGION_FORGE_SOURCE_CACHE[key]) return REGION_FORGE_SOURCE_CACHE[key];
+  const promise=regionForgeCampaignSource(cfg,campaignName);
+  REGION_FORGE_SOURCE_CACHE[key]=promise;
+  promise.catch(()=>{ if(REGION_FORGE_SOURCE_CACHE[key]===promise) delete REGION_FORGE_SOURCE_CACHE[key]; });   // a failed read is never cached
+  return promise;
+}
 async function regionForgeCampaignSource(cfg,campaignName){
   const files=await campaignFiles(cfg,campaignName);
   const read=async path=>path?(await ghGetText(cfg,path).catch(()=>null)):null;
@@ -14921,13 +14937,20 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
   const state=regionForgeDefaultState(campaignName,initialRole==='starter'?'starter':'outer');
   let bundle=null, status='Loading campaign inputs…', saving=false, aiProposal=null, aiBusy=false, aiStatus='';
   host.replaceChildren(h('p',{class:'hint',style:{textAlign:'center'}},status));
-  regionForgeCampaignSource(cfg,campaignName).then(source=>{
-    bundle=source; state.seed=regionForgeOuterUiSeed(campaignName,bundle); status=''; draw();
-  }).catch(error=>{
-    status='Could not read campaign inputs: '+String(error&&error.message||error);
-    bundle={campaign:{name:campaignName,premise:''},setup:{},hiddenDigest:''};
-    state.seed=regionForgeOuterUiSeed(campaignName,bundle); draw();
-  });
+  function loadBundle(opts){
+    regionForgeSourceBundle(cfg,campaignName,opts).then(source=>{
+      bundle=source; state.seed=regionForgeOuterUiSeed(campaignName,bundle); status=''; draw();
+    }).catch(error=>{
+      status='Could not read campaign inputs: '+String(error&&error.message||error);
+      bundle={campaign:{name:campaignName,premise:''},setup:{},hiddenDigest:''};
+      state.seed=regionForgeOuterUiSeed(campaignName,bundle); draw();
+    });
+  }
+  loadBundle();
+  function refreshBundle(){
+    bundle=null; status='Refreshing campaign inputs…'; draw();
+    loadBundle({fresh:true});
+  }
 
   function setRole(role){
     const next=regionForgeDefaultState(campaignName,role);
@@ -14999,7 +15022,8 @@ function regionForgeWorkspace(host,cfg,campaignName,initialRole){
     const sourceStage=regionForgeStage('Source','campaign-bound inputs',
       h('div',{class:'region-forge-grid'},
         regionForgeField('Source type',regionForgeSelect(state.role,[['starter','Starter — character/campaign-bound'],['outer','Outer — continuity + visible seed']],setRole),'Both use the same Forge; starter derives a stable seed.'),
-        h('div',{class:'region-forge-detected'},h('b',null,'Detected: '),...facts.map(chip=>h('span',{class:'region-chip'},chip)))),
+        h('div',{class:'region-forge-detected'},h('b',null,'Detected: '),...facts.map(chip=>h('span',{class:'region-chip'},chip)),
+          h('button',{class:'navbtn ghost region-forge-refresh',type:'button',title:'Re-read the campaign files (inputs are cached for this session)',onclick:()=>refreshBundle()},'↻ Refresh inputs'))),
       bundle&&bundle.hiddenDigest?h('p',{class:'region-warning region-forge-warning'},'Hidden / GM-side campaign signals were detected and may weight the GM-truth map. They are not shown in player-facing labels or preview text.'):null);
     const shapeStage=regionForgeStage('Shape','editable recommendations',
       h('div',{class:'region-forge-grid'},
