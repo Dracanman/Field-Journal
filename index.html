@@ -842,6 +842,8 @@
     background:var(--paper-card); color:var(--ink); font:inherit; padding:7px 9px;
     min-height:38px;
   }
+  /* the experimental drafts lens checkbox sits in the same control row as the selects */
+  .play-drafts-toggle{ width:22px; height:22px; margin:8px 0; accent-color:var(--gold); cursor:pointer; }
   .play-note{
     margin:10px 0 0; max-width:78ch; color:var(--hint); font-size:14px;
     font-style:italic; line-height:1.42;
@@ -3379,6 +3381,7 @@ function hydrate(d){
   merged.companionBox=d.companionBox&&typeof d.companionBox==='object'&&!Array.isArray(d.companionBox)?Object.assign({},d.companionBox):null;
   merged.startHereDismissed=!!d.startHereDismissed;   // the newcomer card was waved away on this device
   merged.playModel=typeof d.playModel==='string'?d.playModel.trim():'';   // the GM table's model override — device-local
+  merged.playDraftLens=!!d.playDraftLens;   // the GM table's experimental drafts lens — device-local, off by default
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -8523,8 +8526,24 @@ function bumpIndex(text, tag, id, title){
 }
 
 /* ---- cards: serialize + parse ---- */
+// Also the card EDITOR's serializer (replaceQueueCard writes its output back over the
+// existing block), so everything getQueueCard parses must survive a round trip: Open Flags
+// (d.flags), the requirement checkboxes' ticked state (d.requirements as {text,checked}),
+// and the existing Notes history (d.notesLines verbatim) — a plain re-draft used to silently
+// drop flags and reset every tick.
 function canonCardMarkdown(d){
-  const bullets=(s,fb)=>{ const a=String(s||'').split('\n').map(x=>x.trim().replace(/^[-*]\s*/,'')).filter(Boolean); return a.length? a.map(x=>'- '+x) : ['- '+fb]; };
+  // Bullet markers are stripped only when FOLLOWED BY whitespace ("- x") — \s* would eat the
+  // leading '-' of a literal like "-druun" or the first '*' of "**bold**" (round-trip loss).
+  const bullets=(s,fb)=>{ const a=String(s||'').split('\n').map(x=>x.trim().replace(/^[-*]\s+/,'')).filter(Boolean); return a.length? a.map(x=>'- '+x) : fb?['- '+fb]:[]; };
+  const flags=bullets(d.flags,'');
+  const reqs=(Array.isArray(d.requirements)&&d.requirements.length? d.requirements : [
+    'Does not contradict any promoted domain file','Has clear limits',
+    'Has immediate story, setting, or game usefulness','Does not make existing canon pointless',
+    'Can be explained simply to a fresh reader'].map(text=>({text,checked:false})))
+    .map(r=>'- ['+(r.checked?'x':' ')+'] '+r.text);
+  const notes=(Array.isArray(d.notesLines)&&d.notesLines.length)
+    ? d.notesLines.map(x=>'- '+String(x).replace(/^[-*]\s+/,''))
+    : [`- ${new Date().toISOString().slice(0,10)} — drafted in the Field Journal Studio.${d.notes? ' '+d.notes:''}`];
   return [
     `## ${d.id} — ${(d.title||'Untitled').trim()}`, '',
     `**Status:** ${d.status||'Draft'}`,
@@ -8533,13 +8552,9 @@ function canonCardMarkdown(d){
     '### Canon Claim', '', (d.claim||'').trim()||'[one declarative sentence of canon]', '',
     '### What This Means', '', ...bullets(d.means,'[consequence or implication]'), '',
     '### Do Not Contradict', '', ...bullets(d.donot,'[boundary that must hold]'), '',
-    '### Promotion Requirements', '',
-    '- [ ] Does not contradict any promoted domain file',
-    '- [ ] Has clear limits',
-    '- [ ] Has immediate story, setting, or game usefulness',
-    '- [ ] Does not make existing canon pointless',
-    '- [ ] Can be explained simply to a fresh reader', '',
-    '### Notes', '', `- ${new Date().toISOString().slice(0,10)} — drafted in the Field Journal Studio.${d.notes? ' '+d.notes:''}`,
+    ...(flags.length? ['### Open Flags', '', ...flags, ''] : []),
+    '### Promotion Requirements', '', ...reqs, '',
+    '### Notes', '', ...notes,
   ].join('\n');
 }
 function parseQueueCards(text){
@@ -8559,7 +8574,9 @@ function parseQueueCards(text){
 function parseRawIdeas(text){
   const lines=text.split('\n'); const out=[]; let inRaw=false, cur=null;
   const flush=()=>{ if(cur){ const body=cur.body.join(' ').replace(/\s+/g,' ').trim();
-    if(body) out.push({ title: body.length>90? body.slice(0,90)+'…' : body, status: cur.label, col:'Raw', section:'RAW DUMP INBOX' }); } cur=null; };
+    // label (the "> date — …" stamp) and text (the full idea) ride along so the board can
+    // hand a raw idea to the Drafter and removeRawIdea can find the exact block afterwards.
+    if(body) out.push({ title: body.length>90? body.slice(0,90)+'…' : body, text: body, label: cur.label, status: cur.label, col:'Raw', section:'RAW DUMP INBOX' }); } cur=null; };
   for(const ln of lines){
     const hm=/^#\s+(.*)/.exec(ln); if(hm){ flush(); inRaw=/raw dump/i.test(hm[1]); continue; }
     if(!inRaw) continue;
@@ -8571,6 +8588,7 @@ function parseRawIdeas(text){
 }
 function statusToCol(status, section){ const s=(status||'').toLowerCase();
   if(/promoted/.test(s)) return 'Promoted'; if(/candidate/.test(s)) return 'Candidate'; if(/draft/.test(s)) return 'Draft';
+  if(/ready/.test(s)) return 'Ready';   // a **Status:** Ready card counts, wherever it sits
   if(/ready for promotion/i.test(section)) return 'Ready'; if(/raw dump/i.test(section)) return 'Raw'; return 'Draft'; }
 
 /* ---- contradiction log --------------------------------------------------- */
@@ -8672,7 +8690,7 @@ function getQueueCard(text, id){
   const oneLine=re=>{ const l=block.find(x=>re.test(x)); return l? l.replace(re,'').trim() : ''; };
   const sect=name=>{ const i=block.findIndex(l=>new RegExp('^###\\s+'+name,'i').test(l)); if(i<0) return [];
     const out=[]; for(let j=i+1;j<block.length;j++){ if(/^#{1,3}\s/.test(block[j]) || /^---\s*$/.test(block[j])) break; if(block[j].trim()) out.push(block[j].trim()); } return out; };
-  const stripBullet=x=>x.replace(/^[-*]\s*/,'');
+  const stripBullet=x=>x.replace(/^[-*]\s+/,'');   // \s+ not \s*: don't eat "-druun" / "**bold**"
   const promotedLine=block.find(x=>/PROMOTED\s*[—-]/i.test(x))||'';
   const promotedFile=(/domains\/[0-9A-Za-z_]+\.md/.exec(promotedLine)||[])[0]||'';
   const promotedDate=(/\b\d{4}-\d{2}-\d{2}\b/.exec(promotedLine)||[])[0]||'';
@@ -8726,6 +8744,85 @@ function markIndexPromoted(text, id, desc, destFile, date){
   let np=-1; for(let i=si+1;i<end;i++){ if(/\(none promoted\)/.test(lines[i])){ np=i; break; } }
   if(np>=0) lines[np]=bullet; else lines.splice(hi>=0? hi+1 : si+1, 0, '', bullet);
   return lines.join('\n');
+}
+
+/* ---- card editing: replace / re-status a queue card in place ---- */
+// Replace an existing card's whole block (same ID) — the Studio card editor's write.
+// getQueueCard's block runs to the next #/## heading, so the old trailing '---' fence is
+// part of what's spliced out; re-emit one so the queue keeps its card separators.
+function replaceQueueCard(text, id, cardMd){
+  const c=getQueueCard(text, id); if(!c) return text;
+  const lines=text.split('\n');
+  lines.splice(c.s, c.e-c.s, String(cardMd).trim(), '', '---', '');
+  return lines.join('\n');
+}
+// Rewrite just the **Status:** line (Draft → Candidate → Ready). Refuses on a promoted
+// card — a lean PROMOTED marker has no live status to advance.
+function setQueueCardStatus(text, id, status){
+  const c=getQueueCard(text, id); if(!c||c.promoted) return text;
+  const lines=text.split('\n');
+  for(let i=c.s;i<c.e;i++){ if(/^\*\*Status:\*\*/.test(lines[i])){ lines[i]='**Status:** '+status; return lines.join('\n'); } }
+  lines.splice(c.s+1, 0, '', '**Status:** '+status);
+  return lines.join('\n');
+}
+// Remove one raw idea (its "> stamp" line + body + trailing fence) from the RAW DUMP INBOX
+// once it has been carded, so the Raw column stops showing ideas that already became cards.
+// Matches by the exact stamp label parseRawIdeas reported; only touches the raw-inbox section.
+function removeRawIdea(text, label){
+  const lines=text.split('\n'); let inRaw=false;
+  for(let i=0;i<lines.length;i++){
+    const hm=/^#\s+(.*)/.exec(lines[i]); if(hm){ inRaw=/raw dump/i.test(hm[1]); continue; }
+    if(!inRaw) continue;
+    const q=/^>\s?(.*)/.exec(lines[i]);
+    if(!q || q[1].trim()!==String(label||'').trim()) continue;
+    let j=i+1;
+    while(j<lines.length && !/^#\s/.test(lines[j]) && !/^>\s?/.test(lines[j]) && !/^---\s*$/.test(lines[j])) j++;
+    if(j<lines.length && /^---\s*$/.test(lines[j])) j++;
+    while(j<lines.length && !lines[j].trim()) j++;
+    lines.splice(i, j-i);
+    return lines.join('\n');
+  }
+  return text;
+}
+// Map a parsed queue card (getQueueCard) back into the Drafter's field shape for in-place
+// editing — editId locks the existing ID so the editor replaces instead of minting.
+function queueCardToDraft(card){
+  return { editId:card.id, tag:card.id.split('-')[0], title:card.desc, category:card.category,
+    source:card.source||'Field Journal Studio', status:card.status||'Draft',
+    claim:card.claim, means:card.means.join('\n'), donot:card.donot.join('\n'),
+    flags:card.flags.join('\n'), notesLines:card.notes.slice(),
+    requirements:card.requirements.map(r=>({text:r.text, checked:r.checked})) };
+}
+
+/* ---- draft corpus: queue cards as RAG entries (the experimental drafts lens) ---- */
+// Draft/Candidate/Ready cards from 02_PROMOTION_QUEUE.md, corpus-shaped like promoted
+// entries but ref'd "draft:<ID>" and body-stamped with their queue status, so retrieval can
+// opt them in (campaign theorycraft) without ever letting one pass as promoted canon.
+// Promoted markers are skipped — the domain files already carry that canon. Mirrors the
+// backend's parse_queue_draft_entries (backend/app.py).
+function parseQueueDraftEntries(text){
+  const src=String(text||'').replace(/\r\n?/g,'\n');
+  const out=[];
+  parseQueueCards(src).forEach(c=>{
+    const cid=cardId(c.title); if(!cid) return;
+    if(c.col==='Promoted' || /promoted/i.test(c.status||'')) return;
+    const card=getQueueCard(src, cid.id); if(!card||card.promoted) return;
+    const status=card.status||c.status||'Draft';
+    const body=[
+      'Status: '+status+' (promotion queue — not promoted canon).',
+      card.claim? 'Canon claim: '+card.claim : '',
+      card.means.length? 'What this means:\n'+card.means.map(x=>'- '+x).join('\n') : '',
+      card.donot.length? 'Do not contradict:\n'+card.donot.map(x=>'- '+x).join('\n') : '',
+      card.flags.length? 'Open flags (unresolved):\n'+card.flags.map(x=>'- '+x).join('\n') : '',
+      card.notes.length? 'Notes:\n'+card.notes.map(x=>'- '+x).join('\n') : '',
+    ].filter(Boolean).join('\n\n').trim();
+    if(!body) return;
+    const ref='draft:'+cid.id;
+    out.push({ kind:'draft', id:ref, draftId:cid.id, status, title:card.title,
+      file:QUEUE_PATH, domain:'Promotion Queue', line:card.s+1, start:card.s+1, end:card.e,
+      body, nodeId:ref, shortId:ref, corpusId:ref });
+  });
+  return out;
 }
 
 /* ---- queue <-> index consistency: catch ID drift before it bites the Drafter ---- */
@@ -8795,8 +8892,17 @@ function parsePromotedDomainEntries(text,file){
   };
   for(let i=0;i<lines.length;i++){
     const idHead=/^##\s+([A-Z]{3}-\d{3})\s+[\-–—]\s+(.+?)\s*$/.exec(lines[i]);
+    // Plain ## section headings are live canon too. Several domain files carry their whole
+    // content under an archive-numbered "## 11. Elements and Expressions"-style heading with
+    // no ### subsections at all — before this, such a file produced ZERO corpus entries and
+    // its canon (the twelve established elements!) was invisible to every RAG surface while
+    // being fully promoted, established canon. A plain ## both starts a foundation entry and
+    // ends the previous one. (00_CANON_HOME.md still uses its own scoped extractor — its
+    // plain ## headings are governance prose, not canon; see parseCanonHomeSettingCanon.)
+    const plainSection=/^##\s+(.+?)\s*$/.exec(lines[i]);
     const foundation=/^###\s+(.+?)\s*$/.exec(lines[i]);
     if(idHead) startEntry('id',idHead[2],idHead[1],i+1,i+1);
+    else if(plainSection) startEntry('foundation',plainSection[1],'',i+1,i+1);
     else if(foundation) startEntry('foundation',foundation[1],'',i+1,i+1);
   }
   entries.forEach((entry,index)=>{
@@ -9082,44 +9188,106 @@ function creationToCard(c){
 async function appendRawDump(text){ const cfg=ghCfg();
   const block='> '+new Date().toISOString().slice(0,10)+' — Studio raw dump\n\n'+text;
   await ghUpdate(cfg, QUEUE_PATH, q=>insertUnderSection(q, '# RAW DUMP INBOX', block), 'Raw dump via Studio', {guard:assertQueue}); }
+// The Drafter runs in two modes sharing one form:
+//  - CREATE (default): mint the next free ID for the chosen tag, append the card to the
+//    queue as Draft, and reserve the ID in the index — the existing flow.
+//  - EDIT (prefill.editId): load that card from the queue, edit every field getQueueCard
+//    can round-trip (claim/means/donot/flags/notes history), tick promotion requirements,
+//    set Status (Draft/Candidate/Ready), and REPLACE the card block in place. Same ID, no
+//    index write — the ID was reserved when the card was first drafted.
 function studioDrafter(host, prefill){
-  const cfg=ghCfg(); const d=Object.assign({tag:'VAE', title:'', category:'', source:'Field Journal Studio', claim:'', means:'', donot:'', notes:''}, prefill||{});
+  const cfg=ghCfg(); const editId=prefill&&prefill.editId||'';
+  const d=Object.assign({tag:'VAE', title:'', category:'', source:'Field Journal Studio', status:'Draft', claim:'', means:'', donot:'', flags:'', notes:'', notesLines:null, requirements:null, rawLabel:''}, prefill||{});
   const highest={};
   const tagSel=h('select', null, ...CANON_TAGS.map(t=>h('option',{value:t}, t))); tagSel.value=d.tag;
+  if(editId) tagSel.disabled=true;
+  const statusSel=h('select', null, ...['Draft','Candidate','Ready'].map(s=>h('option',{value:s}, s))); statusSel.value=/candidate/i.test(d.status)?'Candidate':/ready/i.test(d.status)?'Ready':'Draft';
   const titleIn=h('input',{value:d.title, placeholder:'Descriptive title'});
   const catIn=h('input',{value:d.category, placeholder:'domain file / topic'});
   const claimIn=h('textarea',{value:d.claim, placeholder:'One declarative sentence of canon.'});
   const meansIn=h('textarea',{value:d.means, placeholder:'What this means (one per line).'});
   const donotIn=h('textarea',{value:d.donot, placeholder:'Do not contradict (one per line).'});
+  const flagsIn=h('textarea',{value:d.flags, placeholder:'Open flags — unresolved questions (one per line, optional).'});
   const notesIn=h('input',{value:d.notes, placeholder:'notes (optional)'});
+  const notesEdit=h('textarea',{value:(d.notesLines||[]).join('\n'), placeholder:'Notes history (one per line).'});
+  const reqWrap=h('div',{class:'drafter-reqs'}); let reqChecks=[];
+  function paintReqs(reqs){
+    reqChecks=(reqs||[]).map(r=>({cb:h('input',{type:'checkbox'}), text:r.text}));
+    reqChecks.forEach((x,i)=>{ x.cb.checked=!!reqs[i].checked; x.cb.onchange=refresh;
+      reqWrap.append(h('label',{style:{display:'flex', gap:'8px', alignItems:'flex-start', margin:'4px 0', textTransform:'none', letterSpacing:'0', fontSize:'14px', color:'var(--ink-soft)'}}, x.cb, h('span',null,x.text))); });
+  }
   const idLine=h('span',{class:'idline'},'…'); const preview=h('div',{class:'preview'}); const status=h('div',{class:'hint'});
-  const curId=()=>{ const t=tagSel.value; return t+'-'+pad3((highest[t]||0)+1); };
-  const curCard=()=>canonCardMarkdown({ id:curId(), title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
+  const curId=()=>{ if(editId) return editId; const t=tagSel.value; return t+'-'+pad3((highest[t]||0)+1); };
+  function editNotesLines(){
+    const lines=notesEdit.value.split('\n').map(x=>x.trim().replace(/^[-*]\s+/,'')).filter(Boolean);
+    const stamp=new Date().toISOString().slice(0,10)+' — edited in the Field Journal Studio.';
+    if(!lines.some(x=>x===stamp)) lines.push(stamp);
+    return lines;
+  }
+  const curCard=()=>canonCardMarkdown(editId
+    ? { id:editId, title:titleIn.value, category:catIn.value, source:d.source, status:statusSel.value, claim:claimIn.value, means:meansIn.value, donot:donotIn.value, flags:flagsIn.value,
+        requirements:reqChecks.map(x=>({text:x.text, checked:x.cb.checked})), notesLines:editNotesLines() }
+    : { id:curId(), title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, flags:flagsIn.value, notes:notesIn.value });
   function refresh(){ idLine.textContent=curId(); preview.textContent=curCard(); }
-  [tagSel,titleIn,catIn,claimIn,meansIn,donotIn,notesIn].forEach(el=> el.addEventListener('input', refresh));
+  [tagSel,statusSel,titleIn,catIn,claimIn,meansIn,donotIn,flagsIn,notesIn,notesEdit].forEach(el=> el.addEventListener('input', refresh));
+  statusSel.addEventListener('change', refresh);
   host.append(h('div',{class:'drafter'},
-    h('div',{class:'twocol'}, h('div',null, h('label',null,'Tag'), tagSel), h('div',null, h('label',null,'Next ID'), h('div',{style:{padding:'9px 0'}}, idLine))),
+    h('div',{class:'twocol'},
+      h('div',null, h('label',null,'Tag'), tagSel),
+      h('div',null, h('label',null, editId?'Editing':'Next ID'), h('div',{style:{padding:'9px 0'}}, idLine))),
+    editId? h('div',null, h('label',null,'Status'), statusSel) : null,
     h('label',null,'Title'), titleIn,
     h('label',null,'Category (domain file / topic)'), catIn,
     h('label',null,'Canon Claim'), claimIn,
     h('label',null,'What This Means (one per line)'), meansIn,
     h('label',null,'Do Not Contradict (one per line)'), donotIn,
-    h('label',null,'Notes'), notesIn,
+    h('label',null,'Open Flags (one per line)'), flagsIn,
+    editId? h('label',null,'Promotion requirements — tick as they are met') : null, editId? reqWrap : null,
+    h('label',null,'Notes'), editId? notesEdit : notesIn,
     h('label',null,'Preview — Canon Card'), preview, status,
     h('div',{class:'toolrow'},
-      h('button',{class:'navbtn primary', onclick:()=>appendCard()}, 'Append to Promotion Queue'),
+      h('button',{class:'navbtn primary', onclick:()=>editId?saveEdit():appendCard()}, editId?'Save changes':'Append to Promotion Queue'),
       h('button',{class:'navbtn ghost', onclick:()=>{ navigator.clipboard&&navigator.clipboard.writeText(curCard()); toast('Copied card markdown.'); }}, 'Copy markdown'),
-      h('button',{class:'navbtn ghost', onclick:()=>go('studio',{tab:'inbox'})}, 'Back to Inbox'),
+      editId? h('button',{class:'navbtn ghost', onclick:()=>go('studio',{tab:'board'})}, 'Back to the board')
+            : h('button',{class:'navbtn ghost', onclick:()=>go('studio',{tab:'inbox'})}, 'Back to Inbox'),
     )));
-  (async()=>{ try{ const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t)); }catch(e){} refresh(); })();
+  (async()=>{ try{
+    if(editId){
+      const q=await ghGetText(cfg, QUEUE_PATH); assertQueue(q.text);
+      const card=getQueueCard(q.text, editId);
+      if(!card){ status.textContent='That card isn’t in the queue anymore.'; return; }
+      if(card.promoted){ status.textContent=editId+' is already promoted — promoted canon is edited in its domain file, not here.'; return; }
+      const e=queueCardToDraft(card);
+      tagSel.value=e.tag; statusSel.value=/candidate/i.test(e.status)?'Candidate':/ready/i.test(e.status)?'Ready':'Draft';
+      titleIn.value=e.title; catIn.value=e.category; claimIn.value=e.claim;
+      meansIn.value=e.means; donotIn.value=e.donot; flagsIn.value=e.flags;
+      notesEdit.value=(e.notesLines||[]).join('\n');
+      d.source=e.source;
+      paintReqs(e.requirements);
+    }else{
+      const r=await ghGetText(cfg, INDEX_PATH); if(r) CANON_TAGS.forEach(t=> highest[t]=parseHighest(r.text,t));
+    }
+  }catch(e){ status.textContent='Error: '+e.message; } refresh(); })();
   async function appendCard(){ status.textContent='Saving…';
     try{ const id=curId();
       if(!validCanonId(id) || !validCanonTag(tagSel.value)) throw new Error('that id/tag looks wrong ('+id+')');
-      const card=canonCardMarkdown({ id, title:titleIn.value, category:catIn.value, source:d.source, status:'Draft', claim:claimIn.value, means:meansIn.value, donot:donotIn.value, notes:notesIn.value });
-      await ghUpdate(cfg, QUEUE_PATH, q=>insertUnderSection(q, '# ACTIVE CANON CARDS', card), 'Draft '+id+' via Studio', {guard:assertQueue});
+      const card=curCard();
+      // Carding a raw idea consumes it from the Raw Dump Inbox in the SAME queue write, so
+      // the Raw column never shows an idea that already became a card.
+      await ghUpdate(cfg, QUEUE_PATH, q=>{ q=insertUnderSection(q, '# ACTIVE CANON CARDS', card); return d.rawLabel? removeRawIdea(q, d.rawLabel) : q; }, 'Draft '+id+' via Studio', {guard:assertQueue});
       await ghUpdate(cfg, INDEX_PATH, ix=>bumpIndex(ix, tagSel.value, id, titleIn.value), 'Reserve '+id+' via Studio', {guard:assertIndex});
       highest[tagSel.value]=parseInt(id.split('-')[1],10);
+      d.rawLabel='';
       status.textContent='Appended '+id+' to the queue and reserved the ID.'; toast(id+' drafted to the queue.'); refresh();
+    }catch(e){ status.textContent='Failed: '+e.message; }
+  }
+  async function saveEdit(){ status.textContent='Saving…';
+    try{
+      if(!validCanonId(editId)) throw new Error('that card id looks wrong ('+editId+')');
+      const md=curCard();
+      await ghUpdate(cfg, QUEUE_PATH, q=>{ if(!getQueueCard(q, editId)) throw new Error('card no longer in the queue'); return replaceQueueCard(q, editId, md); }, 'Edit '+editId+' via Studio', {guard:assertQueue});
+      status.textContent='Saved '+editId+'.'; toast(editId+' updated in the queue.');
+      notesEdit.value=editNotesLines().join('\n'); refresh();
     }catch(e){ status.textContent='Failed: '+e.message; }
   }
 }
@@ -9156,7 +9324,9 @@ function studioCardReaderNode(card, close){
     studioCardReaderSection('Promotion Requirements',card.requirements,{checklist:true}),
     studioCardReaderSection('Notes',card.notes));
   }
-  body.append(h('div',{class:'toolrow card-reader-actions'},h('button',{class:'navbtn primary',type:'button',onclick:close},'Close')));
+  body.append(h('div',{class:'toolrow card-reader-actions'},
+    (card&&!card.promoted&&card.id)?h('button',{class:'navbtn',type:'button',onclick:()=>{ close(); go('studio',{tab:'drafter', params:{prefill:{editId:card.id}}}); }},'Edit card'):null,
+    h('button',{class:'navbtn primary',type:'button',onclick:close},'Close')));
   return body;
 }
 function openStudioCardReader(queueText,id){
@@ -9166,7 +9336,17 @@ function openStudioCardReader(queueText,id){
     h('p',{class:'hint'},'Read-only Canon Card from 02_PROMOTION_QUEUE.md.'),
     studioCardReaderNode(card,close)));
 }
-function studioBoardCard(card, queueText){
+// Turn a raw-inbox idea into Drafter prefill. rawLabel rides along so the successful
+// append also removes the idea from the RAW DUMP INBOX (same queue write).
+function rawToCard(r){
+  const text=(r&&r.text||'').trim();
+  return { tag:'PEO', title:text.slice(0,60), category:'', source:'Raw Dump Inbox — '+(r&&r.label||''),
+    claim:text, means:'', donot:'', notes:'From the Raw Dump Inbox ('+(r&&r.label||'')+').', rawLabel:r&&r.label||'' };
+}
+// The next stage a card advances to from its current column — the board's quick advance.
+// Ready has no quick advance; its next step is the deliberate Promote modal.
+function studioNextStage(col){ return col==='Draft'?'Candidate':col==='Candidate'?'Ready':''; }
+function studioBoardCard(card, queueText, refresh){
   const tile=h('div',{class:'pcard'}), cid=cardId(card.title);
   if(cid){
     tile.append(h('button',{class:'pcard-open',type:'button','aria-label':'Read '+card.title,
@@ -9176,20 +9356,34 @@ function studioBoardCard(card, queueText){
   if(cid && card.col!=='Promoted' && card.col!=='Raw'){
     tile.className+=' has-card-actions';
     tile.setAttribute('tabindex','0');
+    const acts=h('div',{class:'card-actions'},
+      h('button',{class:'navbtn primary', onclick:e=>{ e.stopPropagation(); promoteCardModal(cid.id); }},'Promote →'),
+      h('button',{class:'navbtn ghost', onclick:e=>{ e.stopPropagation(); go('studio',{tab:'drafter', params:{prefill:{editId:cid.id}}}); }},'Edit'));
+    const next=studioNextStage(card.col);
+    if(next) acts.append(h('button',{class:'navbtn ghost', onclick:async e=>{ e.stopPropagation(); const btn=e.target; btn.disabled=true;
+      try{ await ghUpdate(ghCfg(), QUEUE_PATH, q=>setQueueCardStatus(q, cid.id, next), cid.id+' → '+next+' via Studio board', {guard:assertQueue});
+        toast(cid.id+' is now '+next+'.'); if(refresh) refresh(); }
+      catch(err){ toast('Failed: '+err.message); btn.disabled=false; } }},'→ '+next));
+    tile.append(acts);
+  }
+  if(!cid && card.col==='Raw' && card.text){
+    tile.className+=' has-card-actions';
+    tile.setAttribute('tabindex','0');
     tile.append(h('div',{class:'card-actions'},h('button',{class:'navbtn primary',
-      onclick:e=>{ e.stopPropagation(); promoteCardModal(cid.id); }},'Promote →')));
+      onclick:e=>{ e.stopPropagation(); go('studio',{tab:'drafter', params:{prefill:rawToCard(card)}}); }},'Draft a card →')));
   }
   return tile;
 }
 function studioBoard(host){
   const cfg=ghCfg(); host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Loading the queue…'));
+  const refresh=()=>{ host.replaceChildren(); studioBoard(host); };
   (async()=>{ try{ const r=await ghGetText(cfg, QUEUE_PATH); if(!r){ host.replaceChildren(h('p',{class:'hint'},'Queue not found.')); return; }
     let ix=null; try{ ix=await ghGetText(cfg, INDEX_PATH); }catch(e){}
     const cards=parseQueueCards(r.text).concat(parseRawIdeas(r.text));
     const cols=[['Raw','Raw / Idea'],['Draft','Draft'],['Candidate','Candidate'],['Ready','Ready'],['Promoted','Promoted']];
     const board=h('div',{class:'board'});
     cols.forEach(([key,label])=>{ const items=cards.filter(c=>c.col===key); const col=h('div',{class:'col'}, h('h4',null, label+' ('+items.length+')'));
-      items.forEach(c=>col.append(studioBoardCard(c,r.text))); board.append(col); });
+      items.forEach(c=>col.append(studioBoardCard(c,r.text,refresh))); board.append(col); });
     const banner = ix ? consistencyBanner(checkConsistency(r.text, ix.text)) : null;
     const count = cards.length+(cards.length===1?' card':' cards')+' in the queue';
     host.replaceChildren(...[banner, h('p',{class:'hint', style:{textAlign:'center'}}, count), board].filter(Boolean));
@@ -9372,7 +9566,14 @@ const CANON_RAG_STOPWORDS={
 };
 
 let canonCorpusCache=null;
+let canonDraftCorpusCache=null;
 let canonEmbedDb=null;
+
+// True for a promotion-queue draft entry (parseQueueDraftEntries) — the experimental
+// drafts lens' material, never to be presented as promoted canon.
+function canonEntryIsDraft(entry){
+  return !!(entry&&(entry.kind==='draft'||String(entry.id||'').indexOf('draft:')===0));
+}
 
 function canonRagTerms(text){
   return Array.from(new Set(String(text||'').toLowerCase().replace(/[`*_~#[\](){}>"']/g,' ').replace(/[^a-z0-9]+/g,' ').split(/\s+/).filter(t=>t.length>2&&!CANON_RAG_STOPWORDS[t])));
@@ -9577,9 +9778,15 @@ function canonGrounding(question, entries, opts){
   opts=opts||{};
   entries=(entries||[]).slice(0,opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES);
   const built=canonGroundingBlocks(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET);
+  // The draft-lens instruction only appears when a draft entry actually made the grounding —
+  // promoted-only callers keep the exact promoted-canon-only wording they've always had.
+  const hasDrafts=built.emitted.some(canonEntryIsDraft);
   return {
     system:[
-      'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
+      hasDrafts
+        ?'Answer using ONLY the canon below. Promoted canon is the authority; if the material does not cover the question, say so - do NOT invent canon.'
+        :'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
+      hasDrafts?'Entries ref\'d [draft:ID] are DRAFT cards from the promotion queue - experimental working material, NOT promoted canon. You may build on them for play and theorycraft, but label anything drawn from them as draft, and promoted canon wins on any conflict.':'',
       'Treat any new wording as a suggestion for the human promotion pipeline, never as canon.',
       'Bare [OPEN]/[UNAUDITED]/[QUESTION] lines are unresolved questions - not canon. [DESTINATION] tags mark committed-but-not-fully-locked direction - do not invent the missing specifics.',
       question?'Question: '+String(question||'').trim():'',
@@ -9609,6 +9816,19 @@ async function loadCanonCorpus(cfg, force){
   if(home&&home.text) docs.push({file:CANON_HOME_PATH,text:home.text});
   const entries=canonCorpusFromDocs(index&&index.text||'',docs);
   canonCorpusCache={key,entries};
+  return entries;
+}
+
+// The experimental drafts lens' corpus: Draft/Candidate/Ready queue cards, chunked like
+// promoted canon. Loaded and cached separately from loadCanonCorpus so promoted-only
+// callers never pay for (or accidentally receive) draft material.
+async function loadDraftCorpus(cfg, force){
+  cfg=cfg||ghCfg();
+  const key=canonCorpusKey(cfg);
+  if(canonDraftCorpusCache&&canonDraftCorpusCache.key===key&&!force) return canonDraftCorpusCache.entries;
+  const queue=await ghGetText(cfg,QUEUE_PATH).catch(()=>null);
+  const entries=canonChunkCorpus(parseQueueDraftEntries(queue&&queue.text||''));
+  canonDraftCorpusCache={key,entries};
   return entries;
 }
 
@@ -9769,7 +9989,13 @@ function canonRetrieveHybrid(question, corpus, index, queryVector, opts){
 
 async function canonGroundingForQuestion(cfg, engine, question, opts){
   opts=opts||{};
-  const corpus=await loadCanonCorpus(cfg,opts.forceCorpus);
+  let corpus=await loadCanonCorpus(cfg,opts.forceCorpus);
+  // opts.includeDrafts (the campaign table's experimental drafts lens) widens retrieval to
+  // the promotion queue's Draft/Candidate/Ready cards. A failed queue read never breaks the
+  // promoted grounding — drafts are additive, best-effort.
+  if(opts.includeDrafts){
+    try{ corpus=corpus.concat(await loadDraftCorpus(cfg,opts.forceCorpus)); }catch(e){}
+  }
   let entries=null, embeddingStatus='fallback', warning='';
   if(canonCanEmbed(engine)){
     try{
@@ -9889,6 +10115,9 @@ function privateApiBuildSearchRequest(profile, query, opts){
   opts=opts||{};
   const body={q:String(query||''),limit:opts.limit||8};
   if(Array.isArray(opts.embedding)) body.embedding=opts.embedding;
+  // The experimental drafts lens: also retrieve draft:<ID> queue-card rows. Off by default —
+  // the backend serves promoted canon only unless the caller opts in.
+  if(opts.includeDrafts) body.include_drafts=true;
   return {
     url:privateApiJoinUrl(profile&&profile.endpoint,'search'),
     opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
@@ -10121,6 +10350,9 @@ function assistantPrivateResultEntry(row, index){
     domain:String(row.domain||row.source||'Private backend').trim(),
     file:String(row.file||row.path||'private backend').trim(),
     body,
+    // draft:<ID> rows (queue-card ingest) carry their queue status so grounding and the UI
+    // can keep labeling them as not-promoted material.
+    status:String(row.status||'').trim(),
     fromPrivateBackend:true
   };
 }
@@ -10132,12 +10364,13 @@ function assistantPrivateResultEntry(row, index){
 // a device that simply doesn't use the private backend sees no warning at all; the warning
 // now only appears for a genuine failure (backend down, network error, etc.) once a profile
 // exists.
-async function assistantPrivateBackendGrounding(question){
+async function assistantPrivateBackendGrounding(question, opts){
+  opts=opts||{};
   const api=typeof window!=='undefined'&&window.__sqlQuery?window.__sqlQuery:null;
   if(!api||typeof api.search!=='function') return null;
   if(typeof api.hasProfile==='function'&&!api.hasProfile()) return null;
   try{
-    const result=await api.search(question,{limit:3});
+    const result=await api.search(question,{limit:3, includeDrafts:!!opts.includeDrafts});
     const rows=Array.isArray(result&&result.items)?result.items:[];
     const entries=rows.map(assistantPrivateResultEntry).filter(entry=>entry.body||entry.title);
     if(!entries.length) return null;
@@ -10181,7 +10414,7 @@ async function assistantCanonGrounding(question, engine, opts){
   }else{
     grounding=assistantNormalizeGrounding(await canonGroundingForQuestion(cfg,engine,question,opts));
   }
-  return assistantMergeGrounding(grounding,await assistantPrivateBackendGrounding(question));
+  return assistantMergeGrounding(grounding,await assistantPrivateBackendGrounding(question,opts));
 }
 
 async function assistantRebuildEmbeddingIndex(engine, onStatus){
@@ -15643,7 +15876,7 @@ function campPlayShortText(text, max){
   return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
 }
 
-function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal){
+function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens){
   const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
   const clocks=campPlayCleanList(sections.clocks);
   const people=campPlayCleanList(sections.people);
@@ -15664,7 +15897,8 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
       rt.strain&&('Strain: '+rt.strain),
     ].filter(Boolean), empty:'No scene state recorded yet.'},
     {id:'threads', label:'Threads & Clocks', items:live.map(x=>'LIVE: '+x).concat(warming.map(x=>'WARMING: '+x), waiting.map(x=>'WAITING: '+x), blocked.map(x=>'BLOCKED: '+x), clocks.map(x=>'Clock: '+x)), empty:'No live threads or clocks yet.'},
-    {id:'grounding', label:'Canon Grounding', items:ids.length?ids.map(x=>'Grounded on: '+x):['Retrieved from promoted canon each turn.'], empty:''},
+    {id:'grounding', label:'Canon Grounding', items:(ids.length?ids.map(x=>'Grounded on: '+x):[draftLens?'Retrieved from promoted canon + draft queue cards each turn.':'Retrieved from promoted canon each turn.'])
+      .concat(draftLens&&ids.length?['Experimental drafts lens ON — draft:ID refs are queue cards, not promoted canon.']:[]), empty:''},
     {id:'secrets', label:'Secrets / Clues', items:knowledge.slice(0,5).concat(carries.slice(0,3), capabilities.slice(0,3)), empty:'Use Knowledge Boundary, carries, and capabilities as the clue surface.'},
     {id:'npcs', label:'NPCs', items:castList.slice(0,6).concat(people.slice(0,4)), empty:'No cast or bond notes yet.'},
     {id:'ledger', label:'Ledger Beats', items:['Capture moments, lore ideas, mechanics, character details, questions, and retcon candidates as CAMPAIGN-ONLY.'], empty:''},
@@ -15867,6 +16101,15 @@ async function campPlayBuildSession(name, profiles){
     h('option',{value:'balanced'},'Balanced (this turn)'),
     h('option',{value:'creative'},'Creative (this turn)')
   );
+  // Experimental drafts lens (Del, 2026-07-02): the campaign table is also where he
+  // theorycrafts, so retrieval can OPT IN to the promotion queue's Draft/Candidate/Ready
+  // cards — ref'd draft:<ID>, status-stamped, and never presented as promoted canon (the
+  // grounding prompt labels them and promoted canon wins on conflict). Off = the default
+  // promoted-only discipline. Remembered on this device, like the Model switch.
+  const draftsToggle=h('input',{type:'checkbox', class:'play-drafts-toggle',
+    title:'Also retrieve Draft/Candidate/Ready cards from the promotion queue as labeled, experimental grounding. They are never presented as promoted canon.'});
+  draftsToggle.checked=!!DB.playDraftLens;
+  draftsToggle.onchange=()=>{ DB.playDraftLens=draftsToggle.checked; saveLocal(); drawTools(); };
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
   const starterRow=h('div',{class:'play-starters'});
@@ -16019,7 +16262,7 @@ async function campPlayBuildSession(name, profiles){
     modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
-    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal);
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked);
     tablePanel.replaceChildren(...cards.map(card=>{
       const list=(card.items||[]).filter(Boolean);
       return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'?true:null},
@@ -16030,7 +16273,7 @@ async function campPlayBuildSession(name, profiles){
     const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
     const override=groundingSel.value;
     const mode=campPlayGroundingMode(persona,override);
-    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'')));
+    groundingLine.replaceChildren(document.createTextNode('Grounding: '+mode+(override?' override':' via '+persona.label)+(draftsToggle.checked?' · drafts lens ON':'')+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'')));
   }
 
   async function runTurn(userText, forceModeId){
@@ -16047,7 +16290,7 @@ async function campPlayBuildSession(name, profiles){
     messages.push(gm); drawTranscript();
     status.textContent='The table is thinking...';
     let groundingSystem='';
-    try{ const g=await assistantCanonGrounding(userText, engine, {}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); groundingTruncated=Number(g&&g.truncated)||0; drawTools(); }catch(e){}
+    try{ const g=await assistantCanonGrounding(userText, engine, {includeDrafts:draftsToggle.checked}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); groundingTruncated=Number(g&&g.truncated)||0; drawTools(); }catch(e){}
     const system=campPlayBuildSystem({
       persona,
       modeId:mode.id,
@@ -16090,11 +16333,12 @@ async function campPlayBuildSession(name, profiles){
         h('label',{class:'play-select-label'},'Engine',engineSel),
         h('label',{class:'play-select-label'},'Model',modelSel),
         h('label',{class:'play-select-label'},'Persona',personaSel),
-        h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel)
+        h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel),
+        h('label',{class:'play-select-label play-drafts-lens'},'Drafts (experimental)',draftsToggle)
       ),
       h('div',{class:'play-head-actions'}, usageMeter(), openChatBtn)
     ),
-    h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn.'),
+    h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn. Drafts (experimental) also grounds the table on your promotion-queue cards — labeled draft:ID, never presented as promoted canon.'),
     h('p',{class:'play-note'},'The Game Master chats in the floating ✦ panel — it follows you across the app, and this table stays visible behind it. The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
     logLoadFailed?h('p',{class:'play-note', role:'status'},'⚠ Could not load the previous session transcript (a network or read error, not a missing file) — this view is starting empty as a precaution. Your saved transcript on disk is untouched, and saving here is paused; reload this tab once the connection is back.'):null,
   );
