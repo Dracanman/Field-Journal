@@ -937,7 +937,7 @@
   @media (max-width:560px){
     .play-command-card,.play-transcript-card,.play-input-card{ border-radius:10px; }
     .play-head .usage-meter{ margin-left:0; width:100%; }
-    .play-control-row,.play-select-label,.play-persona,.play-engine,.play-grounding-mode{ width:100%; }
+    .play-control-row,.play-select-label,.play-persona,.play-engine,.play-model,.play-grounding-mode{ width:100%; }
     .play-tools-wrap{ max-height:240px; }
     .play-chat-stack{ display:flex; flex-direction:column; min-height:62vh; }
     .play-chat-stack.lens-collapsed{ min-height:74vh; }
@@ -3378,6 +3378,7 @@ function hydrate(d){
   // Where this device keeps the floating companion (drag/resize box) — device-local, never synced.
   merged.companionBox=d.companionBox&&typeof d.companionBox==='object'&&!Array.isArray(d.companionBox)?Object.assign({},d.companionBox):null;
   merged.startHereDismissed=!!d.startHereDismissed;   // the newcomer card was waved away on this device
+  merged.playModel=typeof d.playModel==='string'?d.playModel.trim():'';   // the GM table's model override — device-local
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -15552,6 +15553,17 @@ function campPlayModelFor(engine, persona){
   return assistantModelFor({},engine);
 }
 
+// The Model switch (Del, 2026-07-02: swap the table's prose model without
+// touching the engine profile — e.g. Gemma for speed, Mistral Small 24B for
+// prose). Choices = whatever the engine advertises plus its configured model.
+function campPlayModelChoices(engine){
+  const out=[], seen={};
+  const push=m=>{ m=String(m||'').trim(); if(m&&!seen[m]){ seen[m]=1; out.push(m); } };
+  assistantAdvertisedModels(engine).forEach(push);
+  push(engine&&engine.model);
+  return out;
+}
+
 function campPlayChatOptions(engine, persona, mode){
   return assistantChatOptionsForRequest(engine,persona,{temperature:mode&&mode.temperature});
 }
@@ -15791,6 +15803,19 @@ async function campPlayBuildSession(name, profiles){
   // CR-3: campPlayModelFor silently drops a persona's preferred model on a non-local engine
   // that doesn't advertise it (falls back to the engine's own model with no visible sign the
   // preference was ignored) — the title makes that behavior discoverable.
+  // The Model switch: overrides which model narrates THIS table (device-local,
+  // remembered) without touching the engine profile — e.g. a fast everyday
+  // model vs a slower, better-prose one.
+  const modelSel=h('select',{class:'play-model', title:'Which model narrates this table. “Persona’s pick” follows the persona’s preference (or the engine’s own model). Remembered on this device.'});
+  function drawModelSel(){
+    const engine=assistantEngineById(profiles, engineSel.value)||defaultEngine;
+    const choices=campPlayModelChoices(engine);
+    modelSel.replaceChildren(h('option',{value:''},'Persona’s pick'), ...choices.map(m=>h('option',{value:m},m)));
+    const saved=String(DB.playModel||'');
+    modelSel.value=choices.indexOf(saved)>=0?saved:'';
+  }
+  modelSel.onchange=()=>{ DB.playModel=modelSel.value; saveLocal(); };
+  engineSel.onchange=()=>{ drawModelSel(); };
   const personaSel=h('select',{class:'play-persona', title:'A persona’s preferred model is used on a local engine, or when the current engine advertises it — otherwise the engine’s own model is used instead.'},...personaOptions.map(p=>h('option',{value:p.id},p.label)));
   personaSel.value=personaOptions.some(p=>p.id===CAMP_PLAY_DEFAULT_PERSONA_ID)?CAMP_PLAY_DEFAULT_PERSONA_ID:(personaOptions[0]&&personaOptions[0].id)||CAMP_PLAY_DEFAULT_PERSONA_ID;
   // CR-3: this is a one-turn override (campPlayGroundingMode reads it per-send, and it's
@@ -15995,7 +16020,7 @@ async function campPlayBuildSession(name, profiles){
       groundingMode:turnGroundingMode
     });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
-    const chat=Object.assign({ system, messages:history, model:campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
+    const chat=Object.assign({ system, messages:history, model:modelSel.value||campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
     let raw='';
     try{
       await assistantStreamAi(engine, chat, piece=>{ raw+=piece; gm.content=campPlayStripState(raw); if(streamNode) streamNode.textContent=gm.content; transcript.scrollTop=transcript.scrollHeight; });
@@ -16019,10 +16044,12 @@ async function campPlayBuildSession(name, profiles){
   applyLensCollapse();
   drawModeRow(); drawTools(); drawTranscript();
   const openChatBtn=h('button',{class:'navbtn primary', type:'button', onclick:()=>companionOpenGm()},'✦ Open the GM chat');
+  drawModelSel();
   const commandCard=h('div',{class:'play-command-card'},
     h('div',{class:'play-head'},
       h('div',{class:'play-control-row'},
         h('label',{class:'play-select-label'},'Engine',engineSel),
+        h('label',{class:'play-select-label'},'Model',modelSel),
         h('label',{class:'play-select-label'},'Persona',personaSel),
         h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel)
       ),
