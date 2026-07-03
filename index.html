@@ -1122,6 +1122,18 @@
 .region-forge-summary{margin-top:10px;padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 .region-forge-summary p{margin:6px 0 0}
 .region-forge-accept{align-items:center;justify-content:flex-end}
+.region-world-panel{display:grid;gap:12px;padding:16px;border:1.5px solid var(--gold-soft);border-radius:12px;background:var(--paper-card);box-shadow:0 10px 24px -22px rgba(var(--shadow)/.45)}
+.region-world-controls{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;align-items:end}
+.region-world-actions{align-items:center;align-content:end;margin:0}
+.region-world-preview,.region-world-review,.region-world-history{padding:12px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
+.region-world-preview h4{margin:0 0 6px;font-size:18px}
+.region-world-change-list{display:grid;gap:6px;margin:8px 0 12px;padding:0;list-style:none}
+.region-world-change-list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 8px;align-items:start;color:var(--ink-soft)}
+.region-world-change-list small{grid-column:2}
+.region-world-pill{display:inline-flex;align-items:center;border:1px solid #bfd0b8;border-radius:999px;background:#e7efe2;color:#436047;padding:2px 7px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+.region-world-pill.major{border-color:#e1b8aa;background:#fff4ef;color:#8b4b3d}
+.region-world-timeline{margin-top:10px}
+.region-world-history-entry{padding:10px;border:1px solid #e7dcc4;border-radius:10px;background:var(--paper-card)}
 @media(max-width:620px){
   .region-map{padding:12px}.region-map-svg{height:54vh}
   .region-editor{padding:12px}.region-edit-create,.region-edit-inspector{align-items:stretch;flex-direction:column}
@@ -1133,6 +1145,9 @@
   .region-atlas-grid,.region-forge-grid{grid-template-columns:1fr}
   .region-forge-accept,.region-forge-seed-actions,.region-forge-ai-actions{align-items:stretch;flex-direction:column}
   .region-forge-accept .navbtn,.region-forge-seed-actions .navbtn,.region-forge-ai-actions .navbtn{width:100%}
+  .region-world-controls{grid-template-columns:1fr}
+  .region-world-actions{align-items:stretch;flex-direction:column}
+  .region-world-actions .navbtn{width:100%}
 }
 /* ---------- Engine settings: device-only profiles, no model calls yet ---------- */
 .engine-settings{display:grid;gap:14px}
@@ -13055,6 +13070,576 @@ function regionForgeGenerateRegion(input){
   return assertRegion(region,{expectedCampaign:profile.campaign});
 }
 /* ========================================================================== *
+   REGION LIVING WORLD 1 — deterministic, headless world-turn engine.
+
+   Pure logic only. No UI, no AI, no network, no repo writes, no wall clock.
+   A world turn is an explicit campaign action: same campaign + region + turn +
+   trigger gives the same bounded change-set every time.
+ * ========================================================================== */
+const REGION_WORLD_ENGINE_VERSION = '1.0.0';
+const REGION_WORLD_SCOPES = ['ecology','population','creature','route','mana','element'];
+const REGION_WORLD_SEVERITIES = ['minor','major'];
+const REGION_WORLD_AMBIENT_BANDS = ['quiet','steady','bright','charged','severe'];
+const REGION_WORLD_SAFE_FEATURE_LABELS = {
+  'site-arrival':['Crossing Scar'],
+  'site-shelter':['Sheltered Camp'],
+  'site-resource':['Clear Basin','Storm Marker','Warm Vent','Rooted Grove','Sheltered Site'],
+  'site-overlook':['Lookout Edge'],
+  'site-passage':['Layer Passage'],
+  'site-hazard':['Unstable Edge'],
+};
+const REGION_WORLD_FEATURE_FIELDS = {
+  ecology:['settling','stirred','overgrown','recovering','pressured'],
+  population:['quiet tracks','traffic increasing','locals dispersing','small camp sign','foragers nearby'],
+  creature:['fresh tracks nearby','nesting signs nearby','predator spoor nearby','quiet signs nearby','skittish calls'],
+};
+const REGION_WORLD_ROUTE_MINOR = ['open','watched','overgrown','softened'];
+const REGION_WORLD_ROUTE_MAJOR = ['strained','blocked-hint','danger signs'];
+
+function regionWorldRound(value, places){
+  const p = Math.pow(10, Number.isInteger(places) ? places : 3);
+  return Math.round((Number.isFinite(value) ? value : 0) * p) / p;
+}
+function regionWorldClamp(value, min, max){
+  const n = Number.isFinite(value) ? value : min;
+  return Math.min(max, Math.max(min, n));
+}
+function regionWorldStableText(value){ return JSON.stringify(regionForgeStableSnapshot(value)); }
+function regionWorldSameValue(a, b){ return regionWorldStableText(a) === regionWorldStableText(b); }
+function regionWorldIdPart(value, fallback){
+  return String(value == null ? fallback || 'x' : value).toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || (fallback || 'x');
+}
+function regionWorldTurn(ctx){
+  const n = Number(ctx && ctx.turn);
+  return Number.isInteger(n) && n >= 0 ? n : 0;
+}
+function regionWorldTrigger(ctx){ return String(ctx && ctx.trigger || 'advance').trim() || 'advance'; }
+function regionWorldSeed(region, ctx){
+  return regionForgeHashLong({
+    engine:REGION_WORLD_ENGINE_VERSION,
+    campaign:ctx && ctx.campaign || region && region.campaign || '',
+    regionId:region && region.id || '',
+    turn:regionWorldTurn(ctx),
+    trigger:regionWorldTrigger(ctx),
+  });
+}
+function regionWorldAmbientBand(intensity){
+  const n = regionWorldClamp(Number(intensity), 0, 1);
+  if (n >= 0.82) return REGION_WORLD_AMBIENT_BANDS[4];
+  if (n >= 0.62) return REGION_WORLD_AMBIENT_BANDS[3];
+  if (n >= 0.42) return REGION_WORLD_AMBIENT_BANDS[2];
+  if (n >= 0.22) return REGION_WORLD_AMBIENT_BANDS[1];
+  return REGION_WORLD_AMBIENT_BANDS[0];
+}
+function regionWorldTerrainGrid(region, layerId){
+  const payload = region && region.terrain && region.terrain.layers && region.terrain.layers[layerId];
+  if (!regionIsRecord(payload)) return null;
+  const width = payload.width, height = payload.height;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width <= 0 || height <= 0) return null;
+  if (!Array.isArray(payload.cells) || payload.cells.length !== width * height) return null;
+  return { width, height, cells:payload.cells.map((value, index) => ({
+    index, x:index % width, y:Math.floor(index / width), value,
+    occupancy:Array.isArray(payload.occupancy) ? payload.occupancy[index] : 'solid',
+  })) };
+}
+function regionWorldRevealMask(region, layerId){
+  const value = region && region.revealed && region.revealed.layers && region.revealed.layers[layerId];
+  if (Array.isArray(value)) return value;
+  if (regionIsRecord(value) && Array.isArray(value.cells)) return value.cells;
+  return null;
+}
+function regionWorldCellKey(layerId, index){ return layerId + ':' + index; }
+function regionWorldFeatureCellKey(region, feature){
+  const p = feature && feature.position;
+  if (!regionIsRecord(p) || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
+  const grid = regionWorldTerrainGrid(region, feature.layerId);
+  const x = Math.floor(p.x), y = Math.floor(p.y);
+  if (!grid || x < 0 || y < 0 || x >= grid.width || y >= grid.height) return null;
+  return regionWorldCellKey(feature.layerId, y * grid.width + x);
+}
+function regionWorldRevealedCellKeys(region){
+  const out = new Set();
+  (region && Array.isArray(region.localLayers) ? region.localLayers : []).forEach(layer => {
+    const grid = regionWorldTerrainGrid(region, layer.id), mask = regionWorldRevealMask(region, layer.id);
+    if (!grid || !Array.isArray(mask)) return;
+    grid.cells.forEach(cell => { if (!(mask[cell.index] === 0 || mask[cell.index] === false || mask[cell.index] == null)) out.add(regionWorldCellKey(layer.id, cell.index)); });
+  });
+  return out;
+}
+function regionWorldProtectedAdd(out, kind, id, reason){
+  if (!id) return;
+  const list = out[kind] || (out[kind] = []);
+  if (!list.includes(id)) list.push(id);
+  const key = kind + ':' + id;
+  out.reasons[key] = out.reasons[key] || [];
+  if (reason && !out.reasons[key].includes(reason)) out.reasons[key].push(reason);
+}
+function regionWorldHasReference(item){
+  if (!regionIsRecord(item)) return false;
+  const direct = ['questId','questIds','questRef','questRefs','threadId','threadIds','threadRef','threadRefs','sourceThread','sourceThreads'];
+  if (direct.some(key => item[key] !== undefined && item[key] !== null && item[key] !== '' && !(Array.isArray(item[key]) && !item[key].length))) return true;
+  const tags = Array.isArray(item.tags) ? item.tags : [];
+  return tags.some(tag => /\b(?:quest|thread)\b/i.test(String(tag || '')));
+}
+function regionWorldGeneratedFeatureSafe(feature){
+  if (!feature || typeof feature.id !== 'string') return false;
+  const labels = REGION_WORLD_SAFE_FEATURE_LABELS[feature.id];
+  return !!labels && labels.includes(feature.label || '');
+}
+function regionProtectedTargets(region){
+  const valid = assertRegion(region);
+  const generated = regionHasGenerationProvenance(valid);
+  const out = { features:[], connections:[], cells:[], reasons:{} };
+  const revealed = regionWorldRevealedCellKeys(valid);
+  revealed.forEach(key => regionWorldProtectedAdd(out, 'cells', key, 'revealed-cell'));
+  (valid.features || []).forEach(feature => {
+    const cellKey = regionWorldFeatureCellKey(valid, feature);
+    if (!generated || !regionWorldGeneratedFeatureSafe(feature)) regionWorldProtectedAdd(out, 'features', feature.id, generated ? 'custom-name' : 'manual-region');
+    if (cellKey && revealed.has(cellKey)) regionWorldProtectedAdd(out, 'features', feature.id, 'revealed-cell');
+    if (regionWorldHasReference(feature)) regionWorldProtectedAdd(out, 'features', feature.id, 'quest-thread-reference');
+  });
+  const protectedFeatures = new Set(out.features);
+  (valid.connections || []).forEach(connection => {
+    if (!generated || !/^route-\d+$/.test(String(connection.id || ''))) regionWorldProtectedAdd(out, 'connections', connection.id, generated ? 'custom-route' : 'manual-region');
+    if (protectedFeatures.has(connection.from) || protectedFeatures.has(connection.to)) regionWorldProtectedAdd(out, 'connections', connection.id, 'protected-endpoint');
+    if (regionWorldHasReference(connection)) regionWorldProtectedAdd(out, 'connections', connection.id, 'quest-thread-reference');
+  });
+  out.features.sort(); out.connections.sort(); out.cells.sort();
+  Object.keys(out.reasons).forEach(key => out.reasons[key].sort());
+  return out;
+}
+function regionWorldProtectionSet(protection, key){
+  const value = protection && protection[key];
+  return new Set(Array.isArray(value) ? value.map(String) : []);
+}
+function regionWorldProtection(region, ctx){
+  return ctx && regionIsRecord(ctx.protection) ? ctx.protection : regionProtectedTargets(region);
+}
+function regionWorldTargetProtected(protection, target){
+  if (!regionIsRecord(target)) return true;
+  if (target.kind === 'feature') return regionWorldProtectionSet(protection, 'features').has(String(target.id));
+  if (target.kind === 'route') return regionWorldProtectionSet(protection, 'connections').has(String(target.id));
+  if (target.kind === 'cell') return regionWorldProtectionSet(protection, 'cells').has(String(target.layerId) + ':' + String(target.index));
+  if (target.kind === 'element'){
+    const key = (target.layerId || 'region') + ':' + target.element;
+    return regionWorldProtectionSet(protection, 'elements').has(key);
+  }
+  return false;
+}
+function regionWorldPick(list, rng){
+  if (!Array.isArray(list) || !list.length) return null;
+  return list[Math.min(list.length - 1, Math.floor(rng() * list.length))];
+}
+function regionWorldNextValue(options, current, rng){
+  const list = (options || []).filter(value => value !== current);
+  return regionWorldPick(list.length ? list : options, rng);
+}
+function regionWorldChange(id, turn, trigger, scope, severity, target, before, after, note){
+  return { id, turn, trigger, scope, severity, target, before:regionClone(before), after:regionClone(after), note };
+}
+function regionWorldPushChange(out, change, protection){
+  if (!change || !REGION_WORLD_SCOPES.includes(change.scope) || !REGION_WORLD_SEVERITIES.includes(change.severity)) return;
+  if (regionWorldTargetProtected(protection, change.target)) return;
+  if (regionWorldSameValue(change.before, change.after)) return;
+  out.push(change);
+}
+function regionWorldManaChange(region, ctx, rng, protection){
+  const before = regionClone(region.ambientMana || regionNeutralAmbientMana());
+  const direction = rng() < 0.5 ? -1 : 1;
+  const amount = 0.025 + rng() * 0.03;
+  let intensity = regionWorldClamp(regionWorldRound((Number(before.intensity) || 0) + direction * amount, 3), 0, 1);
+  if (intensity === before.intensity) intensity = regionWorldClamp(regionWorldRound((Number(before.intensity) || 0) - direction * amount, 3), 0, 1);
+  const after = { band:regionWorldAmbientBand(intensity), intensity };
+  return regionWorldChange('world-t' + regionWorldTurn(ctx) + '-mana-ambient', regionWorldTurn(ctx), regionWorldTrigger(ctx),
+    'mana', 'minor', { kind:'ambientMana' }, before, after, 'Ambient mana drifts within the saved region state.');
+}
+function regionWorldElementChange(region, ctx, rng){
+  const layer = rng() < 0.45 ? regionWorldPick(region.localLayers || [], rng) : null;
+  const weights = layer ? (region.elementalInfluence.localLayers[layer.id] || {}) : (region.elementalInfluence.region || {});
+  const keys = Object.keys(weights).concat(regionForgeElementKeys()).filter((key, index, list) => key && list.indexOf(key) === index).sort();
+  const element = regionWorldPick(keys, rng) || 'earth';
+  const severity = rng() < 0.28 ? 'major' : 'minor';
+  const direction = rng() < 0.5 ? -1 : 1;
+  const delta = severity === 'major' ? 0.075 : 0.035;
+  const before = Object.prototype.hasOwnProperty.call(weights, element) ? weights[element] : null;
+  let after = regionWorldClamp(regionWorldRound((Number(before) || 0) + direction * delta, 3), 0, 1.2);
+  if (after === before) after = regionWorldClamp(regionWorldRound((Number(before) || 0) - direction * delta, 3), 0, 1.2);
+  return regionWorldChange('world-t' + regionWorldTurn(ctx) + '-element-' + regionWorldIdPart(layer && layer.id || 'region') + '-' + regionWorldIdPart(element),
+    regionWorldTurn(ctx), regionWorldTrigger(ctx), 'element', severity,
+    { kind:'element', layerId:layer && layer.id || null, element }, before, after,
+    (layer ? layer.label || layer.id : 'Region') + ' element influence shifts slightly.');
+}
+function regionWorldFeatureChange(region, ctx, rng, protection){
+  const protectedFeatures = regionWorldProtectionSet(protection, 'features');
+  const candidates = (region.features || []).filter(feature => feature && feature.id && !protectedFeatures.has(feature.id));
+  const feature = regionWorldPick(candidates, rng);
+  if (!feature) return null;
+  const scopes = ['ecology','population','creature'];
+  const scope = regionWorldPick(scopes, rng);
+  const field = scope === 'ecology' ? 'condition' : (scope === 'population' ? 'population' : 'creatures');
+  const state = regionIsRecord(feature.worldState) ? feature.worldState : {};
+  const before = Object.prototype.hasOwnProperty.call(state, field) ? state[field] : null;
+  const severity = scope === 'creature' && rng() > 0.7 ? 'major' : 'minor';
+  const after = regionWorldNextValue(REGION_WORLD_FEATURE_FIELDS[scope], before, rng);
+  return regionWorldChange('world-t' + regionWorldTurn(ctx) + '-' + scope + '-' + regionWorldIdPart(feature.id),
+    regionWorldTurn(ctx), regionWorldTrigger(ctx), scope, severity,
+    { kind:'feature', id:feature.id, field }, before, after,
+    'Local signs change near ' + (feature.label || feature.id) + '.');
+}
+function regionWorldRouteChange(region, ctx, rng, protection){
+  const protectedConnections = regionWorldProtectionSet(protection, 'connections');
+  const candidates = (region.connections || []).filter(connection => connection && connection.id && !protectedConnections.has(connection.id));
+  const connection = regionWorldPick(candidates, rng);
+  if (!connection) return null;
+  const forcedMajor = /end|session|event/i.test(regionWorldTrigger(ctx));
+  const severity = forcedMajor || rng() > 0.72 ? 'major' : 'minor';
+  const before = connection.status || null;
+  const choices = severity === 'major' ? REGION_WORLD_ROUTE_MAJOR : REGION_WORLD_ROUTE_MINOR;
+  const after = regionWorldNextValue(choices, before, rng);
+  return regionWorldChange('world-t' + regionWorldTurn(ctx) + '-route-' + regionWorldIdPart(connection.id),
+    regionWorldTurn(ctx), regionWorldTrigger(ctx), 'route', severity,
+    { kind:'route', id:connection.id, field:'status' }, before, after,
+    'A route condition shifts, queued as a hint rather than terrain rewrite.');
+}
+function worldTurnChanges(region, ctx){
+  const valid = assertRegion(region, ctx && ctx.campaign ? { expectedCampaign:ctx.campaign } : undefined);
+  const rng = regionForgePrng(regionWorldSeed(valid, ctx));
+  const protection = regionWorldProtection(valid, ctx);
+  const changes = [];
+  regionWorldPushChange(changes, regionWorldManaChange(valid, ctx, rng, protection), protection);
+  regionWorldPushChange(changes, regionWorldElementChange(valid, ctx, rng, protection), protection);
+  regionWorldPushChange(changes, regionWorldFeatureChange(valid, ctx, rng, protection), protection);
+  regionWorldPushChange(changes, regionWorldRouteChange(valid, ctx, rng, protection), protection);
+  return changes;
+}
+function regionWorldFindById(list, id){ return (Array.isArray(list) ? list : []).find(item => item && item.id === id) || null; }
+function regionWorldReadTarget(region, target){
+  if (!regionIsRecord(target)) return null;
+  if (target.kind === 'ambientMana') return regionClone(region.ambientMana || regionNeutralAmbientMana());
+  if (target.kind === 'element'){
+    const weights = target.layerId ? region.elementalInfluence.localLayers[target.layerId] : region.elementalInfluence.region;
+    return weights && Object.prototype.hasOwnProperty.call(weights, target.element) ? weights[target.element] : null;
+  }
+  if (target.kind === 'feature'){
+    const feature = regionWorldFindById(region.features, target.id);
+    const state = feature && regionIsRecord(feature.worldState) ? feature.worldState : {};
+    return Object.prototype.hasOwnProperty.call(state, target.field) ? state[target.field] : null;
+  }
+  if (target.kind === 'route'){
+    const connection = regionWorldFindById(region.connections, target.id);
+    return connection && Object.prototype.hasOwnProperty.call(connection, target.field || 'status') ? connection[target.field || 'status'] : null;
+  }
+  return null;
+}
+function regionWorldWriteTarget(region, target, value){
+  if (!regionIsRecord(target)) return false;
+  if (target.kind === 'ambientMana'){
+    if (!regionIsRecord(value)) return false;
+    region.ambientMana = regionClone(value);
+    return true;
+  }
+  if (target.kind === 'element'){
+    const influence = region.elementalInfluence || (region.elementalInfluence = regionNeutralElementalInfluence());
+    let weights;
+    if (target.layerId){
+      influence.localLayers = influence.localLayers || {};
+      weights = influence.localLayers[target.layerId] = influence.localLayers[target.layerId] || {};
+    }else{
+      weights = influence.region = influence.region || {};
+    }
+    if (value == null) delete weights[target.element];
+    else weights[target.element] = regionWorldRound(Number(value), 3);
+    return true;
+  }
+  if (target.kind === 'feature'){
+    const feature = regionWorldFindById(region.features, target.id);
+    if (!feature) return false;
+    const field = target.field || 'condition';
+    if (value == null){
+      if (regionIsRecord(feature.worldState)){
+        delete feature.worldState[field];
+        if (!Object.keys(feature.worldState).length) delete feature.worldState;
+      }
+    }else{
+      feature.worldState = regionIsRecord(feature.worldState) ? feature.worldState : {};
+      feature.worldState[field] = value;
+    }
+    return true;
+  }
+  if (target.kind === 'route'){
+    const connection = regionWorldFindById(region.connections, target.id);
+    if (!connection) return false;
+    const field = target.field || 'status';
+    if (value == null) delete connection[field];
+    else connection[field] = value;
+    return true;
+  }
+  return false;
+}
+function regionWorldReverseChange(change, before){
+  return {
+    ...regionClone(change),
+    id:String(change && change.id || 'change') + '-reverse',
+    before:regionClone(change && change.after),
+    after:regionClone(before),
+    note:'Reverse: ' + String(change && change.note || 'world turn change'),
+  };
+}
+function regionWorldChangeTurn(changes){
+  const first = Array.isArray(changes) ? changes.find(change => Number.isInteger(change && change.turn)) : null;
+  return first ? first.turn : 0;
+}
+function worldTurnApply(region, changes){
+  const valid = assertRegion(region);
+  const next = regionClone(valid), applied = [], reverse = [];
+  (Array.isArray(changes) ? changes : []).forEach(change => {
+    if (!regionIsRecord(change) || !regionIsRecord(change.target)) return;
+    const before = regionWorldReadTarget(next, change.target);
+    if (!regionWorldWriteTarget(next, change.target, change.after)) return;
+    const appliedChange = { ...regionClone(change), before:regionClone(before), after:regionClone(change.after) };
+    applied.push(appliedChange);
+    reverse.unshift(regionWorldReverseChange(change, before));
+  });
+  const checked = assertRegion(next, { expectedCampaign:valid.campaign, expectedId:valid.id });
+  return { region:checked, turn:regionWorldChangeTurn(changes), applied, reverse };
+}
+/* ========================================================================== *
+   REGION LIVING WORLD 2 - history, pending review, and rollback.
+
+   Campaign-side persistence for the pure Slice 41 engine. World turns still
+   happen only through explicit calls; this module loads/saves region JSON plus
+   the sibling history file through the existing guarded GitHub write path.
+ * ========================================================================== */
+const REGION_WORLD_HISTORY_SCHEMA_VERSION = 1;
+
+function worldHistoryPath(campaignName, regionId){ return 'campaign/'+campaignName+'/regions/'+regionId+'.history.json'; }
+function worldHistoryCleanTrigger(trigger){ return String(trigger||'advance').replace(/\s+/g,' ').trim().slice(0,160)||'advance'; }
+function worldHistoryNow(cfg){ return cfg && cfg.worldNow ? String(cfg.worldNow) : new Date().toISOString(); }
+function worldHistoryTemplate(regionId){ return { regionId:String(regionId||'').trim(), turn:0, entries:[] }; }
+function worldHistoryChangeKey(turn, id){ return String(Number.isInteger(turn)?turn:0)+':'+String(id||''); }
+function worldHistoryChangeRef(change){
+  return { turn:Number.isInteger(change&&change.turn)?change.turn:0, id:String(change&&change.id||'') };
+}
+function worldHistoryNormalizeRefs(list){
+  return (Array.isArray(list)?list:[]).map(item=>regionIsRecord(item)?{
+    turn:Number.isInteger(item.turn)?item.turn:0,
+    id:String(item.id||''),
+  }:{ turn:0, id:String(item||'') }).filter(ref=>ref.id);
+}
+function worldHistoryNormalizeEntry(entry){
+  if(!regionIsRecord(entry)) throw new Error('history entry must be an object');
+  const turn=Number(entry.turn);
+  if(!Number.isInteger(turn) || turn<0) throw new Error('history entry turn must be a nonnegative integer');
+  const out={
+    turn,
+    trigger:worldHistoryCleanTrigger(entry.trigger),
+    at:String(entry.at||''),
+    applied:(Array.isArray(entry.applied)?entry.applied:[]).map(regionClone),
+    reverse:(Array.isArray(entry.reverse)?entry.reverse:[]).map(regionClone),
+    pending:(Array.isArray(entry.pending)?entry.pending:[]).map(regionClone),
+  };
+  if(regionIsRecord(entry.resolution)) out.resolution={
+    accepted:worldHistoryNormalizeRefs(entry.resolution.accepted),
+    rejected:worldHistoryNormalizeRefs(entry.resolution.rejected),
+  };
+  if(Number.isInteger(entry.rollbackOf) && entry.rollbackOf>=0) out.rollbackOf=entry.rollbackOf;
+  return out;
+}
+function assertWorldHistoryObject(value, options){
+  if(!regionIsRecord(value)) throw new Error('world history must be a JSON object');
+  const expected=options&&options.regionId;
+  const regionId=String(value.regionId||expected||'').trim();
+  if(!regionId) throw new Error('world history needs a regionId');
+  if(expected && regionId!==expected) throw new Error('world history regionId mismatch');
+  const turn=Number(value.turn);
+  if(!Number.isInteger(turn) || turn<0) throw new Error('world history turn must be a nonnegative integer');
+  if(!Array.isArray(value.entries)) throw new Error('world history entries must be an array');
+  return { regionId, turn, entries:value.entries.map(worldHistoryNormalizeEntry) };
+}
+function parseWorldHistory(text, regionId){
+  const raw=String(text||'').trim();
+  if(!raw) return worldHistoryTemplate(regionId);
+  let parsed;
+  try{ parsed=JSON.parse(raw); }catch(error){ throw new Error('Malformed world history JSON: '+String(error&&error.message||error)); }
+  return assertWorldHistoryObject(parsed,{regionId});
+}
+function serializeWorldHistory(history){
+  const valid=assertWorldHistoryObject(history);
+  return JSON.stringify({
+    regionId:valid.regionId,
+    turn:valid.turn,
+    entries:valid.entries,
+  },null,2)+'\n';
+}
+function assertWorldHistory(text){
+  const raw=String(text||'').trim();
+  if(!raw) return text;
+  try{ assertWorldHistoryObject(JSON.parse(raw)); }
+  catch(error){ throw new Error('refusing to write - that file is not a world history file'); }
+  return text;
+}
+function assertWorldHistoryWriteTarget(path, campaignName, history, currentText){
+  const valid=assertWorldHistoryObject(history);
+  const expected=worldHistoryPath(campaignName,valid.regionId);
+  if(path!==expected) throw new Error('Refusing world history write: expected '+expected+' but received '+path);
+  if(currentText!=null && String(currentText).trim()) parseWorldHistory(currentText,valid.regionId);
+  return valid;
+}
+function worldHistoryTextMatches(currentText, expectedText, regionId){
+  const current=String(currentText||'').trim(), expected=String(expectedText||'').trim();
+  if(!current && !expected) return true;
+  if(!current || !expected) return false;
+  return serializeWorldHistory(parseWorldHistory(current,regionId))===serializeWorldHistory(parseWorldHistory(expected,regionId));
+}
+function worldHistoryAppend(history, entry, turn){
+  const valid=assertWorldHistoryObject(history);
+  const nextTurn=Number.isInteger(turn) && turn>=0 ? turn : valid.turn;
+  return { regionId:valid.regionId, turn:nextTurn, entries:valid.entries.concat([worldHistoryNormalizeEntry(entry)]) };
+}
+function worldHistoryResolutionKeys(history){
+  const resolved=new Set(), rolledBackTurns=new Set();
+  assertWorldHistoryObject(history).entries.forEach(entry=>{
+    if(Number.isInteger(entry.rollbackOf)) rolledBackTurns.add(String(entry.rollbackOf));
+    if(entry.resolution){
+      (entry.resolution.accepted||[]).concat(entry.resolution.rejected||[]).forEach(ref=>{
+        resolved.add(worldHistoryChangeKey(ref.turn,ref.id));
+      });
+    }
+  });
+  return {resolved, rolledBackTurns};
+}
+function worldPendingChanges(history){
+  const valid=assertWorldHistoryObject(history), keys=worldHistoryResolutionKeys(valid), out=[];
+  valid.entries.forEach(entry=>{
+    if(keys.rolledBackTurns.has(String(entry.turn))) return;
+    (entry.pending||[]).forEach(change=>{
+      const turn=Number.isInteger(change.turn)?change.turn:entry.turn;
+      const id=String(change.id||'');
+      if(!id || keys.resolved.has(worldHistoryChangeKey(turn,id))) return;
+      out.push({...regionClone(change), turn, trigger:change.trigger||entry.trigger});
+    });
+  });
+  return out;
+}
+function worldHistoryAcceptedSet(acceptedIds){
+  const set=new Set();
+  (Array.isArray(acceptedIds)?acceptedIds:[]).forEach(item=>{
+    if(regionIsRecord(item)){
+      if(item.id) set.add(worldHistoryChangeKey(Number.isInteger(item.turn)?item.turn:0,item.id));
+      if(item.id) set.add(String(item.id));
+    }else if(item!=null) set.add(String(item));
+  });
+  return set;
+}
+function worldHistoryIsAccepted(set, change){
+  const ref=worldHistoryChangeRef(change);
+  return set.has(worldHistoryChangeKey(ref.turn,ref.id)) || set.has(ref.id);
+}
+async function worldTurnLoadRegion(cfg, campaignName, regionId){
+  const path=regionExpectedPath(campaignName,regionId), read=await ghGetText(cfg,path);
+  if(!read) throw new Error('Region not found: '+path);
+  const region=assertRegionJson(read.text,{expectedCampaign:campaignName,expectedId:regionId});
+  return {path, text:read.text, region};
+}
+async function worldTurnLoadHistory(cfg, campaignName, regionId){
+  const path=worldHistoryPath(campaignName,regionId), read=await ghGetText(cfg,path);
+  return {path, text:read?read.text:'', history:parseWorldHistory(read?read.text:'',regionId)};
+}
+function worldTurnCurrentRegionMatches(currentText, expectedText, campaignName, regionId){
+  if(!String(currentText||'').trim() || !String(expectedText||'').trim()) return false;
+  const current=assertRegionJson(currentText,{expectedCampaign:campaignName,expectedId:regionId});
+  const expected=assertRegionJson(expectedText,{expectedCampaign:campaignName,expectedId:regionId});
+  return serializeRegion(current)===serializeRegion(expected);
+}
+async function worldTurnWriteRegion(cfg, campaignName, path, nextRegion, expectedText, message){
+  const valid=assertRegionWriteTarget(path,campaignName,nextRegion,expectedText);
+  const nextText=serializeRegion(valid);
+  await ghUpdate(cfg,path,current=>{
+    assertRegionWriteTarget(path,campaignName,valid,current);
+    if(expectedText!=null && !worldTurnCurrentRegionMatches(current,expectedText,campaignName,valid.id)) throw new Error('Region changed before the world turn write could land; reload and try again.');
+    return nextText;
+  },message,{guard:current=>assertRegionWriteTarget(path,campaignName,valid,current)});
+}
+async function worldTurnWriteHistory(cfg, campaignName, path, nextHistory, expectedText, message){
+  const valid=assertWorldHistoryWriteTarget(path,campaignName,nextHistory,expectedText);
+  const nextText=serializeWorldHistory(valid);
+  await ghUpdate(cfg,path,current=>{
+    assertWorldHistoryWriteTarget(path,campaignName,valid,current);
+    if(expectedText!=null && !worldHistoryTextMatches(current,expectedText,valid.regionId)) throw new Error('World history changed before the write could land; reload and try again.');
+    return nextText;
+  },message,{create:true,guard:assertWorldHistory});
+}
+function worldTurnSplitChanges(changes){
+  const list=Array.isArray(changes)?changes:[];
+  return {
+    minor:list.filter(change=>change&&change.severity==='minor'),
+    major:list.filter(change=>change&&change.severity==='major'),
+  };
+}
+async function worldTurnAdvance(cfg, campaignName, regionId, trigger){
+  const regionState=await worldTurnLoadRegion(cfg,campaignName,regionId);
+  const historyState=await worldTurnLoadHistory(cfg,campaignName,regionId);
+  const turn=historyState.history.turn+1, cleanTrigger=worldHistoryCleanTrigger(trigger);
+  const changes=worldTurnChanges(regionState.region,{campaign:campaignName,turn,trigger:cleanTrigger});
+  const split=worldTurnSplitChanges(changes), applied=worldTurnApply(regionState.region,split.minor);
+  const entry={
+    turn, trigger:cleanTrigger, at:worldHistoryNow(cfg),
+    applied:applied.applied, reverse:applied.reverse, pending:split.major,
+  };
+  const nextHistory=worldHistoryAppend(historyState.history,entry,turn);
+  await worldTurnWriteRegion(cfg,campaignName,regionState.path,applied.region,regionState.text,'World turn '+turn+' for '+regionId);
+  await worldTurnWriteHistory(cfg,campaignName,historyState.path,nextHistory,historyState.text,'World turn history '+turn+' for '+regionId);
+  return { turn, trigger:cleanTrigger, changes, applied:applied.applied, reverse:applied.reverse, pending:split.major, region:applied.region, history:nextHistory };
+}
+async function worldResolvePending(cfg, campaignName, regionId, acceptedIds){
+  const regionState=await worldTurnLoadRegion(cfg,campaignName,regionId);
+  const historyState=await worldTurnLoadHistory(cfg,campaignName,regionId);
+  const pending=worldPendingChanges(historyState.history), acceptedSet=worldHistoryAcceptedSet(acceptedIds);
+  const accepted=pending.filter(change=>worldHistoryIsAccepted(acceptedSet,change));
+  const rejected=pending.filter(change=>!worldHistoryIsAccepted(acceptedSet,change));
+  if(!pending.length) return { turn:historyState.history.turn, accepted:[], rejected:[], region:regionState.region, history:historyState.history };
+  const applied=worldTurnApply(regionState.region,accepted);
+  const entry={
+    turn:historyState.history.turn,
+    trigger:'review',
+    at:worldHistoryNow(cfg),
+    applied:applied.applied,
+    reverse:applied.reverse,
+    pending:[],
+    resolution:{ accepted:accepted.map(worldHistoryChangeRef), rejected:rejected.map(worldHistoryChangeRef) },
+  };
+  const nextHistory=worldHistoryAppend(historyState.history,entry,historyState.history.turn);
+  await worldTurnWriteRegion(cfg,campaignName,regionState.path,applied.region,regionState.text,'Resolve world turn changes for '+regionId);
+  await worldTurnWriteHistory(cfg,campaignName,historyState.path,nextHistory,historyState.text,'Resolve world turn history for '+regionId);
+  return { turn:historyState.history.turn, accepted:applied.applied, rejected, region:applied.region, history:nextHistory };
+}
+async function worldRollbackTurn(cfg, campaignName, regionId, turn){
+  const target=Number(turn);
+  if(!Number.isInteger(target) || target<0) throw new Error('Rollback turn must be a nonnegative integer');
+  const regionState=await worldTurnLoadRegion(cfg,campaignName,regionId);
+  const historyState=await worldTurnLoadHistory(cfg,campaignName,regionId);
+  if(historyState.history.turn!==target) throw new Error('Only the most recent world turn can be rolled back');
+  const rollbackEntries=historyState.history.entries.filter(entry=>entry.turn===target && !Number.isInteger(entry.rollbackOf) && Array.isArray(entry.reverse) && entry.reverse.length);
+  if(!rollbackEntries.length) throw new Error('No reversible changes stored for turn '+target);
+  const reverse=[];
+  rollbackEntries.slice().reverse().forEach(entry=>{ reverse.push(...entry.reverse.map(regionClone)); });
+  const applied=worldTurnApply(regionState.region,reverse);
+  const entry={
+    turn:target,
+    trigger:'rollback',
+    at:worldHistoryNow(cfg),
+    applied:applied.applied,
+    reverse:applied.reverse,
+    pending:[],
+    rollbackOf:target,
+  };
+  const nextHistory=worldHistoryAppend(historyState.history,entry,Math.max(0,target-1));
+  await worldTurnWriteRegion(cfg,campaignName,regionState.path,applied.region,regionState.text,'Rollback world turn '+target+' for '+regionId);
+  await worldTurnWriteHistory(cfg,campaignName,historyState.path,nextHistory,historyState.text,'Rollback world turn history '+target+' for '+regionId);
+  return { turn:target, applied:applied.applied, reverse:applied.reverse, region:applied.region, history:nextHistory };
+}
+/* ========================================================================== *
    THE GAME SPACE — manage campaigns and hand sessions off to the GM. The
    campaign counterpart to the Canon Studio: a landing that lists your runs, and
    a per-campaign view (Resume / Ledger / Threads / Character) over the repo files.
@@ -15898,6 +16483,8 @@ campRegion=async function(host,name){
         wrap.append(h('section',{class:'region-opened'},h('div',{class:'region-editor-head'},h('h3',null,'Open region'),h('span',{class:'hint'},selected.json.name))));
         wrap.append(regionStatusCard(selected));
         wrap.append(typeof regionEditableMapPanel==='function'?regionEditableMapPanel(selected,cfg,name):regionMapPanel(selected));
+        const worldPanel=typeof regionWorldHubPanel==='function'?regionWorldHubPanel(selected,cfg,name,()=>campRegion(host,name)):null;
+        if(worldPanel) wrap.append(worldPanel);
       }
     }
     if(result.orphanMarkdown.length){
@@ -15909,6 +16496,219 @@ campRegion=async function(host,name){
     host.replaceChildren(h('p',{class:'hint'},'Region data unavailable: '+String(error&&error.message||error)));
   }
 };
+/* ========================================================================== *
+   REGION LIVING WORLD 3 - campaign surface.
+
+   UI and table context for the Slice 41/42 world-turn primitives. This file
+   previews before writing, then delegates every mutation to the guarded history
+   helpers.
+ * ========================================================================== */
+
+const REGION_WORLD_TRIGGER_OPTIONS = [
+  ['time-passed','Time passed'],
+  ['end-session','Session end'],
+  ['event','Event'],
+];
+
+function worldSurfaceTriggerValue(kind, note){
+  const cleanKind=String(kind||'time-passed').trim()||'time-passed';
+  const cleanNote=String(note||'').replace(/\s+/g,' ').trim().slice(0,120);
+  return cleanKind==='event' && cleanNote ? 'event: '+cleanNote : cleanKind;
+}
+function worldSurfaceTargetLabel(change){
+  const target=change&&change.target||{};
+  if(target.kind==='ambientMana') return 'ambient mana';
+  if(target.kind==='element') return (target.layerId||'region')+' '+target.element;
+  if(target.kind==='feature') return (target.field||'feature')+' '+target.id;
+  if(target.kind==='route') return 'route '+target.id;
+  return target.kind||'region';
+}
+function worldSurfaceValueLabel(value){
+  if(value==null) return 'cleared';
+  if(regionIsRecord(value)){
+    if(value.band!=null && value.intensity!=null) return value.band+' '+value.intensity;
+    return JSON.stringify(regionStableValue(value));
+  }
+  return String(value);
+}
+function worldSurfaceChangeLine(change){
+  return String(change&&change.scope||'world')+' '+worldSurfaceTargetLabel(change)+' -> '+worldSurfaceValueLabel(change&&change.after);
+}
+function worldSurfacePreview(region, history, trigger){
+  const valid=assertRegion(region);
+  const hist=assertWorldHistoryObject(history||worldHistoryTemplate(valid.id),{regionId:valid.id});
+  const clean=worldHistoryCleanTrigger(trigger);
+  const turn=hist.turn+1;
+  const changes=worldTurnChanges(valid,{campaign:valid.campaign,turn,trigger:clean});
+  const split=worldTurnSplitChanges(changes);
+  return {turn, trigger:clean, changes, minor:split.minor, major:split.major};
+}
+function worldSurfaceHistoryEntries(history){
+  return assertWorldHistoryObject(history).entries.slice().reverse();
+}
+function worldSurfaceCanRollback(history, entry){
+  const valid=assertWorldHistoryObject(history);
+  return !!(entry && !Number.isInteger(entry.rollbackOf) && entry.turn===valid.turn && (entry.reverse||[]).length);
+}
+function worldSurfaceChangeList(changes, mode){
+  const list=Array.isArray(changes)?changes:[];
+  if(!list.length) return h('p',{class:'hint'},mode==='pending'?'No major changes awaiting review.':'No changes in this group.');
+  return h('ul',{class:'region-world-change-list'},...list.map(change=>
+    h('li',null,
+      h('span',{class:'region-world-pill '+(change.severity==='major'?'major':'minor')},mode==='pending'?'needs review':(change.severity==='major'?'major':'auto')),
+      h('span',null,worldSurfaceChangeLine(change)),
+      change.note?h('small',{class:'hint'},change.note):null)));
+}
+function worldSurfacePendingReview(history){
+  const pending=worldPendingChanges(history);
+  if(!pending.length) return h('p',{class:'hint'},'No major changes awaiting review.');
+  const picks=pending.map(change=>{
+    const cb=h('input',{type:'checkbox'});
+    return {change,cb,node:h('label',{class:'play-proposal-pick region-world-review-pick'},cb,h('span',null,worldSurfaceChangeLine(change)))};
+  });
+  return {pending,picks,node:h('div',{class:'play-proposal region-world-review'},
+    h('div',{class:'hint'},'Major changes wait here until you choose which ones become world truth. Checked items are accepted; unchecked items are rejected.'),
+    h('div',{class:'play-proposal-list'},...picks.map(pick=>pick.node)))};
+}
+function worldSurfaceHistoryNode(history, onRollback){
+  const valid=assertWorldHistoryObject(history), entries=worldSurfaceHistoryEntries(valid);
+  if(!entries.length) return h('details',{class:'region-world-history'},h('summary',null,'History'),h('p',{class:'hint'},'No world turns recorded yet.'));
+  return h('details',{class:'region-world-history',open:true},
+    h('summary',null,'History'),
+    h('div',{class:'ledger-timeline-list region-world-timeline'},...entries.map(entry=>
+      h('div',{class:'ledger-timeline-entry region-world-history-entry'},
+        h('div',{class:'ledger-timeline-summary'},
+          h('span',{class:'ledger-timeline-dot','aria-hidden':'true'}),
+          h('span',{class:'ledger-timeline-main'},
+            h('span',{class:'ledger-timeline-meta'},
+              h('b',null,'turn '+entry.turn),
+              h('span',{class:'ledger-timeline-phase'},entry.trigger||'advance'),
+              entry.rollbackOf!=null?h('span',{class:'ledger-timeline-label'},'rollback of '+entry.rollbackOf):null,
+              entry.at?h('span',{class:'ledger-timeline-date'},entry.at):null),
+            h('span',{class:'ledger-timeline-preview'},
+              (entry.applied||[]).length+' applied, '+(entry.pending||[]).length+' pending'))),
+        h('div',{class:'ledger-timeline-full'},
+          (entry.applied||[]).length?h('div',null,h('b',null,'Applied'),worldSurfaceChangeList(entry.applied,'applied')):null,
+          (entry.pending||[]).length?h('div',null,h('b',null,'Pending review'),worldSurfaceChangeList(entry.pending,'pending')):null,
+          worldSurfaceCanRollback(valid,entry)?h('div',{class:'toolrow'},
+            h('button',{class:'navbtn ghost',type:'button',onclick:()=>onRollback(entry.turn)},'Rollback turn '+entry.turn)):null)))));
+}
+function worldHistoryTableItems(history, region, limit){
+  const valid=assertWorldHistoryObject(history), title=(region&&region.title)||valid.regionId, out=[];
+  valid.entries.slice().reverse().forEach(entry=>{
+    (entry.applied||[]).slice().reverse().forEach(change=>{
+      out.push(title+': '+worldSurfaceChangeLine(change)+' - turn '+entry.turn);
+    });
+    (entry.pending||[]).forEach(change=>{
+      if(worldPendingChanges(valid).some(p=>p.id===change.id && p.turn===entry.turn)){
+        out.push(title+': awaiting review - '+worldSurfaceChangeLine(change)+' - turn '+entry.turn);
+      }
+    });
+  });
+  return out.slice(0,Math.max(1,limit||6));
+}
+async function worldCampaignTableChanges(cfg, campaignName, limit){
+  const loaded=await loadCampaignRegions(cfg,campaignName);
+  const validEntries=loaded.regions.filter(entry=>entry.region&&(!entry.errors||!entry.errors.length));
+  const chunks=await Promise.all(validEntries.map(async entry=>{
+    try{
+      const read=await ghGetText(cfg,worldHistoryPath(campaignName,entry.region.id));
+      const history=parseWorldHistory(read?read.text:'',entry.region.id);
+      return worldHistoryTableItems(history,entry.region,limit);
+    }catch(error){ return []; }
+  }));
+  return chunks.flat().slice(0,Math.max(1,limit||6));
+}
+
+function regionWorldHubPanel(entry, cfg, campaignName, refresh){
+  const region=entry&&entry.region;
+  if(!region || (entry.errors&&entry.errors.length)) return null;
+  const section=h('section',{class:'region-world-panel'});
+  let history=worldHistoryTemplate(region.id), preview=null, status='Loading world history...', busy=false, triggerKind='time-passed', eventNote='';
+
+  function setStatus(text){ status=text; draw(); }
+  async function loadHistory(){
+    try{ history=(await worldTurnLoadHistory(cfg,campaignName,region.id)).history; status=''; draw(); }
+    catch(error){ status='World history unavailable: '+String(error&&error.message||error); draw(); }
+  }
+  async function confirmPreview(){
+    if(!preview || busy) return;
+    busy=true; setStatus('Advancing the world turn...');
+    try{
+      await worldTurnAdvance(cfg,campaignName,region.id,preview.trigger);
+      status='World turn advanced.';
+      if(typeof refresh==='function') refresh();
+      else await loadHistory();
+    }catch(error){
+      busy=false; setStatus('Advance failed: '+String(error&&error.message||error));
+    }
+  }
+  async function resolveReview(picks){
+    if(busy) return;
+    const accepted=picks.filter(pick=>pick.cb.checked).map(pick=>pick.change.id);
+    busy=true; setStatus('Resolving reviewed changes...');
+    try{
+      await worldResolvePending(cfg,campaignName,region.id,accepted);
+      status='Review saved.';
+      if(typeof refresh==='function') refresh();
+      else await loadHistory();
+    }catch(error){
+      busy=false; setStatus('Review failed: '+String(error&&error.message||error));
+    }
+  }
+  async function rollback(turn){
+    if(busy) return;
+    if(typeof confirm==='function' && !confirm('Rollback world turn '+turn+'?')) return;
+    busy=true; setStatus('Rolling back turn '+turn+'...');
+    try{
+      await worldRollbackTurn(cfg,campaignName,region.id,turn);
+      status='Rollback saved.';
+      if(typeof refresh==='function') refresh();
+      else await loadHistory();
+    }catch(error){
+      busy=false; setStatus('Rollback failed: '+String(error&&error.message||error));
+    }
+  }
+  function draw(){
+    const triggerSelect=h('select',{onchange:ev=>{ triggerKind=ev.target.value; preview=null; draw(); }},
+      ...REGION_WORLD_TRIGGER_OPTIONS.map(opt=>h('option',{value:opt[0]},opt[1])));
+    triggerSelect.value=triggerKind;
+    const note=h('input',{value:eventNote,placeholder:'Optional event note',maxlength:'120',onchange:ev=>{ eventNote=ev.target.value; preview=null; draw(); }});
+    const review=worldSurfacePendingReview(history);
+    const reviewNode=review.node||review;
+    const kids=[
+      h('div',{class:'region-editor-head'},
+        h('h3',null,'World turn'),
+        h('span',{class:'hint'},'turn '+history.turn+' recorded')),
+      h('div',{class:'region-world-controls'},
+        regionForgeField('Trigger',triggerSelect,'World turns advance only from this explicit action.'),
+        regionForgeField('Event note',note,'Used only when the trigger is Event.'),
+        h('div',{class:'toolrow region-world-actions'},
+          h('button',{class:'navbtn primary',type:'button',disabled:busy?'true':null,onclick:()=>{
+            preview=worldSurfacePreview(region,history,worldSurfaceTriggerValue(triggerKind,eventNote));
+            draw();
+          }},'Preview changes'),
+          preview?h('button',{class:'navbtn primary',type:'button',disabled:busy?'true':null,onclick:confirmPreview},'Confirm world turn'):null,
+          h('span',{class:'hint',role:'status'},status))),
+      preview?h('div',{class:'region-world-preview'},
+        h('h4',null,'Preview turn '+preview.turn),
+        h('p',{class:'hint'},'Minor changes auto-apply on confirm. Major changes wait for review.'),
+        h('b',null,'Auto-applied minors'),
+        worldSurfaceChangeList(preview.minor,'applied'),
+        h('b',null,'Major changes needing review'),
+        worldSurfaceChangeList(preview.major,'pending')):null,
+      reviewNode,
+      review.pending&&review.pending.length?h('div',{class:'toolrow region-world-actions'},
+        h('button',{class:'navbtn primary',type:'button',disabled:busy?'true':null,onclick:()=>resolveReview(review.picks)},'Resolve review'),
+        h('span',{class:'hint'},'Unchecked items are rejected.')):null,
+      worldSurfaceHistoryNode(history,rollback),
+    ];
+    section.replaceChildren(...kids.filter(Boolean));
+  }
+  draw();
+  loadHistory();
+  return section;
+}
 /* ========================================================================== *
    CAMPAIGN DEMO — a read-only preview of the Game tools, populated with sample
    content so you can see the atlas, the maps (with GM/player fog), and the cast
@@ -16423,7 +17223,7 @@ function campPlayShortText(text, max){
   return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
 }
 
-function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens){
+function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges){
   const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
   const clocks=campPlayCleanList(sections.clocks);
   const people=campPlayCleanList(sections.people);
@@ -16432,6 +17232,7 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
   const carries=campPlayCleanList(sections.carries);
   const castList=(Array.isArray(cast)?cast:[]).map(c=>[c.name,c.status,c.relationship].filter(Boolean).join(' - ')).filter(Boolean);
   const ids=(Array.isArray(groundingIds)?groundingIds:[]).filter(Boolean);
+  const worldItems=(Array.isArray(worldChanges)?worldChanges:[]).map(item=>String(item||'').trim()).filter(Boolean);
   return [
     {id:'scene', label:'Scene', items:[
       t.scene&&('Scene: '+t.scene),
@@ -16444,6 +17245,7 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
       rt.strain&&('Strain: '+rt.strain),
     ].filter(Boolean), empty:'No scene state recorded yet.'},
     {id:'threads', label:'Threads & Clocks', items:live.map(x=>'LIVE: '+x).concat(warming.map(x=>'WARMING: '+x), waiting.map(x=>'WAITING: '+x), blocked.map(x=>'BLOCKED: '+x), clocks.map(x=>'Clock: '+x)), empty:'No live threads or clocks yet.'},
+    {id:'world', label:'World Changes', items:worldItems, empty:'No applied world changes yet.'},
     {id:'grounding', label:'Canon Grounding', items:(ids.length?ids.map(x=>'Grounded on: '+x):[draftLens?'Retrieved from promoted canon + draft queue cards each turn.':'Retrieved from promoted canon each turn.'])
       .concat(draftLens&&ids.length?['Experimental drafts lens ON — draft:ID refs are queue cards, not promoted canon.']:[]), empty:''},
     {id:'secrets', label:'Secrets / Clues', items:knowledge.slice(0,5).concat(carries.slice(0,3), capabilities.slice(0,3)), empty:'Use Knowledge Boundary, carries, and capabilities as the clue surface.'},
@@ -16604,7 +17406,7 @@ async function campPlay(host, name){
 async function campPlayBuildSession(name, profiles){
   const cfg=ghCfg();
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
-  let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null;
+  let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null, worldChanges=[];
   let warmPrediction=null;   // Slice 45: {text, ids} — the quiet typing-time canon prediction
   try{
     files=await campaignFiles(cfg,name);
@@ -16615,6 +17417,7 @@ async function campPlayBuildSession(name, profiles){
     if(ca&&typeof parseCast==='function') cast=parseCast(ca.text);
     const log=await campPlayLoadLog(cfg, name);
     messages=log.messages; logLoadFailed=log.failed;
+    if(typeof worldCampaignTableChanges==='function') worldChanges=await worldCampaignTableChanges(cfg,name,8).catch(()=>[]);
   }catch(e){ return {error:'Error: '+e.message}; }
 
   const defaultEngine=assistantDefaultEngine(profiles);
@@ -16810,7 +17613,7 @@ async function campPlayBuildSession(name, profiles){
     modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
-    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked);
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges);
     tablePanel.replaceChildren(...cards.map(card=>{
       const list=(card.items||[]).filter(Boolean);
       return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'?true:null},
