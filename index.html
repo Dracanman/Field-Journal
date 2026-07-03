@@ -258,7 +258,10 @@
 .shelf-kicker-world{ color:var(--gold); border-color:color-mix(in srgb, var(--gold) 45%, transparent); }
   /* ---------- worksheet editor ---------- */
   .editor-wrap{ display:grid; grid-template-columns:minmax(0,1fr) 446px; gap:40px; align-items:start; }
-  @media (max-width:900px){ .editor-wrap{ grid-template-columns:1fr; } .card-col{ order:-1; } }
+  /* One column on the phone, card first — and UNSTUCK: the desktop sticky
+     (top:64px below) otherwise pins the preview over the form as you scroll
+     into the fields ("the card covers the worksheet" — Del, 2026-07-02). */
+  @media (max-width:900px){ .editor-wrap{ grid-template-columns:1fr; } .card-col{ order:-1; position:static; } }
   .editor-intro{ display:grid; gap:10px; margin-bottom:22px; padding-bottom:16px; border-bottom:1px solid var(--gold-soft); }
   .editor-note{ margin:0; color:var(--ink-soft); font-style:italic; }
   .editor-example-toggle[aria-pressed="true"]{ background:#eef0e4; border-color:var(--green); color:#4d5a36; }
@@ -1420,6 +1423,24 @@ body.theme-night .space-tile[data-space="learner"]{--accent:#2e789d}
     .prc-check{ padding:9px 0; }
     .prc-check input{ width:22px; height:22px; margin-top:2px; }
   }
+/* AMBIENT MARGIN DOODLES — homemade flourishes in the blank space beside the
+   content column. currentColor = the active person's accent, then the space
+   accent — so the art retints with the profile by CSS alone. z-index:-1 keeps
+   every real card painted over them: the doodles only exist where nothing else
+   does. Wide screens only — the phone has no blank margins, so no art. */
+.ambient-art{
+  position:fixed; inset:0; pointer-events:none; z-index:-1; display:none;
+  color:var(--who-accent, var(--accent, var(--gold)));
+}
+.ambient-art svg{ position:absolute; opacity:.16; }
+@media (min-width:1200px){ .ambient-art{ display:block; } }
+@media print{ .ambient-art{ display:none !important; } }
+/* under ✦ Atmospherics the doodles breathe, barely (margin, not transform —
+   transform carries each doodle's rotation) */
+body.fx-rich .ambient-art svg{ animation:ambient-bob 14s ease-in-out infinite alternate; }
+body.fx-rich .ambient-art svg:nth-child(2n){ animation-duration:19s; animation-delay:-7s; }
+@keyframes ambient-bob{ from{ margin-top:0; } to{ margin-top:10px; } }
+@media (prefers-reduced-motion:reduce){ .ambient-art svg{ animation:none !important; } }
   /* ========================================================================
      Cloud / Aetherial theme — the OVERARCHING look (floating sky, frosted glass,
      glowing elemental accents). Loaded last so it can both (a) redefine the
@@ -3487,6 +3508,7 @@ function render(){
   $app.append(quickCaptureButton());
   $app.append(companionMount());
   $app.append(bottomNav());
+  ambientArtMount();   // margin doodles (body layer, wide screens only) follow the space
   ensureSpaceStatusDots();
 }
 function errorCard(e){
@@ -4572,6 +4594,77 @@ function undoToast(msg, onUndo){
   document.body.append(t); clearTimeout(toastT); toastT=setTimeout(()=>t.remove(),5500);
 }
 
+/* ---------- AMBIENT MARGIN DOODLES ------------------------------------------
+   Homemade flourishes for the blank space beside the content column (Del,
+   2026-07-02: "fill blank spaces and have them change color with the profile").
+   Same wobbly language as the worksheet example doodles, but stroke-only in
+   currentColor: the CSS layer colors itself var(--who-accent, var(--accent)),
+   so the art retints with the active space AND the active person's flavor with
+   no JS repaint. The layer sits at z-index:-1 — real content covers it, so the
+   doodles exist only where nothing else does — and only shows on wide screens
+   (see ambient.css); on the phone there is no blank space, so there is no art. */
+const AMBIENT={ layer:null, key:'' };
+
+// Stroke-only motifs, 100x100 boxes, drawn crooked on purpose.
+const AMBIENT_MOTIFS={
+  sprig:'<g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"><path d="M50,92 Q54,60 46,28 Q44,18 50,10"/><path d="M48,70 Q30,64 24,48"/><path d="M50,52 Q68,48 76,32"/><path d="M47,36 Q34,30 30,18"/></g>',
+  sparkle:'<g fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"><path d="M50,16 L50,46"/><path d="M50,60 L50,84"/><path d="M18,50 L42,50"/><path d="M60,50 L84,50"/></g>',
+  cloud:'<path d="M22,66 Q20,48 40,46 Q44,30 62,34 Q80,34 82,50 Q94,54 90,66 Q76,76 48,74 Q28,74 22,66 Z" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linejoin="round"/>',
+  island:'<g fill="none" stroke="currentColor" stroke-width="5.4" stroke-linejoin="round" stroke-linecap="round"><path d="M18,44 Q34,34 52,34 Q74,34 84,44 Q86,50 78,52 Q50,58 24,52 Q16,50 18,44 Z"/><path d="M28,52 Q40,74 52,86 Q60,72 72,62 Q78,56 76,52"/><path d="M44,34 Q44,24 52,18 Q58,26 56,34"/></g>',
+  flower:'<g fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><circle cx="50" cy="50" r="10"/><path d="M50,36 Q44,20 52,14 Q60,22 56,36"/><path d="M62,44 Q78,36 84,44 Q78,54 64,52"/><path d="M58,60 Q66,76 58,84 Q48,78 50,62"/><path d="M38,56 Q22,60 18,50 Q26,42 38,46"/></g>',
+  swirl:'<path d="M24,60 Q24,28 56,26 Q84,26 82,52 Q80,74 58,72 Q42,70 44,54 Q46,42 58,44" fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round"/>',
+  seed:'<g fill="none" stroke="currentColor" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round"><path d="M50,26 Q68,44 66,64 Q64,84 50,85 Q36,84 34,64 Q32,44 50,26 Z"/><path d="M50,16 L50,6"/><path d="M72,26 L79,19"/><path d="M28,26 L21,19"/></g>',
+};
+
+// Which doodles sit where, per space — left/right margin bands only, so they
+// can never crowd the column. Numbers are honest eyeballing, not a system.
+const AMBIENT_SPOTS={
+  maker:[
+    {side:'left',x:34,top:14,size:64,rot:-8,motif:'sprig'},{side:'left',x:44,top:62,size:52,rot:6,motif:'flower'},
+    {side:'left',x:70,top:40,size:26,rot:0,motif:'sparkle'},{side:'right',x:40,top:22,size:56,rot:8,motif:'seed'},
+    {side:'right',x:56,top:55,size:44,rot:-6,motif:'swirl'},{side:'right',x:30,top:78,size:60,rot:14,motif:'sprig'},
+  ],
+  worldbuilder:[
+    {side:'left',x:36,top:16,size:56,rot:-10,motif:'swirl'},{side:'left',x:62,top:44,size:28,rot:0,motif:'sparkle'},
+    {side:'left',x:30,top:70,size:62,rot:10,motif:'sprig'},{side:'right',x:34,top:18,size:70,rot:6,motif:'island'},
+    {side:'right',x:66,top:48,size:24,rot:0,motif:'sparkle'},{side:'right',x:36,top:76,size:48,rot:-8,motif:'flower'},
+  ],
+  game:[
+    {side:'left',x:30,top:15,size:74,rot:-6,motif:'island'},{side:'left',x:48,top:48,size:58,rot:4,motif:'cloud'},
+    {side:'left',x:66,top:76,size:26,rot:0,motif:'sparkle'},{side:'right',x:38,top:20,size:64,rot:-4,motif:'cloud'},
+    {side:'right',x:30,top:60,size:66,rot:8,motif:'island'},{side:'right',x:70,top:40,size:24,rot:0,motif:'sparkle'},
+  ],
+  learner:[
+    {side:'left',x:40,top:18,size:48,rot:8,motif:'swirl'},{side:'left',x:60,top:42,size:30,rot:0,motif:'sparkle'},
+    {side:'left',x:34,top:68,size:54,rot:-6,motif:'seed'},{side:'right',x:64,top:22,size:26,rot:0,motif:'sparkle'},
+    {side:'right',x:32,top:50,size:58,rot:6,motif:'sprig'},{side:'right',x:46,top:78,size:42,rot:-10,motif:'swirl'},
+  ],
+};
+
+function ambientArtHtml(profile){
+  const spots=AMBIENT_SPOTS[profile]||AMBIENT_SPOTS.maker;
+  return spots.map(s=>
+    '<svg viewBox="0 0 100 100" aria-hidden="true" style="'+s.side+':'+s.x+'px;top:'+s.top+'%;width:'+s.size+'px;height:'+s.size+'px;transform:rotate('+s.rot+'deg)">'+
+    (AMBIENT_MOTIFS[s.motif]||'')+'</svg>'
+  ).join('');
+}
+
+// Mounted by render() on every navigation, like the companion: one persistent
+// body layer, rebuilt only when the space actually changes.
+function ambientArtMount(){
+  if(typeof document==='undefined'||!document.body||!document.body.append) return;
+  if(!AMBIENT.layer){
+    const layer=document.createElement('div');
+    layer.className='ambient-art no-print';
+    layer.setAttribute('aria-hidden','true');
+    AMBIENT.layer=layer;
+    document.body.append(layer);
+  }
+  const key=DB&&DB.profile||'maker';
+  if(AMBIENT.key===key) return;
+  AMBIENT.key=key;
+  try{ AMBIENT.layer.innerHTML=ambientArtHtml(key); }catch(e){}
+}
 /* ---------- Cozy / Full kit mode ------------------------------------------- */
 function themeModeValue(value){ return value==='dark'||value==='light'?value:'auto'; }
 function themeModeLabel(){ const m=themeModeValue(DB.themeMode); return m==='dark'?'Night' : m==='light'?'Day' : 'Auto'; }
