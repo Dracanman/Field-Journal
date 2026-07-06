@@ -13275,36 +13275,43 @@ const REGION_FORGE_COSMIC_BASE = {
 
 // Tunable signal weights. Public signals may influence terrain and visible
 // feature choice. Hidden signals influence only anonymous weights/forms.
+// STEMMED on purpose: each keyword is followed by \w* before its closing \b, so
+// "mountains"/"forests"/"waterfall"/"dangerous" all still hit their base word
+// ("mountain"/"forest"/"water"/"danger") — a plain plural or suffix used to miss
+// silently under strict \bword\b matching (found via a real Forge session,
+// 2026-07-06: typed terrain/direction text registered zero effect).
 const REGION_FORGE_SIGNAL_WEIGHTS = [
-  { re:/\b(?:vael|wing|aerial|sky|flight|bird|feather|glide|airspace)\b/i,
+  { re:/\b(?:vael|wing|aerial|sky|flight|bird|feather|glide|airspace|island|chain)\w*\b/i,
     elements:{air:0.75,light:0.25}, forms:{aerial:0.7,island:0.45,ridge:0.25}, ambient:0.05 },
-  { re:/\b(?:gill|river|rain|water|sea|tide|lake|swim|stream|crossing)\b/i,
+  { re:/\b(?:gill|river|rain|water|sea|tide|lake|swim|stream|crossing|fall)\w*\b/i,
     elements:{water:0.75,life:0.18}, forms:{basin:0.55,mist:0.25}, ambient:0.02 },
-  { re:/\b(?:root|wood|forest|grove|tree|green|growth|plant|living)\b/i,
+  { re:/\b(?:root|wood|forest|grove|tree|green|growth|plant|living|lush)\w*\b/i,
     elements:{wood:0.7,life:0.35,earth:0.15}, forms:{rooted:0.6,basin:0.2}, ambient:0.03 },
-  { re:/\b(?:stone|earth|soil|mountain|ridge|strength|endurance|sturdy|body)\b/i,
+  { re:/\b(?:stone|earth|soil|mountain|ridge|strength|endurance|sturdy|body)\w*\b/i,
     elements:{earth:0.65,metal:0.15}, forms:{ridge:0.55,ravine:0.2}, ambient:0.01 },
-  { re:/\b(?:fire|ember|heat|forge|burn|spark|volcanic|flame)\b/i,
+  { re:/\b(?:fire|ember|heat|forge|burn|spark|volcanic|flame)\w*\b/i,
     elements:{fire:0.75,metal:0.2}, forms:{ridge:0.15,ravine:0.25}, ambient:0.12, danger:0.12 },
-  { re:/\b(?:storm|lightning|quick|speed|agility|charge|electric)\b/i,
+  { re:/\b(?:storm|lightning|quick|speed|agility|charge|electric)\w*\b/i,
     elements:{lightning:0.7,air:0.35}, forms:{storm:0.75,aerial:0.25}, ambient:0.12, danger:0.1 },
-  { re:/\b(?:ice|frost|cold|stillness|winter)\b/i,
+  { re:/\b(?:ice|frost|cold|stillness|winter)\w*\b/i,
     elements:{ice:0.75,water:0.2}, forms:{ridge:0.2,mist:0.3}, ambient:0.05, danger:0.06 },
-  { re:/\b(?:crystal|lattice|memory|resonance|focus|intelligence|study|scholar)\b/i,
+  { re:/\b(?:crystal|lattice|memory|resonance|focus|intelligence|study|scholar)\w*\b/i,
     elements:{crystal:0.65,light:0.2}, forms:{ridge:0.2,cave:0.25}, ambient:0.08 },
-  { re:/\b(?:shadow|stealth|hidden|night|secret|fear|danger|threat|monster|ambush)\b/i,
+  { re:/\b(?:shadow|stealth|hidden|night|secret|fear|danger|threat|monster|ambush)\w*\b/i,
     elements:{shadow:0.65}, forms:{cave:0.3,ravine:0.35,mist:0.25}, ambient:0.08, danger:0.25 },
-  { re:/\b(?:profession|craft|smith|soldier|guard|hunter|scout|fieldcraft|survival)\b/i,
+  { re:/\b(?:profession|craft|smith|soldier|guard|hunter|scout|fieldcraft|survival)\w*\b/i,
     elements:{earth:0.25,metal:0.25,wood:0.18}, forms:{ridge:0.18,rooted:0.18}, ambient:0.01 },
-  { re:/\b(?:kind|compassion|heal|vital|life|charisma|bond|friend|community)\b/i,
+  { re:/\b(?:kind|compassion|heal|vital|life|charisma|bond|friend|community)\w*\b/i,
     elements:{life:0.65,light:0.2,wood:0.2}, forms:{basin:0.2,rooted:0.25}, ambient:0.04 },
-  { re:/\b(?:premise|arrival|portal|threshold|gate|crossing|hook|start|begin)\b/i,
+  { re:/\b(?:premise|arrival|portal|threshold|gate|crossing|hook|start|begin)\w*\b/i,
     elements:{air:0.12,crystal:0.12}, forms:{island:0.2,ridge:0.15,mist:0.15}, ambient:0.04 },
+  { re:/\b(?:cave|cavern|grotto|tunnel|underground|hollow)\w*\b/i,
+    elements:{earth:0.3,shadow:0.25,crystal:0.15}, forms:{cave:0.65,ravine:0.2}, ambient:0.02 },
 ];
 const REGION_FORGE_HIDDEN_SIGNAL_WEIGHTS = [
-  { re:/\b(?:eldrabreer|patron|gift|divine|godling|author|gm-only|secret)\b/i,
+  { re:/\b(?:eldrabreer|patron|gift|divine|godling|author|gm-only|secret)\w*\b/i,
     elements:{shadow:0.45,crystal:0.35,life:0.2,light:0.15}, forms:{mist:0.45,ravine:0.25,cave:0.25}, ambient:0.12, danger:0.1 },
-  { re:/\b(?:doom|curse|enemy|betrayal|horror|danger|threat|pressure)\b/i,
+  { re:/\b(?:doom|curse|enemy|betrayal|horror|danger|threat|pressure)\w*\b/i,
     elements:{shadow:0.5,fire:0.2}, forms:{ravine:0.45,cave:0.25,storm:0.15}, ambient:0.1, danger:0.35 },
 ];
 
@@ -13461,12 +13468,14 @@ function regionForgeApplySignalTable(scores,text,table,scale){
   table.forEach(signal=>{ if(signal.re.test(text)) regionForgeApplySignal(scores,signal,scale); });
 }
 function regionForgeApplyExplicitElements(scores,text,scale){
+  // \w* after the root (same stemming fix as the signal tables): "Wood" still
+  // matches inside "Woods"/"Woody", "crystal" inside "crystalline", etc.
   regionForgeElementKeys().forEach(key=>{
-    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\b','i');
+    const re=new RegExp('\\b'+key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'\\w*\\b','i');
     if(re.test(text)) scores.elements[key]=(scores.elements[key]||0)+0.7*scale;
   });
   Object.entries(REGION_FORGE_EXPRESSION_ELEMENTS).forEach(([key,weights])=>{
-    const re=new RegExp('\\b'+key+'\\b','i');
+    const re=new RegExp('\\b'+key+'\\w*\\b','i');
     if(re.test(text)) regionForgeAddWeights(scores.elements,weights,0.55*scale);
   });
 }
@@ -13682,9 +13691,19 @@ function regionForgeConnections(features){
     status:'open',
   }));
 }
+// The Danger dropdown, found doing nothing (2026-07-06): unlike Ambient Mana it
+// had no override at all — "Moderate"/"High" only ever changed the seed hash
+// (via setup.danger's provenance text), never the actual danger score, so the
+// hazard feature and the ambient-intensity formula never felt it. A FLOOR (not
+// a hard clamp) so narrative keywords can still push danger higher than the pick.
+const REGION_FORGE_DANGER_FLOORS = {low:0.05, moderate:0.4, high:0.85};
 function regionForgeGenerateRegion(input){
   const profile=regionForgeInputProfile(input);
   const scores=regionForgeScoreProfile(profile);
+  const dangerLevel=input&&typeof input==='object'?String(input.dangerLevel||''):'';
+  if(Object.prototype.hasOwnProperty.call(REGION_FORGE_DANGER_FLOORS,dangerLevel)){
+    scores.danger=Math.max(scores.danger, REGION_FORGE_DANGER_FLOORS[dangerLevel]);
+  }
   const layers=regionForgeLocalLayers(profile,scores);
   const terrain=regionForgeBuildTerrain(profile,layers,scores);
   const features=regionForgeFeatures(profile,layers,terrain,scores);
@@ -17420,6 +17439,10 @@ function regionForgeBuildInput(state,bundle,campaignName){
     width:Number(state.width),
     height:Number(state.height),
     cosmicBlend:state.neighborLayer?{neighborLayer:state.neighborLayer,strength:Number(state.blendStrength),band:'transition'}:{},
+    // Danger dropdown's real lever (see REGION_FORGE_DANGER_FLOORS) — separate
+    // from setup.danger above, which only carries the label into the seed's
+    // provenance text.
+    dangerLevel:state.danger&&state.danger!=='recommended'?state.danger:'',
   };
   if(state.role==='starter'){
     if(source.character) input.character=source.character;
