@@ -14852,7 +14852,16 @@ const CAMP_TABS=[
 // Tab content renderers keyed by tab id. The four built-ins are registered here; feature
 // layers (Region, Timeline, Cast, Scratch) self-register via registerCampaignTab so the
 // shared framing (back link, tabs row, GitHub guard, hint) lives only in viewCampaign.
-const CAMP_TAB_VIEWS={ resume:campResume, ledger:campLedger, threads:campThreads, character:campCharacter };
+// LATE-BINDING wrappers, not bare references: feature layers upgrade these views by
+// reassigning the globals after this file runs (campResume gains gauges/survival/
+// tracker-fields; campRegion gains the map + Forge atlas). A bare reference here
+// freezes the load-time version into the tab forever — the placeholder-Region bug.
+const CAMP_TAB_VIEWS={
+  resume:(host,name)=>campResume(host,name),
+  ledger:(host,name)=>campLedger(host,name),
+  threads:(host,name)=>campThreads(host,name),
+  character:(host,name)=>campCharacter(host,name),
+};
 // Add a campaign tab without touching viewCampaign. tabDef=['key','Label','hint'];
 // render=(host,name)=>{}; opts.before/after names an existing tab id to anchor next to.
 function registerCampaignTab(tabDef, render, opts){
@@ -15604,8 +15613,12 @@ async function campRegion(host,name){
 }
 
 // Register the Region tab through the shared campaign-tab helper; the framing (back link,
-// tabs row, GitHub guard, hint) lives in viewCampaign. This focused view stays read-only.
-registerCampaignTab(['region','Region','Saved regional geography, layers, connections, markers, and validation status.'], campRegion);
+// tabs row, GitHub guard, hint) lives in viewCampaign.
+// LATE-BINDING on purpose: region-render.js and region-forge.js upgrade this view by
+// reassigning `campRegion` after this file runs — registering the bare reference would
+// freeze the original placeholder into the tab forever (which is exactly the bug that
+// hid the map and the Create Region buttons until 2026-07-06).
+registerCampaignTab(['region','Region','Saved regional geography, layers, connections, markers, and validation status.'], (host,name)=>campRegion(host,name));
 /* ========================================================================== *
    REGION RENDER — Region Update 2: a deterministic, read-only layered map.
 
