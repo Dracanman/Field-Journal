@@ -609,6 +609,24 @@
   .gh .twocol{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
   .gh .warn{ font-size:13px; color:#9a7b3a; background:#f6edd6; border-radius:8px; padding:9px 12px; margin-top:14px; }
 
+
+/* Slice 49 - the Primer reader (a book, not a workbench) */
+.primer-spine{ text-align:center; margin:4px 0 8px; }
+.primer-wrap{ display:flex; gap:14px; align-items:flex-start; margin-top:10px; }
+.primer-toc{ flex:0 0 210px; position:sticky; top:8px; display:flex; flex-direction:column; gap:4px; max-height:80vh; overflow-y:auto; }
+.primer-toc-item{ text-align:left; font-size:13px; }
+.primer-toc-item.on{ font-weight:600; }
+.primer-book{ flex:1 1 auto; min-width:0; }
+.primer-chapter{ margin-bottom:18px; padding:16px 18px; border-radius:10px; }
+.primer-chapter-head{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.primer-badge{ font-size:12px; }
+.primer-gm-hidden{ font-style:italic; opacity:.6; }
+.primer-gm{ border-left:3px solid var(--glass-border, #b8a67a); padding-left:10px; opacity:.9; }
+.primer-anchor{ display:block; height:0; }
+@media (max-width:700px){
+  .primer-wrap{ flex-direction:column; }
+  .primer-toc{ position:static; flex-direction:row; flex-wrap:wrap; max-height:none; }
+}
   /* ---------- Game space (campaigns) — reuses studio/board/canon-doc styles ---------- */
   .profile-game .maker-only{ display:none !important; }
 
@@ -997,6 +1015,26 @@
   .play-table-stage.table-only .play-tools{
     display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; align-items:start;
   }
+
+/* Slice 51 - the sub-area peek (read-only) + the shared sub-area scene art */
+.region-subarea-peek{ margin-top:10px; padding:12px; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+.subarea-peek-stage{ min-height:60px; }
+.subarea-peek-frame{ border-radius:10px; overflow:hidden; }
+.subarea-peek-frame .region-subarea-svg{ display:block; width:100%; height:auto; max-height:70vh; }
+.subarea-sky{ fill:#1a2033; opacity:.92; }
+.region-map.cosmic-top .subarea-sky{ fill:#dfeefb; opacity:.95; }
+.region-map.cosmic-middle .subarea-sky{ fill:#efe8d2; opacity:.95; }
+.region-map.cosmic-bottom .subarea-sky{ fill:#37324a; opacity:.95; }
+.subarea-blob{ stroke:rgba(60,50,30,.18); stroke-width:.04; }
+.subarea-marks path{ stroke:rgba(60,50,30,.5); stroke-width:.06; stroke-linecap:round; }
+.subarea-niche path,.subarea-niche circle{ stroke:rgba(45,60,45,.55); stroke-width:.06; }
+.subarea-niche circle[r="0.08"]{ fill:rgba(45,60,45,.55); stroke:none; }
+.subarea-landmark circle{ fill:rgba(120,90,40,.65); stroke:rgba(60,45,20,.7); stroke-width:.05; }
+.subarea-landmark-label{ font-size:.42px; fill:rgba(50,40,25,.85); paint-order:stroke; stroke:rgba(255,250,235,.7); stroke-width:.1; }
+.subarea-denizen{ fill:rgba(90,60,110,.7); }
+.subarea-hexes path{ stroke:rgba(40,40,60,.4); stroke-width:.03; stroke-dasharray:.09 .07; }
+.subarea-rim-band{ pointer-events:none; }
+@media (max-width:700px){ .region-subarea-peek .toolrow{ flex-wrap:wrap; } }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
 .region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
@@ -1259,6 +1297,10 @@
 /* the canon assistant shares that wider seat (Slice 46) */
 .companion-panel:has(.companion-studio){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
 .companion-panel.tall:has(.companion-studio){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+/* …and so does the practice coach (Slice 47); its mode chips fold in 📖 reading mode */
+.companion-panel:has(.companion-coach){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
+.companion-panel.tall:has(.companion-coach){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+.companion-panel.reading .prc-coach-mode-row{ display:none; }
 /* the studio chat: transcript flexes; the ask row carries a compact persona select */
 .companion-studio{ display:flex; flex-direction:column; min-height:0; }
 .companion-studio .assistant-chat{ display:flex; flex-direction:column; min-height:0; flex:1 1 auto; gap:8px; }
@@ -1474,6 +1516,22 @@ body.theme-night .space-tile[data-space="learner"]{--accent:#2e789d}
     .prc-check{ padding:9px 0; }
     .prc-check input{ width:22px; height:22px; margin-top:2px; }
   }
+
+/* Slice 47 - the coach rides the companion panel */
+.companion-coach{ display:flex; flex-direction:column; min-height:0; }
+.prc-coach-chat{ display:flex; flex-direction:column; min-height:0; flex:1 1 auto; gap:8px; }
+.prc-coach-chat .companion-log{ flex:1 1 auto; }
+.prc-coach-mode-row{ display:flex; flex-wrap:nowrap; overflow-x:auto; gap:6px; padding-bottom:2px; }
+.prc-coach-msg{ max-width:96%; }
+.prc-coach-answer-text{ white-space:pre-wrap; margin:0; font:inherit; background:none; padding:0; }
+.prc-coach-msg-meta{ font-size:11px; opacity:.75; margin-top:4px; }
+.prc-coach-panel-status{ margin:0; font-size:11px; }
+.prc-coach-copyout{ width:100%; min-height:90px; }
+
+/* Slice 48 - track chips */
+.prc-track-row{ justify-content:center; gap:8px; margin-bottom:10px; }
+.prc-track-chip.on{ font-weight:600; }
+.prc-no-compile{ margin-top:6px; }
 /* AMBIENT MARGIN DOODLES — homemade flourishes in the blank space beside the
    content column. currentColor = the active person's accent, then the space
    accent — so the art retints with the profile by CSS alone. z-index:-1 keeps
@@ -3144,6 +3202,121 @@ auto it = std::find(v.begin(), v.end(), target);
 ];
 
 function pppDefaultIndex(){ return 1; }   // start at Ch 1 "Hello, World!", not the front-matter
+/* ---------- Git basics track (Slice 48 — the second Learn track) -------------
+   A small, honest starter track proving the multi-track Learn: 6 chapters on the
+   git that already runs Del's whole world (the journal sync, the canon repo, the
+   deploy). SAME data shape as practice-ppp.js (summary / teaches / keyTerms /
+   drills with prompt·hint·expect·watchFor) — but `compilable:false` in the track
+   registry: no Compiler Explorer, no in-app run; a drill is "type what you'd
+   run", checked against its expected answer. All content original. */
+
+const GIT_UNLOCKS = [
+  [2, 'staging with git add, committing with git commit'],
+  [3, 'branches: git branch, git switch'],
+  [4, 'merging and resolving conflicts'],
+  [5, 'remotes: git push, git pull, git fetch'],
+  [6, 'undo tools: git restore, git revert, reset --soft'],
+];
+
+const GIT_CHAPTERS = [
+  { n:1, part:'Git basics', title:'What a repo is',
+    summary:'A repository is a folder whose whole history travels with it. Git watches the folder, and every commit is a saved snapshot you can return to.',
+    teaches:['what the hidden .git folder holds','working tree vs. history','reading git status and git log'],
+    keyTerms:['repository','commit','working tree','history'],
+    drills:[
+      { prompt:'You are dropped into a folder and want to know: is this a git repo, and what state is it in? Type the two commands you would run, in order.',
+        hint:'One asks "what is going on right now"; the other asks "what happened before".',
+        expect:'git status\ngit log --oneline',
+        watchFor:['checks the present before the past','uses a compact log form instead of drowning in full messages'] },
+      { prompt:'Turn a plain folder called field-notes into a fresh repository. Type the command(s).',
+        hint:'One command creates the hidden folder that makes it a repo.',
+        expect:'cd field-notes\ngit init',
+        watchFor:['runs init inside the folder (or passes the path)','does not add or commit anything yet — init alone makes the repo'] },
+    ] },
+  { n:2, part:'Git basics', title:'Add and commit — the staging area',
+    summary:'Git saves in two steps: you STAGE what belongs in the next snapshot (git add), then COMMIT it with a message. The staging area is how one commit stays one idea.',
+    teaches:['git add picks what the next commit contains','git commit -m writes the snapshot','one commit = one idea'],
+    keyTerms:['stage','staging area','commit message'],
+    drills:[
+      { prompt:'You edited journal.md and doodle.png, but only journal.md belongs in this commit ("fix a typo"). Type the commands.',
+        hint:'Stage only the file you mean; the message goes with -m.',
+        expect:'git add journal.md\ngit commit -m "fix journal typo"',
+        watchFor:['stages the one file by name — not git add . out of habit','a message that says what changed, not "stuff"'] },
+      { prompt:'You staged secrets.txt by mistake and have not committed. Un-stage it, keeping the file on disk. Type the command.',
+        hint:'restore has a flag that means "just the staging area".',
+        expect:'git restore --staged secrets.txt',
+        watchFor:['touches the stage, not the working file','no reset --hard anywhere near this'] },
+    ] },
+  { n:3, part:'Git basics', title:'Branches',
+    summary:'A branch is a movable label on a line of commits. Making one is instant and safe — you experiment on the branch while main stays exactly where it was.',
+    teaches:['git branch lists / creates','git switch moves between branches','why work happens off main'],
+    keyTerms:['branch','main','HEAD','switch'],
+    drills:[
+      { prompt:'Create a branch called naming-tree-polish and move onto it, in one command.',
+        hint:'switch has a flag that means "create it first".',
+        expect:'git switch -c naming-tree-polish',
+        watchFor:['one step, not branch-then-switch (both fine, one is tidier)','a branch name that says what the work is'] },
+      { prompt:'You are on naming-tree-polish and want to see every branch and which one you are on. Then go back to main. Type both commands.',
+        hint:'The list marks "you are here" with a star.',
+        expect:'git branch\ngit switch main',
+        watchFor:['reads before moving','switch (modern) rather than checkout (works, but does too many jobs)'] },
+    ] },
+  { n:4, part:'Git basics', title:'Merge — and the conflict that is not an error',
+    summary:'Merging brings a branch’s commits into another. When both sides changed the same lines, git stops and asks YOU — a conflict is a question, not a failure.',
+    teaches:['git merge from the receiving branch','reading conflict markers','finish a merge: edit, add, commit'],
+    keyTerms:['merge','conflict','conflict markers'],
+    drills:[
+      { prompt:'You are on main and want to bring in the finished branch naming-tree-polish. Type the command — and say in one line what git does if both sides changed the same line.',
+        hint:'You merge FROM the branch you are standing on.',
+        expect:'git merge naming-tree-polish\n(If both sides changed the same lines, git pauses with conflict markers in the file and waits for me to choose.)',
+        watchFor:['merges while standing on the receiving branch','knows a conflict pauses the merge instead of breaking anything'] },
+      { prompt:'Mid-merge, journal.md shows <<<<<<< / ======= / >>>>>>> markers. Describe the three moves that finish the merge.',
+        hint:'Edit, then the same two commands as any save.',
+        expect:'1. Edit journal.md to the version I actually want (remove the markers).\n2. git add journal.md\n3. git commit',
+        watchFor:['edits by hand first — no tool magic needed','knows the closing commit seals the merge'] },
+    ] },
+  { n:5, part:'Git basics', title:'Remotes — push, pull, fetch',
+    summary:'A remote is the same repository living elsewhere (for us: GitHub). push sends your commits up, pull brings theirs down, fetch peeks without changing your files.',
+    teaches:['origin is just a nickname','git push / git pull','git fetch looks without touching'],
+    keyTerms:['remote','origin','push','pull','fetch'],
+    drills:[
+      { prompt:'Send your new commits on main up to GitHub, then state the difference between pull and fetch in one line each.',
+        hint:'One of the two downloads AND merges; the other only downloads.',
+        expect:'git push origin main\n(pull = fetch + merge into my branch; fetch = download the news but change nothing of mine.)',
+        watchFor:['names remote and branch explicitly at least once','knows fetch is the safe peek'] },
+      { prompt:'Your push was rejected: the remote has commits you do not have (someone synced from the iPad). Type the safe sequence.',
+        hint:'Take theirs down first, then send yours.',
+        expect:'git pull\ngit push',
+        watchFor:['pulls before pushing instead of forcing','no --force in sight — force-push is how households lose journals'] },
+    ] },
+  { n:6, part:'Git basics', title:'Undo, safely',
+    summary:'Git has gentle undo and sharp undo. restore fixes a file, revert writes a new commit that undoes an old one, reset --soft rewinds the label but keeps your work. The sharp ones (--hard, force-push) you treat like knives.',
+    teaches:['git restore for a file','git revert for a shared commit','reset --soft vs the dangerous --hard'],
+    keyTerms:['restore','revert','reset','--soft vs --hard'],
+    drills:[
+      { prompt:'You mangled journal.md (not committed) and want the last committed version back. Type the command.',
+        hint:'The same restore as chapter 2, without the --staged flag.',
+        expect:'git restore journal.md',
+        watchFor:['file-level undo, not a repo-wide reset','knows uncommitted edits are gone after this — that is the point'] },
+      { prompt:'A commit already pushed to the shared repo turned out wrong. Undo it without rewriting history. Type the command and say why not reset.',
+        hint:'The undo that ADDS a commit instead of deleting one.',
+        expect:'git revert <commit-hash>\n(Reset rewrites history others may already have pulled; revert adds a new commit that undoes it, so everyone stays in sync.)',
+        watchFor:['revert for anything shared','treats history rewriting on a shared branch as off-limits'] },
+    ] },
+];
+
+const GIT_GLOSSARY = [
+  { term:'repository (repo)', plain:'A folder whose whole history travels with it — the .git folder inside holds every snapshot.', example:'The canon workbench is one repo; the public kit page is another.', file:'.git/', where:'Both repos on the desktop, and the sync target on GitHub.' },
+  { term:'commit', plain:'One saved snapshot with a message saying why.', example:'"canon: promote COS-005" is a single commit.', file:'git log --oneline', where:'Every promotion, slice, and journal sync lands as one.' },
+  { term:'stage / staging area', plain:'The waiting room for the next commit — you pick what goes in.', example:'Stage journal.md but not the doodle you are still drawing.', file:'git add <file>', where:'Why one commit can stay one idea.' },
+  { term:'branch', plain:'A movable label on a line of commits; making one is instant and safe.', example:'naming-tree-polish while main stays untouched.', file:'git switch -c <name>', where:'The kit’s features grew on branches like these.' },
+  { term:'merge', plain:'Bring one branch’s commits into another; git only stops when both changed the same lines.', example:'main absorbing the finished polish branch.', file:'git merge <branch>', where:'How finished work reaches main.' },
+  { term:'conflict', plain:'Git’s question, not an error: both sides edited the same lines, you choose the truth.', example:'<<<<<<< markers in journal.md during a merge.', file:'edit → add → commit', where:'Rare in a two-person household, calm when it happens.' },
+  { term:'remote / origin', plain:'The same repo living elsewhere; origin is just its default nickname.', example:'github.com/Dracanman/… is origin for the workbench.', file:'git remote -v', where:'The sync layer under the whole journal.' },
+  { term:'push / pull', plain:'push sends your commits up; pull brings theirs down and merges.', example:'The iPad pulls what the desktop pushed.', file:'git push · git pull', where:'Every device handoff in the household.' },
+  { term:'fetch', plain:'Download the news without changing any of your files — the safe peek.', example:'fetch to see if the phone synced before you pull.', file:'git fetch', where:'Checking for stranded work without touching yours.' },
+  { term:'restore / revert', plain:'The gentle undos: restore fixes a file back to the last commit; revert adds a commit that undoes a shared one.', example:'revert a bad promotion instead of rewriting history.', file:'git restore · git revert', where:'The undo that never loses anyone else’s work.' },
+];
 /* ========================================================================== *
    ASSISTANT PERSONAS
 
@@ -3327,7 +3500,15 @@ function namingDefault(){ return {
 // the Code Practice (Apprentice) space — book-chapter progress + per-chapter
 // drill code, flashcard progress/scheduling, the per-session checklist, the confusion log,
 // and the paste-lock toggle. Free-text inputs live in .fields, keyed by name.
-function practiceDefault(){ return { fields:{}, flash:0, flashKnown:{}, flashSchedule:{}, checklist:{}, journal:[], chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, pasteLock:true }; }
+/* Practice state, multi-track since Slice 48: per-track progress (chapter, done
+   marks, typed drills, flashcards) nests under tracks[trackId]; track-agnostic
+   bits (form fields, session checklist, confusion journal, paste-lock) stay
+   top-level. A LEGACY flat shape (pre-48) migrates into tracks.ppp on normalize —
+   nothing lost, and the sync merge normalizes both sides the same way. */
+/* NOTE: practiceDefault/normalizePracticeState stay self-contained (no calls into
+   practiceTrackDefault) so the test loader can extract them standalone. */
+function practiceTrackDefault(){ return { flash:0, flashKnown:{}, flashSchedule:{}, chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, touched:0 }; }
+function practiceDefault(){ return { fields:{}, checklist:{}, journal:[], pasteLock:true, activeTrack:'ppp', tracks:{ ppp:{ flash:0, flashKnown:{}, flashSchedule:{}, chapter:1, chapterDone:{}, drills:{}, drillIdx:{}, touched:0 } } }; }
 function normalizePracticeState(value){
   const source=value&&typeof value==='object'&&!Array.isArray(value)?value:{}, out=practiceDefault();
   const objectMap=(v)=>v&&typeof v==='object'&&!Array.isArray(v)?v:{};
@@ -3340,15 +3521,18 @@ function normalizePracticeState(value){
     const box=finiteIndex(row.box,0), due=finiteIndex(row.due,0), interval=finiteIndex(row.interval,0), last=finiteIndex(row.last,0), reps=finiteIndex(row.reps,0);
     if(row.seen||box||due||interval||last||reps) m[k]={box,due,interval,last,reps,seen:!!row.seen};
   }); return m; };
+  const normalizeTrack=(v)=>{ const src=objectMap(v); return {
+    flash:finiteIndex(src.flash,0),
+    flashKnown:boolMap(src.flashKnown),
+    flashSchedule:scheduleMap(src.flashSchedule),
+    chapter:finiteIndex(src.chapter,1),
+    chapterDone:boolMap(src.chapterDone),
+    drills:textMap(src.drills),
+    drillIdx:indexMap(src.drillIdx),
+    touched:finiteIndex(src.touched,0),
+  }; };
   out.fields=textMap(source.fields);
-  out.flash=finiteIndex(source.flash,0);
-  out.flashKnown=boolMap(source.flashKnown);
-  out.flashSchedule=scheduleMap(source.flashSchedule);
   out.checklist=boolMap(source.checklist);
-  out.chapter=finiteIndex(source.chapter,1);
-  out.chapterDone=boolMap(source.chapterDone);
-  out.drills=textMap(source.drills);
-  out.drillIdx=indexMap(source.drillIdx);
   out.pasteLock=source.pasteLock!==false;
   out.journal=(Array.isArray(source.journal)?source.journal:[]).map(entry=>entry&&typeof entry==='object'&&!Array.isArray(entry)?{
     title:String(entry.title||''),
@@ -3358,6 +3542,14 @@ function normalizePracticeState(value){
     askRune:String(entry.askRune||''),
     createdAt:String(entry.createdAt||''),
   }:null).filter(Boolean).slice(0,30);
+  if(source.tracks&&typeof source.tracks==='object'&&!Array.isArray(source.tracks)){
+    out.activeTrack=typeof source.activeTrack==='string'&&source.activeTrack.trim()?source.activeTrack.trim():'ppp';
+    Object.keys(source.tracks).forEach(id=>{ const k=String(id||'').trim(); if(k) out.tracks[k]=normalizeTrack(source.tracks[id]); });
+    if(!out.tracks.ppp) out.tracks.ppp=normalizeTrack(null);
+  }else{
+    // legacy flat shape → everything per-track it carried nests into tracks.ppp
+    out.tracks.ppp=normalizeTrack(source);
+  }
   return out;
 }
 function usageMetric(value){
@@ -3404,7 +3596,7 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, who:'', people:[], whoActiveAt:0, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault() }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, who:'', people:[], whoActiveAt:0, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault(), primerPos:null }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -3428,6 +3620,8 @@ function hydrate(d){
   merged.liveRefresh=d.liveRefresh!==false;   // live background refresh — on unless turned off
   // Where this device keeps the floating companion (drag/resize box) — device-local, never synced.
   merged.companionBox=d.companionBox&&typeof d.companionBox==='object'&&!Array.isArray(d.companionBox)?Object.assign({},d.companionBox):null;
+  // The Primer reader's reading position (Slice 49) — device-local.
+  merged.primerPos=d.primerPos&&typeof d.primerPos==='object'&&!Array.isArray(d.primerPos)?{file:String(d.primerPos.file||''),anchor:String(d.primerPos.anchor||'')}:null;
   merged.startHereDismissed=!!d.startHereDismissed;   // the newcomer card was waved away on this device
   merged.playModel=typeof d.playModel==='string'?d.playModel.trim():'';   // the GM table's model override — device-local
   merged.playDraftLens=!!d.playDraftLens;   // the GM table's experimental drafts lens — device-local, off by default
@@ -5307,7 +5501,7 @@ function pOutput(buildFn, label, msg){
     ta);
 }
 function prcFlashIndex(){ return prcFlashCardIndex(prcFlashDeck(Date.now())); }
-function prcFlashKnown(i){ return !!DB.practice.flashKnown[i]; }
+function prcFlashKnown(i){ return !!prcState().flashKnown[i]; }
 function flashDay(now){
   if(now instanceof Date) return Math.floor(now.getTime()/PRACTICE_MS_PER_DAY);
   if(typeof now==='string'){
@@ -5371,14 +5565,15 @@ function flashDueText(entry, now){
   if(delta===1) return 'Due tomorrow';
   return 'Due in '+delta+' days';
 }
-function prcFlashSchedule(){ return DB.practice.flashSchedule&&typeof DB.practice.flashSchedule==='object'?DB.practice.flashSchedule:(DB.practice.flashSchedule={}); }
-function prcFlashDeck(now){ return flashDeck(GLOSSARY,prcFlashSchedule(),now); }
-function prcFlashCursor(deck){ const i=DB.practice.flash|0, n=(deck&&deck.length)||GLOSSARY.length; return n?(i>=0&&i<n?i:0):0; }
+function prcFlashSchedule(){ const s=prcState(); return s.flashSchedule&&typeof s.flashSchedule==='object'?s.flashSchedule:(s.flashSchedule={}); }
+function prcFlashDeck(now){ return flashDeck(prcGlossary(),prcFlashSchedule(),now); }
+function prcFlashCursor(deck){ const i=prcState().flash|0, n=(deck&&deck.length)||prcGlossary().length; return n?(i>=0&&i<n?i:0):0; }
 function prcFlashCardIndex(deck){ const d=deck&&deck.length?deck:prcFlashDeck(Date.now()); const row=d[prcFlashCursor(d)]; return row?row.index:0; }
 function prcReviewFlash(index, remembered, now){
   const schedule=prcFlashSchedule();
   schedule[index]=flashReview(schedule[index],remembered,now);
-  DB.practice.flashKnown[index]=!!remembered;
+  prcState().flashKnown[index]=!!remembered;
+  prcTouch();
   save();
 }
 
@@ -5404,33 +5599,72 @@ function viewPractice(tab, params){
   return f;
 }
 
-/* ---------- chapter spine (PPP 3rd ed.) + scoped coach ---------------------- */
-function prcChapter(){ const i=DB.practice.chapter|0; return PPP_CHAPTERS[(i>=0&&i<PPP_CHAPTERS.length)?i:1]; }
-function prcChapterDone(n){ return !!DB.practice.chapterDone[n]; }
+/* ---------- tracks (Slice 48) ------------------------------------------------
+   Learn is multi-track: content is data files in the SAME shape (chapters with
+   drills/keyTerms, an unlocks ladder, a glossary), the registry below wires them
+   in, and progress lives per-track under DB.practice.tracks[trackId]. A track
+   with compilable:false gets no Compiler Explorer / in-app run affordances —
+   its drills check against their expected answers instead. */
+const PRACTICE_TRACKS=[
+  { id:'ppp', label:'C++ · the book', tagline:'Stroustrup, chapter by chapter', subject:'C++',
+    chapters:PPP_CHAPTERS, unlocks:PPP_UNLOCKS, glossary:GLOSSARY, compilable:true },
+  { id:'git', label:'Git basics', tagline:'the repo under everything', subject:'Git',
+    chapters:GIT_CHAPTERS, unlocks:GIT_UNLOCKS, glossary:GIT_GLOSSARY, compilable:false },
+];
+function prcActiveTrack(){ const id=DB.practice.activeTrack; return PRACTICE_TRACKS.find(t=>t.id===id)||PRACTICE_TRACKS[0]; }
+function prcState(){
+  const t=prcActiveTrack(), tracks=DB.practice.tracks=DB.practice.tracks||{};
+  return tracks[t.id]||(tracks[t.id]=(typeof practiceTrackDefault==='function'?practiceTrackDefault():{flash:0,flashKnown:{},flashSchedule:{},chapter:1,chapterDone:{},drills:{},drillIdx:{},touched:0}));
+}
+function prcSetTrack(id){
+  const t=PRACTICE_TRACKS.find(x=>x.id===id); if(!t) return;
+  DB.practice.activeTrack=t.id;
+  const tracks=DB.practice.tracks=DB.practice.tracks||{};
+  if(!tracks[t.id]){
+    tracks[t.id]=(typeof practiceTrackDefault==='function'?practiceTrackDefault():{flash:0,flashKnown:{},flashSchedule:{},chapter:1,chapterDone:{},drills:{},drillIdx:{},touched:0});
+    if(t.id!=='ppp') tracks[t.id].chapter=0;   // ppp's default 1 skips the front-matter chapter; other tracks start at their first
+  }
+  save();
+}
+function prcTouch(){ prcState().touched=Date.now(); }
+function prcChapters(){ return prcActiveTrack().chapters||[]; }
+function prcUnlocksList(){ return prcActiveTrack().unlocks||[]; }
+function prcGlossary(){ return prcActiveTrack().glossary||[]; }
+function prcCompilable(){ return prcActiveTrack().compilable!==false; }
+
+/* ---------- chapter spine + scoped coach (per active track) ----------------- */
+function prcChapter(){ const chapters=prcChapters(); const i=prcState().chapter|0; return chapters[(i>=0&&i<chapters.length)?i:(chapters.length>1?1:0)]||chapters[0]; }
+function prcChapterDone(n){ return !!prcState().chapterDone[n]; }
 // a chapter holds a small ladder of drills; the current one is tracked per chapter, and
 // each drill's typed code is stored under "chapter.drill" so the ladder rungs don't clobber.
 function prcChapterDrills(){ return prcChapter().drills || []; }
-function prcDrillIndex(){ const n=prcChapter().n, ds=prcChapterDrills(); const i=(DB.practice.drillIdx&&DB.practice.drillIdx[n])|0; return (i>=0&&i<ds.length)?i:0; }
-function prcSetDrillIndex(i){ const n=prcChapter().n; (DB.practice.drillIdx=DB.practice.drillIdx||{})[n]=i; save(); }
+function prcDrillIndex(){ const n=prcChapter().n, ds=prcChapterDrills(); const s=prcState(); const i=(s.drillIdx&&s.drillIdx[n])|0; return (i>=0&&i<ds.length)?i:0; }
+function prcSetDrillIndex(i){ const n=prcChapter().n, s=prcState(); (s.drillIdx=s.drillIdx||{})[n]=i; prcTouch(); save(); }
 function prcCurDrill(){ const ds=prcChapterDrills(); return ds.length? ds[prcDrillIndex()] : null; }
 function prcDrillKey(){ return prcChapter().n + '.' + prcDrillIndex(); }
-function prcDrillCode(){ const k=prcDrillKey(); return (DB.practice.drills&&DB.practice.drills[k])||''; }
-function prcSetDrillCode(v){ const k=prcDrillKey(); (DB.practice.drills=DB.practice.drills||{})[k]=v; save(); }
-function prcAllowed(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c<=n).map(([,t])=>t); }
-function prcNotYet(){ const n=prcChapter().n; return PPP_UNLOCKS.filter(([c])=>c>n).map(([c,t])=>`${t} (Ch ${c})`); }
-function prcCodeBlock(){ const code=prcDrillCode().trim(); return code? '```cpp\n'+code+'\n```' : '(no code typed yet)'; }
+function prcDrillCode(){ const k=prcDrillKey(), s=prcState(); return (s.drills&&s.drills[k])||''; }
+function prcSetDrillCode(v){ const k=prcDrillKey(), s=prcState(); (s.drills=s.drills||{})[k]=v; prcTouch(); save(); }
+function prcAllowed(){ const n=prcChapter().n; return prcUnlocksList().filter(([c])=>c<=n).map(([,t])=>t); }
+function prcNotYet(){ const n=prcChapter().n; return prcUnlocksList().filter(([c])=>c>n).map(([c,t])=>`${t} (Ch ${c})`); }
+function prcCodeBlock(){ const code=prcDrillCode().trim(); const fence=prcCompilable()?'cpp':'text'; return code? '```'+fence+'\n'+code+'\n```' : (prcCompilable()?'(no code typed yet)':'(nothing typed yet)'); }
 // the scope guard injected into every coach prompt, so the AI never teaches ahead of the book.
 function pppScopeNote(){
-  const cur=prcChapter(); const have=prcAllowed(), notYet=prcNotYet();
+  const track=prcActiveTrack(); const cur=prcChapter(); const have=prcAllowed(), notYet=prcNotYet();
+  const intro=track.id==='ppp'
+    ? `Context: a beginner working through Stroustrup's "Programming: Principles and Practice Using C++" (3rd ed.), currently at Chapter ${cur.n} — ${cur.title}.`
+    : `Context: a beginner working through the "${track.label}" practice track (${track.tagline}), currently at Chapter ${cur.n} — ${cur.title}.`;
+  const rules=track.id==='ppp'
+    ? `Use only modern ISO C++ (C++20/23). Reject C-style arrays, raw owning pointers, and pre-C++11 patterns.`
+    : `Stay inside this track's scope — plain, safe, beginner-first ${track.subject}.`;
   return [
-    `Context: a beginner working through Stroustrup's "Programming: Principles and Practice Using C++" (3rd ed.), currently at Chapter ${cur.n} — ${cur.title}.`,
-    `Use only modern ISO C++ (C++20/23). Reject C-style arrays, raw owning pointers, and pre-C++11 patterns.`,
-    have.length? `Tools taught so far (fair game): ${have.join('; ')}.` : `Only the basics from Chapters 1–2 have been taught so far.`,
+    intro,
+    rules,
+    have.length? `Tools taught so far (fair game): ${have.join('; ')}.` : `Only the basics from the first chapters have been taught so far.`,
     notYet.length? `NOT yet introduced — do not use, teach, or suggest these: ${notYet.join('; ')}.` : ''
   ].filter(Boolean).join('\n');
 }
-function prcSocraticPrompt(){ const d=prcCurDrill();
-  return ['You are a patient Socratic C++ tutor. Never write the solution code — explain the idea, give an analogy, and ask me ONE guiding question so I find it myself. A short pseudo-code outline with the key line left blank is fine.','',
+function prcSocraticPrompt(){ const d=prcCurDrill(); const subject=prcActiveTrack().subject||'coding';
+  return [`You are a patient Socratic ${subject} tutor. Never write the solution — explain the idea, give an analogy, and ask me ONE guiding question so I find it myself. A short outline with the key part left blank is fine.`,'',
     pppScopeNote(),'', d? 'The drill: '+d.prompt : 'No specific drill — I just want to understand the concept below.','',
     'My attempt so far:', prcCodeBlock(),'','Give me one hint or guiding question. No full solution.'].join('\n'); }
 function prcCompilerPrompt(){
@@ -5438,6 +5672,12 @@ function prcCompilerPrompt(){
     'Here is my code:', prcCodeBlock(),'',
     'If it would NOT compile, tell me the FIRST error in plain English and which line — but do not fix it for me, just point me at it. If it compiles, say so and show what it would print.'].join('\n'); }
 function prcCriticPrompt(){ const d=prcCurDrill();
+  if(!prcCompilable()){
+    const subject=prcActiveTrack().subject||'this topic';
+    return [`You are a careful ${subject} reviewer coaching a beginner. Review my answer below — do not rewrite it for me.`,'',
+      pppScopeNote(),'', d? 'The drill: '+d.prompt : '', 'My answer:', prcCodeBlock(),'',
+      'Point at anything risky, wasteful, or misunderstood — then ask me ONE "what happens if…" question so I check my own reasoning.'].filter(Boolean).join('\n');
+  }
   return ['You are a careful C++ reviewer in the spirit of the C++ Core Guidelines, coaching a beginner. Review my COMPILING code — do not rewrite it for me.','',
     pppScopeNote(),'', d? 'The drill: '+d.prompt : '', 'My code:', prcCodeBlock(),'',
     'Flag any: raw new/delete, magic numbers, uninitialized variables, or a class whose invariant could be broken. Then ask me ONE "what happens if…" question (e.g., a negative or empty input) so I check my own logic.'].filter(Boolean).join('\n'); }
@@ -5446,12 +5686,13 @@ function prcUE5Prompt(){
     pppScopeNote(),'UE5 names are the exception to the "not yet introduced" rule above — this mode names UE5 types/macros on purpose, even ones the book hasn\'t covered, since that\'s the whole point of the mapping.','',
     'Concept / code:', prcCodeBlock(),'','Keep it a mapping, not a rewrite of my program.'].join('\n'); }
 function practiceCoachModes(){
-  return [
-    {id:'hint',label:'Socratic hint',build:prcSocraticPrompt},
-    {id:'compile',label:'Compile-check',build:prcCompilerPrompt},
-    {id:'critique',label:'Critique',build:prcCriticPrompt},
-    {id:'ue5',label:'UE5 map',build:prcUE5Prompt},
-  ];
+  // Compile-check and the UE5 map are C++ affordances — non-compilable tracks
+  // (Slice 48) keep the Socratic hint and the critique only.
+  const modes=[{id:'hint',label:'Socratic hint',build:prcSocraticPrompt}];
+  if(prcCompilable()) modes.push({id:'compile',label:'Compile-check',build:prcCompilerPrompt});
+  modes.push({id:'critique',label:'Critique',build:prcCriticPrompt});
+  if(prcCompilable()) modes.push({id:'ue5',label:'UE5 map',build:prcUE5Prompt});
+  return modes;
 }
 function practiceCoachIsLocalEngine(engine){
   return engine&&engine.type==='OpenAI-compatible local endpoint';
@@ -5490,6 +5731,128 @@ async function practiceCoachCallAi(engine,chat,onChunk){
   if(!streamed&&result&&result.text) emit(result.text,{text:result.text,model:result.model});
   return result;
 }
+
+/* ---- the companion seat (Slice 47) ------------------------------------------
+   Same family as the GM (campPlaySeat) and the Studio assistant (assistantSeat,
+   Slice 46): the coach chat is built ONCE into a module-level session and the
+   floating companion hosts it as mode '✶ coach' — so the DRILL stays visible
+   while you ask, and the transcript survives navigation. The whole pipeline
+   (prompt build, engine call, spend label, copy-prompt fallback) stays in this
+   file; companion.js only hosts. */
+let PRACTICE_COACH_SESSION=null;
+function practiceCoachSession(){ return PRACTICE_COACH_SESSION; }
+function practiceCoachSeat(session){ PRACTICE_COACH_SESSION=session||null; }
+function practiceCoachEnsureSession(){
+  if(!PRACTICE_COACH_SESSION) practiceCoachSeat(practiceCoachBuildSession());
+  return PRACTICE_COACH_SESSION;
+}
+function practiceCoachChapterLabel(){ const c=prcChapter(); return 'Ch '+c.n+' · '+c.title; }
+
+// A transcript message; answers stream into a pre-wrap body then wear a small
+// mode/chapter meta line.
+function practiceCoachMsg(session, role, textValue){
+  const body=role==='you'?h('p',null,String(textValue||'')):h('pre',{class:'prc-coach-answer-text'},String(textValue||''));
+  const meta=role==='you'?null:h('div',{class:'hint prc-coach-msg-meta'});
+  const node=h('div',{class:'companion-msg '+(role==='you'?'you':'guide prc-coach-msg')}, body, meta);
+  session.log.append(node);
+  const scroll=()=>{ try{ session.log.scrollTop=session.log.scrollHeight||0; }catch(e){} };
+  scroll();
+  return {
+    node, body,
+    append(piece){ if(piece) body.append(document.createTextNode(String(piece))); scroll(); },
+    finish(label){ if(meta) meta.textContent=label; scroll(); },
+    fail(message){ body.replaceChildren(document.createTextNode(String(message||'The coach could not answer.'))); node.className='companion-msg guide prc-coach-msg bad'; scroll(); },
+  };
+}
+
+function practiceCoachBuildSession(){
+  const log=h('div',{class:'companion-log prc-coach-log'},
+    h('p',{class:'hint companion-hello'},'Pick a mode below — every ask is scoped to the chapter you’re on, and it’s hints, never solutions.'));
+  const status=h('p',{class:'hint prc-coach-panel-status'},practiceCoachSpendLabel(practiceCoachEngine()));
+  const chips=h('div',{class:'prc-coach-mode-row'});
+  const confusionBtn=h('button',{class:'navbtn ghost',type:'button'},'🐞 Log a confusion');
+  const settingsBtn=h('button',{class:'navbtn ghost',type:'button',onclick:()=>openEngineSettings()},'⚙ Engine');
+  const chatNode=h('div',{class:'prc-coach-chat'},
+    log,
+    chips,
+    h('div',{class:'companion-footrow prc-coach-foot'}, confusionBtn, settingsBtn),
+    status);
+  const session={chapter:prcChapter(), log, status, chatNode, busy:false};
+  const fillChips=()=>{
+    chips.replaceChildren(...practiceCoachModes().map(mode=>{
+      const chip=h('button',{class:'chip dash prc-coach-chip',type:'button'},mode.label);
+      chip.onclick=()=>session.ask(mode);
+      return chip;
+    }));
+  };
+  // Opening the coach re-scopes to the CURRENT track + chapter without wiping the
+  // transcript — the prompts read prcChapter() at ask time anyway, and the chip
+  // strip refreshes because the mode set is track-dependent (Slice 48).
+  session.rescope=function(){
+    session.chapter=prcChapter();
+    fillChips();
+    status.textContent=practiceCoachSpendLabel(practiceCoachEngine());
+    if(typeof companionRefreshContext==='function') companionRefreshContext();
+  };
+  session.ask=async function(mode){
+    if(session.busy) return;
+    const prompt=mode.build();
+    practiceCoachMsg(session,'you',mode.label+' · '+practiceCoachChapterLabel());
+    const engine=practiceCoachEngine();
+    if(!engine){
+      // keyless: the copy-the-prompt fallback lives right in the panel
+      const area=h('textarea',{class:'prc-out prc-coach-copyout', readonly:true, value:prompt});
+      const copyBtn=h('button',{class:'navbtn',type:'button',onclick:()=>prcCopyArea(area,'Copied — paste into Claude / ChatGPT.')},'Copy the prompt');
+      session.log.append(h('div',{class:'companion-msg guide prc-coach-msg'},
+        h('p',null,'No engine on this device — copy this prompt into Claude or ChatGPT:'),
+        area, h('div',{class:'toolrow'},copyBtn)));
+      status.textContent='No engine configured. Copy prompts still work.';
+      try{ session.log.scrollTop=session.log.scrollHeight||0; }catch(e){}
+      return;
+    }
+    session.busy=true;
+    status.textContent=practiceCoachIsLocalEngine(engine)?'Asking local coach...':'Asking active API coach. Metered usage will be recorded.';
+    const msg=practiceCoachMsg(session,'assistant','');
+    try{
+      const result=await practiceCoachCallAi(engine,practiceCoachChat(prompt,engine),piece=>msg.append(piece));
+      if(!String(msg.body.textContent||'').trim()) msg.append(result&&result.text?result.text:'(No text returned.)');
+      msg.finish(mode.label+' · '+practiceCoachChapterLabel());
+      status.textContent='Coach answer ready. Hints only; your practice progress stayed local.';
+    }catch(e){
+      msg.fail(e&&e.message?e.message:String(e));
+      status.textContent='The coach could not answer in app. Use the copy-out on the Learn tab instead.';
+    }finally{ session.busy=false; }
+  };
+  fillChips();
+  confusionBtn.onclick=()=>{
+    const titleIn=h('input',{class:'companion-input',placeholder:'what’s confusing, in a few words'});
+    const saveBtn=h('button',{class:'navbtn primary',type:'button'},'Save entry');
+    const node=h('div',{class:'companion-msg guide prc-coach-msg'},
+      h('p',null,'Jot the confusion — it lands in your Journal log to bring back later:'),
+      titleIn, h('div',{class:'toolrow'},saveBtn));
+    saveBtn.onclick=()=>{
+      const text=String(titleIn.value||'').trim();
+      const entry={ title:text||'Untitled confusion', tried:'', happened:'', confusing:text, askRune:'', createdAt:new Date().toLocaleString() };
+      DB.practice.journal=[entry, ...(DB.practice.journal||[])].slice(0,30);
+      save();
+      node.replaceChildren(h('p',null,'Logged — it’s in ✶ Journal → Bug / confusion log.'));
+    };
+    session.log.append(node);
+    try{ session.log.scrollTop=session.log.scrollHeight||0; }catch(e){}
+  };
+  return session;
+}
+
+// What the companion panel shows in 'coach' mode: the seated chat, or a seat hint.
+function practiceCoachCompanionBody(){
+  const s=practiceCoachSession();
+  if(!s) return h('div',{class:'companion-body companion-coach'},
+    h('p',{class:'hint companion-hello'},'The coach isn’t seated yet. Open ✶ Apprentice → Learn and tap “✶ Ask the coach” — then the drill stays visible while you ask.'),
+    h('div',{class:'companion-footrow'}, h('button',{class:'navbtn',type:'button',onclick:()=>{ if(typeof setProfile==='function') setProfile('learner'); }},'✶ Go to practice')));
+  s.rescope();
+  return h('div',{class:'companion-body companion-coach'}, s.chatNode);
+}
+
 function ceCompilerId(id){
   const clean=String(id||'').trim();
   return clean||PRACTICE_CE_DEFAULT_COMPILER;
@@ -5575,34 +5938,45 @@ async function ceCompile(input){
 /* ---------- LEARN --------------------------------------------------------- */
 function practiceLearn(host){
   host.replaceChildren();
+  const track=prcActiveTrack(), chapters=prcChapters();
   const ch=prcChapter(), idx=ch.n;
-  const doneCount=PPP_CHAPTERS.filter(c=>prcChapterDone(c.n)).length;
+  const chIndex=chapters.indexOf(ch);
+  const doneCount=chapters.filter(c=>prcChapterDone(c.n)).length;
 
-  // chapter picker (grouped by Part), the spine of the book on Del's desk
-  host.append(pHead('Your place in the book'));
-  const sel=h('select',{class:'prc-input', onchange:e=>{ DB.practice.chapter=+e.target.value; save(); practiceLearn(host); }});
+  // track chips (Slice 48): the practice space grows by adding data files
+  const trackRow=h('div',{class:'toolrow prc-track-row'});
+  PRACTICE_TRACKS.forEach(t=>{
+    const chip=h('button',{class:'chip prc-track-chip'+(t.id===track.id?' on':' dash'),type:'button',title:t.tagline},t.label);
+    chip.onclick=()=>{ if(t.id!==track.id){ prcSetTrack(t.id); practiceLearn(host); } };
+    trackRow.append(chip);
+  });
+  host.append(trackRow);
+
+  // chapter picker (grouped by Part) — the spine of the active track
+  host.append(pHead(track.id==='ppp'?'Your place in the book':'Your place in the track'));
+  const sel=h('select',{class:'prc-input', onchange:e=>{ prcState().chapter=+e.target.value; prcTouch(); save(); practiceLearn(host); }});
   const groups={}, order=[];
-  PPP_CHAPTERS.forEach(c=>{ if(!groups[c.part]){ groups[c.part]=h('optgroup',{label:c.part}); order.push(c.part); }
-    groups[c.part].append(h('option',{value:c.n, selected:c.n===idx?'selected':null}, `${c.n}. ${c.title}`+(prcChapterDone(c.n)?' ✓':''))); });
+  chapters.forEach((c,ci)=>{ if(!groups[c.part]){ groups[c.part]=h('optgroup',{label:c.part}); order.push(c.part); }
+    groups[c.part].append(h('option',{value:ci, selected:ci===chIndex?'selected':null}, `${c.n}. ${c.title}`+(prcChapterDone(c.n)?' ✓':''))); });
   order.forEach(p=> sel.append(groups[p]));
   host.append(sel);
-  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, `${doneCount}/${PPP_CHAPTERS.length} chapters marked done`));
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}}, `${doneCount}/${chapters.length} chapters marked done`));
 
   // chapter card
-  const allowed=prcAllowed(), next=PPP_UNLOCKS.find(([c])=>c>idx);
+  const allowed=prcAllowed(), next=prcUnlocksList().find(([c])=>c>idx);
   host.append(h('div',{class:'prc-card'},
     h('h3',{class:'prc-h'}, `Chapter ${ch.n} — ${ch.title}`),
     h('p',null, ch.summary),
     (ch.teaches&&ch.teaches.length)? h('div',null, h('h4',{class:'prc-sub'},'This chapter introduces'), pList(ch.teaches)) : null,
     (ch.keyTerms&&ch.keyTerms.length)? h('p',{class:'prc-note'}, 'Key terms: '+ch.keyTerms.join(' · ')) : null,
     h('h4',{class:'prc-sub'}, 'What you can use up to here'),
-    allowed.length? pList(allowed) : h('p',{class:'hint'}, 'Just the basics so far — variables, simple output, and (from Ch 2) input.'),
+    allowed.length? pList(allowed) : h('p',{class:'hint'}, track.id==='ppp'?'Just the basics so far — variables, simple output, and (from Ch 2) input.':'Just the beginning — the first chapter sets the stage.'),
     next? h('p',{class:'prc-note'}, `Not yet: ${next[1]} comes in Chapter ${next[0]} — try not to reach for it before then.`) : null,
     h('div',{class:'toolrow'},
-      h('button',{class:'navbtn', onclick:()=>{ DB.practice.chapter=Math.max(0,idx-1); save(); practiceLearn(host); }}, '‹ Previous'),
-      h('button',{class:'navbtn primary', onclick:()=>{ DB.practice.chapterDone[idx]=!prcChapterDone(idx); save(); practiceLearn(host); }},
+      h('button',{class:'navbtn', onclick:()=>{ prcState().chapter=Math.max(0,chIndex-1); prcTouch(); save(); practiceLearn(host); }}, '‹ Previous'),
+      h('button',{class:'navbtn primary', onclick:()=>{ prcState().chapterDone[idx]=!prcChapterDone(idx); prcTouch(); save(); practiceLearn(host); }},
         prcChapterDone(idx)? 'Mark not done' : 'Mark chapter done'),
-      h('button',{class:'navbtn', onclick:()=>{ DB.practice.chapter=Math.min(PPP_CHAPTERS.length-1,idx+1); save(); practiceLearn(host); }}, 'Next ›')),
+      h('button',{class:'navbtn', onclick:()=>{ prcState().chapter=Math.min(chapters.length-1,chIndex+1); prcTouch(); save(); practiceLearn(host); }}, 'Next ›')),
   ));
 
   // drill ladder + sandbox + chapter-scoped coach
@@ -5621,7 +5995,7 @@ function practiceLearn(host){
     drillCard.append(h('h4',{class:'prc-sub'},'Practice'),
       h('p',{class:'hint'}, 'You can paste any code below for coaching.'));
   }
-  const sandbox=h('textarea',{class:'prc-input prc-sandbox', rows:9, placeholder:'type your C++ here…', value:prcDrillCode(),
+  const sandbox=h('textarea',{class:'prc-input prc-sandbox', rows:9, placeholder:prcCompilable()?'type your C++ here…':'type the command(s) you would run…', value:prcDrillCode(),
     oninput:e=>prcSetDrillCode(e.target.value),
     onpaste:e=>{ if(DB.practice.pasteLock){ e.preventDefault(); toast('Paste-lock is on — type it out to build muscle memory.'); } }});
   drillCard.append(pLabeled('Your sandbox', sandbox));
@@ -5634,6 +6008,7 @@ function practiceLearn(host){
     prcSetDrillCode(drill.skeleton); practiceLearn(host);
   }}, '⤓ Load skeleton'));
   drillCard.append(sandboxTools);
+  if(prcCompilable()){
   const openCompilerExplorer=()=>{ try{ sandbox.focus(); sandbox.select(); navigator.clipboard&&navigator.clipboard.writeText(prcDrillCode()); }catch(_){}; try{ window.open('https://godbolt.org/','_blank','noopener'); }catch(_){}; toast('Code copied - paste it into Compiler Explorer to run.'); };
   const compileStatus=h('div',{class:'sync-status prc-compile-status',role:'status'},'Ready to run when your sandbox has code.');
   const compileOut=h('div',{class:'prc-compile-out'},h('p',{class:'hint'},'Output appears here after a run.'));
@@ -5673,69 +6048,51 @@ function practiceLearn(host){
     h('div',{class:'toolrow prc-compile-actions'},compileBtn,ceBtn),
     compileStatus,
     compileOut);
-  const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
-  const coachStatus=h('div',{class:'sync-status prc-coach-status',role:'status'});
-  const coachAnswer=h('div',{class:'prc-coach-answer'},h('p',{class:'hint'},'Ask in app, or copy a prompt for another AI.'));
+  } else {
+    // Non-compilable track (Slice 48): no Compiler Explorer, no in-app run — the
+    // drill's "Show expected result" above IS the check; say so plainly.
+    drillCard.append(h('p',{class:'hint prc-no-compile'},'This track has no compiler — type your answer, then check yourself against “Show expected result” above.'));
+  }
+  // Slice 47: the coach rides the ✦ companion — the drill stays visible while you
+  // ask, and the chat follows you anywhere. The page keeps only the launcher (and
+  // the copy-a-prompt fallback on keyless devices).
   const coachEngine=practiceCoachEngine();
-  const coachBtn=(builder,label)=> h('button',{class:'navbtn', onclick:()=>{ coachOut.value=builder(); prcCopyArea(coachOut, 'Copied — paste into Claude / ChatGPT.'); }}, label);
-  const askCoach=async(builder,label)=>{
-    const prompt=builder();
-    coachOut.value=prompt;
-    const engine=practiceCoachEngine();
-    if(!engine){
-      coachStatus.textContent='Add an Engine profile first, or copy the prompt below.';
-      coachAnswer.replaceChildren(h('p',{class:'hint'},'Copy-out is still available below.'));
-      return;
-    }
-    coachStatus.textContent=practiceCoachIsLocalEngine(engine)?'Asking local coach...':'Asking active API coach. Metered usage will be recorded.';
-    const answerPre=h('pre',{class:'prc-coach-answer-text stream-text'});
-    coachAnswer.replaceChildren(answerPre);
-    try{
-      const result=await practiceCoachCallAi(engine,practiceCoachChat(prompt,engine),piece=>{
-        if(piece) answerPre.append(document.createTextNode(piece));
-      });
-      if(!String(answerPre.textContent||'').trim()) answerPre.append(document.createTextNode(result&&result.text?result.text:'(No text returned.)'));
-      coachStatus.textContent='Coach answer ready. Hints only; your practice progress stayed local.';
-    }catch(error){
-      coachAnswer.replaceChildren(h('p',{class:'bad'},error&&error.message?error.message:String(error)));
-      coachStatus.textContent='The coach could not answer in app. Copy the prompt instead.';
-    }
-  };
-  const askBtn=(builder,label)=>{
-    const btn=h('button',{class:'navbtn primary',type:'button',disabled:coachEngine?null:'true'},'Ask '+label);
-    btn.onclick=()=>askCoach(builder,label);
-    return btn;
+  const coachLaunch=h('button',{class:'navbtn primary',type:'button'},'✶ Ask the coach');
+  coachLaunch.onclick=()=>{
+    const s=practiceCoachEnsureSession(); s.rescope();
+    if(typeof companionOpenCoach==='function') companionOpenCoach();
   };
   const settingsBtn=h('button',{class:'navbtn ghost',type:'button'},'Engine settings');
   settingsBtn.onclick=()=>openEngineSettings();
   drillCard.append(
-    h('h4',{class:'prc-sub'},'Coach (scoped to this chapter)'),
-    h('p',{class:'hint'},'Each path uses the same chapter-scoped tutor prompt. In-app answers never write canon or repo files.'),
+    h('h4',{class:'prc-sub'},'Coach'),
+    h('p',{class:'hint'},'Chapter-scoped hints in the floating ✦ panel — the drill stays on screen while you ask. In-app answers never write canon or repo files.'),
     typeof usageMeter==='function'?usageMeter():null,
     h('p',{class:'hint'},practiceCoachSpendLabel(coachEngine)),
-    h('div',{class:'toolrow prc-coach-actions'},
-      ...practiceCoachModes().map(mode=>askBtn(mode.build,mode.label)),
-      !coachEngine?settingsBtn:null),
-    coachStatus,
-    coachAnswer,
-    h('p',{class:'hint'},'Copy-out fallback'),
-    h('div',{class:'toolrow'},
-      ...practiceCoachModes().map(mode=>coachBtn(mode.build,mode.label))),
-    coachOut);
+    h('div',{class:'toolrow prc-coach-actions'},coachLaunch, !coachEngine?settingsBtn:null));
+  if(!coachEngine){
+    const coachOut=h('textarea',{class:'prc-out', readonly:true, placeholder:'a coach prompt appears here — copy it into Claude or ChatGPT'});
+    const coachBtn=(builder,label)=> h('button',{class:'navbtn', onclick:()=>{ coachOut.value=builder(); prcCopyArea(coachOut, 'Copied — paste into Claude / ChatGPT.'); }}, label);
+    drillCard.append(
+      h('p',{class:'hint'},'Copy-out fallback'),
+      h('div',{class:'toolrow'},
+        ...practiceCoachModes().map(mode=>coachBtn(mode.build,mode.label))),
+      coachOut);
+  }
   host.append(drillCard);
 
   // flashcards
   host.append(prcFlashcards());
 
-  // glossary search
+  // glossary search (scoped to the active track)
   host.append(pHead('Glossary'));
   const results=h('dl',{class:'prc-gloss'});
-  const search=h('input',{class:'prc-input', placeholder:'search C++ terms…', oninput:e=>renderGloss(e.target.value)});
+  const search=h('input',{class:'prc-input', placeholder:'search '+(prcActiveTrack().subject||'')+' terms…', oninput:e=>renderGloss(e.target.value)});
   host.append(h('div',{class:'prc-block'}, search, results));
   function renderGloss(filter){
     const q=(filter||'').trim().toLowerCase();
     results.replaceChildren();
-    GLOSSARY.filter(e=>`${e.term} ${e.plain} ${e.example} ${e.file} ${e.where}`.toLowerCase().includes(q)).forEach(e=>{
+    prcGlossary().filter(e=>`${e.term} ${e.plain} ${e.example} ${e.file} ${e.where}`.toLowerCase().includes(q)).forEach(e=>{
       results.append(
         h('dt',null, e.term),
         h('dd',null, e.plain),
@@ -5750,12 +6107,14 @@ function prcFlashcards(){
   const wrap=h('div',{class:'prc-card prc-flash'});
   function render(){
     wrap.replaceChildren();
-    const now=Date.now(), deck=prcFlashDeck(now), cursor=prcFlashCursor(deck), row=deck[cursor]||deck[0], i=row?row.index:0, card=GLOSSARY[i];
+    const glossary=prcGlossary();
+    const now=Date.now(), deck=prcFlashDeck(now), cursor=prcFlashCursor(deck), row=deck[cursor]||deck[0], i=row?row.index:0, card=glossary[i];
+    if(!card){ wrap.append(h('h3',{class:'prc-h'},'Flashcards'), h('p',{class:'hint'},'No cards on this track yet.')); return; }
     const schedule=row?row.schedule:flashScheduleEntry(null), due=dueCards(deck,now).length;
-    const known=GLOSSARY.filter((_,k)=>prcFlashKnown(k)).length;
+    const known=glossary.filter((_,k)=>prcFlashKnown(k)).length;
     wrap.append(
       h('h3',{class:'prc-h'}, 'Flashcards'),
-      h('p',{class:'hint'}, `${cursor+1}/${GLOSSARY.length} cards - ${known} known - ${due} due`),
+      h('p',{class:'hint'}, `${cursor+1}/${glossary.length} cards - ${known} known - ${due} due`),
       h('div',{class:'prc-flashface'},
         h('b',null, card.term),
         h('p',null, card.plain),
@@ -5763,10 +6122,10 @@ function prcFlashcards(){
         h('p',{class:'hint'}, 'File: '+card.file),
         h('p',{class:'hint'}, schedule.seen?('Box '+schedule.box+' - '+flashDueText(schedule,now)):flashDueText(schedule,now))),
       h('div',{class:'toolrow'},
-        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(cursor-1+deck.length)%deck.length; save(); render(); }}, '‹ Prev'),
+        h('button',{class:'navbtn', onclick:()=>{ prcState().flash=(cursor-1+deck.length)%deck.length; save(); render(); }}, '‹ Prev'),
         h('button',{class:'navbtn', onclick:()=>{ prcReviewFlash(i,false,now); render(); }}, 'Still learning'),
         h('button',{class:'navbtn primary', onclick:()=>{ prcReviewFlash(i,true,now); render(); }}, 'Known'),
-        h('button',{class:'navbtn', onclick:()=>{ DB.practice.flash=(cursor+1)%deck.length; save(); render(); }}, 'Next ›')),
+        h('button',{class:'navbtn', onclick:()=>{ prcState().flash=(cursor+1)%deck.length; save(); render(); }}, 'Next ›')),
     );
   }
   render();
@@ -5788,14 +6147,16 @@ function prcJournalText(){
 function practiceJournal(host){
   host.replaceChildren();
 
-  // progress at a glance
-  const chDone=PPP_CHAPTERS.filter(c=>prcChapterDone(c.n)).length;
-  const known=GLOSSARY.filter((_,k)=>prcFlashKnown(k)).length;
+  // progress at a glance (chapter/flashcard counts follow the active track)
+  const chapters=prcChapters(), glossary=prcGlossary();
+  const chDone=chapters.filter(c=>prcChapterDone(c.n)).length;
+  const known=glossary.filter((_,k)=>prcFlashKnown(k)).length;
   const checkDone=PRACTICE_CHECKLIST.filter((_,i)=>DB.practice.checklist[i]).length;
   host.append(pHead('Progress'));
   host.append(h('div',{class:'prc-strip'},
-    h('span',null, h('b',null,'Chapters: '), `${chDone}/${PPP_CHAPTERS.length} done`),
-    h('span',null, h('b',null,'Flashcards: '), `${known}/${GLOSSARY.length} known`),
+    h('span',null, h('b',null,'Track: '), prcActiveTrack().label),
+    h('span',null, h('b',null,'Chapters: '), `${chDone}/${chapters.length} done`),
+    h('span',null, h('b',null,'Flashcards: '), `${known}/${glossary.length} known`),
     h('span',null, h('b',null,'This session: '), `${checkDone}/${PRACTICE_CHECKLIST.length}`)));
 
   // per-session checklist
@@ -6047,22 +6408,40 @@ function stripForBackup(db){
   }
   return d;
 } // never write tokens, engine keys, engine endpoints, engine models, usage ledger, or session scratch into a backup
+/* Practice merge, per-track since Slice 48: practiceSyncSettings normalizes BOTH
+   sides first, so a legacy flat payload from an un-updated device nests into
+   tracks.ppp before merging - it can never clobber migrated progress. Per track:
+   the side touched more recently wins wholesale (newest-wins per track, mirroring
+   the household roster's newest-wins per person); an untouched tie falls back to
+   the old field-wise union so pre-`touched` devices still merge losslessly. */
+function mergePracticeTrack(a,b){
+  if(!a||typeof a!=='object') return b;
+  if(!b||typeof b!=='object') return a;
+  const at=Number(a.touched)||0, bt=Number(b.touched)||0;
+  if(at>bt) return a;
+  if(bt>at) return b;
+  return Object.assign({},a,b,{
+    flashKnown:Object.assign({},a.flashKnown,b.flashKnown),
+    flashSchedule:Object.assign({},a.flashSchedule,b.flashSchedule),
+    chapterDone:Object.assign({},a.chapterDone,b.chapterDone),
+    drills:Object.assign({},a.drills,b.drills),
+    drillIdx:Object.assign({},a.drillIdx,b.drillIdx),
+  });
+}
 function mergePracticeState(local,incoming){
   const a=practiceSyncSettings(local), b=practiceSyncSettings(incoming);
   const journalSeen={};
   const journal=[];
   (b.journal||[]).concat(a.journal||[]).forEach(entry=>{
-    const key=[entry.title,entry.createdAt,entry.tried,entry.happened,entry.confusing,entry.askRune].join('\u0001');
+    const key=[entry.title,entry.createdAt,entry.tried,entry.happened,entry.confusing,entry.askRune].join('');
     if(!journalSeen[key]){ journalSeen[key]=true; journal.push(entry); }
   });
+  const tracks={};
+  Object.keys(Object.assign({},a.tracks,b.tracks)).forEach(id=>{ tracks[id]=mergePracticeTrack(a.tracks[id],b.tracks[id]); });
   return Object.assign({},a,b,{
     fields:Object.assign({},a.fields,b.fields),
-    flashKnown:Object.assign({},a.flashKnown,b.flashKnown),
-    flashSchedule:Object.assign({},a.flashSchedule,b.flashSchedule),
     checklist:Object.assign({},a.checklist,b.checklist),
-    chapterDone:Object.assign({},a.chapterDone,b.chapterDone),
-    drills:Object.assign({},a.drills,b.drills),
-    drillIdx:Object.assign({},a.drillIdx,b.drillIdx),
+    tracks,
     journal:journal.slice(0,30),
   });
 }
@@ -7820,10 +8199,12 @@ function companionRenderLog(){
 }
 
 function companionRefreshContext(){
-  // The ✒ seat button follows the gm-button pattern one step further: it only
-  // appears once a studio seat exists (the desk's "Open the assistant" makes one).
+  // The ✒/✶ seat buttons follow the gm-button pattern one step further: they only
+  // appear once their seat exists (the desk / Learn-tab launcher makes one).
   const studioBtn=COMPANION.panel&&COMPANION.panel._studioBtn;
   if(studioBtn) studioBtn.style.display=(typeof assistantSession==='function'&&assistantSession())?'':'none';
+  const coachBtn=COMPANION.panel&&COMPANION.panel._coachBtn;
+  if(coachBtn) coachBtn.style.display=(typeof practiceCoachSession==='function'&&practiceCoachSession())?'':'none';
   const chip=COMPANION.panel&&COMPANION.panel._context;
   if(!chip) return;
   if(COMPANION.mode==='gm'){
@@ -7835,6 +8216,11 @@ function companionRefreshContext(){
     const s=typeof assistantSession==='function'?assistantSession():null;
     const persona=s&&typeof assistantPersonaById==='function'?assistantPersonaById(s.state.personaId):null;
     chip.textContent=s?('✒ '+(persona&&persona.label?persona.label:'Canon assistant')+' · promoted canon'):'✒ not seated';
+    return;
+  }
+  if(COMPANION.mode==='coach'){
+    const s=typeof practiceCoachSession==='function'?practiceCoachSession():null;
+    chip.textContent=s&&s.chapter?('✶ Ch '+s.chapter.n+' · '+s.chapter.title):'✶ not seated';
     return;
   }
   chip.textContent=companionContext().line;
@@ -7874,12 +8260,12 @@ function companionChatBody(){
   return h('div',{class:'companion-body'}, log, h('div',{class:'companion-inputrow'}, input, send), h('div',{class:'companion-footrow'}, report));
 }
 
-const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master', studio:'✒ Canon assistant'};
+const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master', studio:'✒ Canon assistant', coach:'✶ Coach'};
 function companionSetMode(mode){
   COMPANION.mode=mode;
   const body=COMPANION.panel&&COMPANION.panel._body;
   if(!body) return;
-  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():companionChatBody());
+  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():mode==='coach'?practiceCoachCompanionBody():companionChatBody());
   const title=COMPANION.panel._title;
   if(title) title.textContent=COMPANION_TITLES[mode]||COMPANION_TITLES.chat;
   companionRefreshContext();
@@ -8042,6 +8428,8 @@ function companionEnsurePanel(){
     onclick:()=>companionSetMode(COMPANION.mode==='gm'?'chat':'gm')}, '♟');
   const studioBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Canon assistant', title:'The canon assistant',
     onclick:()=>companionSetMode(COMPANION.mode==='studio'?'chat':'studio')}, '✒');
+  const coachBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Practice coach', title:'The practice coach',
+    onclick:()=>companionSetMode(COMPANION.mode==='coach'?'chat':'coach')}, '✶');
   const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
     onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
   const readBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
@@ -8049,7 +8437,7 @@ function companionEnsurePanel(){
   const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
-  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, msgBtn, readBtn, sizeBtn, closeBtn);
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, coachBtn, msgBtn, readBtn, sizeBtn, closeBtn);
   // Safari (iPad included) never renders the native CSS resize corner, so the
   // panel carries its own touch grip: the top-left corner resizes toward/away
   // from the bottom-right, which stays visually put.
@@ -8059,7 +8447,7 @@ function companionEnsurePanel(){
     body,
     grip);
   panel.style.display='none';
-  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn; panel._coachBtn=coachBtn;
   COMPANION.panel=panel;
   companionWireDrag(panel, head);
   companionWireResize(panel);
@@ -8094,6 +8482,15 @@ function companionOpenStudio(){
   if(typeof assistantEnsureSession==='function') assistantEnsureSession();
   companionEnsurePanel();
   companionSetMode('studio');
+  companionToggle(true);
+}
+
+// Learn's "✶ Ask the coach" (or the ✶ header button once a seat exists) seats the
+// practice coach. The pipeline stays in practice.js — the panel only hosts.
+function companionOpenCoach(){
+  if(typeof practiceCoachEnsureSession==='function') practiceCoachEnsureSession();
+  companionEnsurePanel();
+  companionSetMode('coach');
   companionToggle(true);
 }
 
@@ -9080,6 +9477,7 @@ const STUDIO_TABS=[
   ['inbox','In-tray','Raw ideas and the maker’s creations, waiting to be turned into Canon Cards.'],
   ['drafter','Draft a card','Turn an idea into a Canon Card (Draft) — it lands in the queue with its own reserved ID.'],
   ['browse','Look up','Read and search your promoted canon. Reference only — nothing here changes canon.'],
+  ['primer','📖 Primer','Read the bible start to finish — a book, not a workbench. Strictly read-only; [OPEN] badges show where the spine is still soft.'],
   ['assistant','Assistant','Ask a local-first AI helper grounded only in promoted canon. Suggestions stay Draft or campaign-only until you choose.'],
   ['query','Query','Ask your private tailnet backend for read-only SQL and vector search results.'],
   ['graph','Canon graph','See promoted canon as a read-only web: foundation entries, promoted cards, domains, and cross-references.'],
@@ -9104,6 +9502,7 @@ function viewStudio(tab, params){
   body.append(viewStage(host, studioRail(queueStats)));
   loadStudioQueueCounts(queueStats);
   if(tab==='browse') studioBrowse(host);
+  else if(tab==='primer') studioPrimer(host);
   else if(tab==='threads') studioThreads(host);
   else if(tab==='contradictions') studioContradictions(host);
   else if(tab==='inbox') studioInbox(host);
@@ -9469,6 +9868,190 @@ function consistencyBanner(issues){
   warns.forEach(i=> ul.append(h('li',{style:{color:'#9a5b1c', margin:'2px 0'}}, i.msg)));
   infos.forEach(i=> ul.append(h('li',{style:{color:'var(--ink-soft)', margin:'2px 0'}}, i.msg)));
   box.append(ul); return box;
+}
+/* ========================================================================== *
+   THE PRIMER READER (Slice 49) — read the bible start to finish.
+
+   A read-only Studio tab that stitches every DOMAIN_FILES entry, in order, into
+   one continuous book: chapter per domain file, entries anchored by their ID, a
+   slim table-of-contents rail, and per-chapter [OPEN]-thread badges (the same
+   scan the threads board uses) so the book wears the Foundation-v1 progress bar
+   itself. Parchment treatment — this is an in-world artifact, not app chrome.
+
+   STRICTLY READ-ONLY: no write or promote affordance anywhere in this file.
+   GM-ONLY blocks (the canon templates' marker convention) render as an inert
+   "GM notes — hidden" line by default — the content stays OUT of the DOM until
+   the per-session "show GM notes" toggle is on — and are excluded from the
+   single-file download the same way.
+ * ========================================================================== */
+
+// Line prefixes the templates reserve for GM-side material.
+const PRIMER_GM_RE=/^\s*>?\s*(GM-ONLY|GM ONLY|HIDDEN|SECRET|PRIVATE|PATRON|SPOILER)\s*:/i;
+let PRIMER_SHOW_GM=false;   // per-session, never persisted — a read-through starts player-safe
+
+// Pure: split a chapter's markdown into ordered segments, GM blocks separated.
+// A GM block is the marked line plus its continuation (same block rule as the
+// thread scan: until a blank line, heading, or rule).
+function primerSegments(text){
+  const lines=String(text||'').split('\n'), segs=[]; let buf=[], i=0;
+  const flush=()=>{ if(buf.length){ segs.push({gm:false, text:buf.join('\n')}); buf=[]; } };
+  while(i<lines.length){
+    if(PRIMER_GM_RE.test(lines[i])){
+      flush();
+      const gm=[lines[i]]; let j=i+1;
+      while(j<lines.length && lines[j].trim() && !/^#{1,4}\s/.test(lines[j]) && !/^---\s*$/.test(lines[j]) && !PRIMER_GM_RE.test(lines[j])){ gm.push(lines[j]); j++; }
+      segs.push({gm:true, text:gm.join('\n')});
+      i=j; continue;
+    }
+    buf.push(lines[i]); i++;
+  }
+  flush();
+  return segs;
+}
+
+// Pure: the whole spine as ONE markdown file, DOMAIN_FILES order; GM blocks
+// excluded unless opts.includeGm.
+function primerCompile(docs, opts){
+  opts=opts||{};
+  const day=new Date(opts.now||Date.now()).toISOString().slice(0,10);
+  const parts=['# The Vael Primer','',
+    '*Compiled from promoted canon on '+day+'. A reading copy — the `domains/**` files are the live authority.*'];
+  DOMAIN_FILES.forEach(d=>{
+    const doc=(docs||[]).find(x=>x&&x.file===d.file);
+    if(!doc||!String(doc.text||'').trim()) return;
+    parts.push('','---','','# '+d.topic,'');
+    primerSegments(doc.text).forEach(seg=>{ if(!seg.gm||opts.includeGm) parts.push(seg.text); });
+  });
+  return parts.join('\n');
+}
+
+// Pure: per-chapter open-thread counts, from the SAME scan the threads board
+// uses (findOpenThreads) — never a second scanner.
+function primerOpenCounts(docs){
+  const byFile={}; let total=0;
+  DOMAIN_FILES.forEach(d=>{
+    const doc=(docs||[]).find(x=>x&&x.file===d.file);
+    const n=doc?findOpenThreads(doc.text,d.file).length:0;
+    byFile[d.file]=n; total+=n;
+  });
+  return {byFile,total};
+}
+
+function primerChapterId(file){ return 'primer-ch-'+String(file||'').replace(/[^a-z0-9]+/gi,'-').toLowerCase(); }
+
+// Chapter markdown → nodes: prose via the kit's mdToHtml, an anchor span before
+// every promoted entry heading (## COS-005 …), GM blocks per the toggle.
+function primerChapterNodes(text, showGm){
+  const nodes=[];
+  primerSegments(text).forEach(seg=>{
+    if(seg.gm){
+      if(showGm) nodes.push(h('div',{class:'primer-gm', html:mdToHtml(seg.text)}));
+      else nodes.push(h('p',{class:'hint primer-gm-hidden'},'GM notes — hidden'));
+      return;
+    }
+    const lines=seg.text.split('\n'); let buf=[];
+    const flush=()=>{ if(buf.length){ nodes.push(h('div',{class:'primer-prose', html:mdToHtml(buf.join('\n'))})); buf=[]; } };
+    lines.forEach(ln=>{
+      const m=/^##\s+([A-Z]{3}-\d{3})\b/.exec(ln);
+      if(m){ flush(); nodes.push(h('span',{id:'primer-'+m[1], class:'primer-anchor'})); }
+      buf.push(ln);
+    });
+    flush();
+  });
+  return nodes;
+}
+
+// Test hook mirrors the __canonRag style; real path is the shared cached loader.
+async function primerLoadDocs(force){
+  const hook=typeof window!=='undefined'&&window.__primerDocs?window.__primerDocs:null;
+  if(hook) return typeof hook==='function'?hook():hook;
+  return loadCanonDocs(ghCfg(),force);
+}
+
+function primerRememberPos(file, anchor){
+  DB.primerPos={file:String(file||''), anchor:String(anchor||'')};
+  saveLocal();
+}
+
+function primerScrollTo(id){
+  try{
+    const el=typeof document!=='undefined'&&document.getElementById?document.getElementById(id):null;
+    if(el&&typeof el.scrollIntoView==='function') el.scrollIntoView({behavior:'auto', block:'start'});
+  }catch(e){}
+}
+
+function primerDownload(docs){
+  const md=primerCompile(docs,{includeGm:PRIMER_SHOW_GM});
+  const blob=new Blob([md],{type:'text/markdown'});
+  const a=h('a',{href:URL.createObjectURL(blob), download:'vael-primer-'+new Date().toISOString().slice(0,10)+'.md'});
+  document.body.append(a); a.click(); a.remove();
+  toast('Saved the Primer as one file.');
+}
+
+async function studioPrimer(host){
+  host.replaceChildren(h('p',{class:'hint', style:{textAlign:'center'}},'Opening the book…'));
+  let docs;
+  try{ docs=await primerLoadDocs(); }
+  catch(e){ host.replaceChildren(h('p',{class:'bad'},'Could not open the Primer: '+(e&&e.message?e.message:String(e)))); return; }
+  primerRender(host, docs);
+}
+
+function primerRender(host, docs){
+  const counts=primerOpenCounts(docs);
+  const chaptersWithOpen=DOMAIN_FILES.filter(d=>counts.byFile[d.file]>0).length;
+
+  // the spine line: the Foundation-v1 progress bar, worn by the book itself
+  const spine=counts.total>0
+    ? h('p',{class:'hint primer-spine'}, counts.total+' [OPEN] thread'+(counts.total===1?'':'s')+' across '+chaptersWithOpen+' chapter'+(chaptersWithOpen===1?'':'s')+' — the spine isn’t closed yet.')
+    : h('p',{class:'hint primer-spine'},'Spine clear ✦ — the bible reads start to finish with no [OPEN] threads.');
+
+  const gmBtn=h('button',{class:'navbtn ghost', type:'button', 'aria-pressed':PRIMER_SHOW_GM?'true':'false'}, PRIMER_SHOW_GM?'Hide GM notes':'Show GM notes');
+  gmBtn.onclick=()=>{ PRIMER_SHOW_GM=!PRIMER_SHOW_GM; primerRender(host, docs); };
+  const dlBtn=h('button',{class:'navbtn', type:'button'},'⤓ Download the Primer');
+  dlBtn.onclick=()=>primerDownload(docs);
+  const tools=h('div',{class:'toolrow', style:{justifyContent:'center'}}, gmBtn, dlBtn);
+
+  const toc=h('nav',{class:'primer-toc', 'aria-label':'Chapters'});
+  const book=h('div',{class:'primer-book'});
+
+  DOMAIN_FILES.forEach(d=>{
+    const doc=(docs||[]).find(x=>x&&x.file===d.file)||{text:''};
+    const chapId=primerChapterId(d.file);
+    const openN=counts.byFile[d.file]||0;
+
+    const art=h('article',{class:'primer-chapter theme-vael', id:chapId});
+    const head=h('div',{class:'primer-chapter-head'}, h('h2',null,d.topic));
+    if(openN){
+      const badge=h('button',{class:'chip dash primer-badge', type:'button', title:'Open threads in this chapter — see the threads board'}, openN+' [OPEN]');
+      badge.onclick=()=>go('studio',{tab:'threads'});
+      head.append(badge);
+    }
+    art.append(head);
+    primerChapterNodes(doc.text, PRIMER_SHOW_GM).forEach(n=>art.append(n));
+    book.append(art);
+
+    const tocBtn=h('button',{class:'navbtn ghost primer-toc-item'+(DB.primerPos&&DB.primerPos.file===d.file?' on':''), type:'button'},
+      d.topic+(openN?(' · '+openN):''));
+    tocBtn.onclick=()=>{
+      primerRememberPos(d.file,'');
+      Array.from(toc.children||[]).forEach(c=>{ c.className=String(c.className||'').replace(' on',''); });
+      tocBtn.className+=' on';
+      primerScrollTo(chapId);
+    };
+    toc.append(tocBtn);
+  });
+
+  const headRow=[spine, tools];
+  if(DB.primerPos&&DB.primerPos.file){
+    const back=DOMAIN_FILES.find(d=>d.file===DB.primerPos.file);
+    if(back){
+      const cont=h('button',{class:'navbtn primary', type:'button'},'Continue reading — '+back.topic);
+      cont.onclick=()=>primerScrollTo(DB.primerPos.anchor?('primer-'+DB.primerPos.anchor):primerChapterId(back.file));
+      headRow.push(h('div',{class:'toolrow', style:{justifyContent:'center'}}, cont));
+    }
+  }
+
+  host.replaceChildren(...headRow, h('div',{class:'primer-wrap'}, toc, book));
 }
 /* ========================================================================== *
    CANON GRAPH — read-only promoted-canon map for Canon Studio.
@@ -9877,12 +10460,24 @@ function canonCorpusKey(cfg){
   return [cfg.owner||'',cfg.repo||'',cfg.branch||'',cfg.path||''].join('/');
 }
 
+// Raw domain-file texts, cached alongside the parsed corpus — the Primer reader
+// (Slice 49) stitches these; loadCanonCorpus reuses the same fetch so there is
+// exactly ONE read path for the domain files.
+let canonDocsCache=null;
+async function loadCanonDocs(cfg, force){
+  cfg=cfg||ghCfg();
+  const key=canonCorpusKey(cfg);
+  if(canonDocsCache&&canonDocsCache.key===key&&!force) return canonDocsCache.docs;
+  const docs=await Promise.all(DOMAIN_FILES.map(d=>ghGetText(cfg,d.file).then(r=>({file:d.file,text:r&&r.text||''}))));
+  canonDocsCache={key,docs};
+  return docs;
+}
 async function loadCanonCorpus(cfg, force){
   cfg=cfg||ghCfg();
   const key=canonCorpusKey(cfg);
   if(canonCorpusCache&&canonCorpusCache.key===key&&!force) return canonCorpusCache.entries;
   const index=await ghGetText(cfg,INDEX_PATH);
-  const docs=await Promise.all(DOMAIN_FILES.map(d=>ghGetText(cfg,d.file).then(r=>({file:d.file,text:r&&r.text||''}))));
+  const docs=(await loadCanonDocs(cfg,force)).slice();
   const home=await ghGetText(cfg,CANON_HOME_PATH).catch(()=>null);
   if(home&&home.text) docs.push({file:CANON_HOME_PATH,text:home.text});
   const entries=canonCorpusFromDocs(index&&index.text||'',docs);
@@ -13132,6 +13727,503 @@ function regionForgeGenerateRegion(input){
   return assertRegion(region,{expectedCampaign:profile.campaign});
 }
 /* ========================================================================== *
+   SUB-AREA ENGINE (Slice 50 / SUBSCALE-001) — deterministic "inside a tile".
+
+   Entering one tile of a region's local layer derives a finer scene — an
+   EXTENSION of Region Forge, never a second generator: everything below comes
+   from the accepted region's own stored fields (terrain cells + occupancy, the
+   layer's elementalInfluence weights, the region ambientMana band, features),
+   through the Forge's own PRNG/hash helpers. Pure engine: NO UI, NO AI, NO
+   writes, NO persistence — nothing exists for an unvisited tile, and deriving
+   stores nothing (Slice 52 persists what HAPPENS, as deltas).
+
+   Determinism contract (the grill's rim law): the scene's identity (seed /
+   sourceHash) covers the ONE-RING neighbor sample, but interior cells derive
+   from a core seed WITHOUT neighbors and each rim band from its own edge seed —
+   so changing one neighbor changes exactly that edge's rim and nothing interior.
+   Per-cell values are hash-seeded by address (order-independent), never drawn
+   from one shared sequence.
+ * ========================================================================== */
+
+// Fine-grid size + niche cap — pacing constants (game-phase; named, not magic).
+const SUBAREA_GRID_W=12;
+const SUBAREA_GRID_H=10;
+const SUBAREA_MAX_NICHES=3;
+const SUBAREA_ENGINE_VERSION='1.0.0';
+// Pointy-top odd-r hex directions, matching the parent renderer's convention.
+const SUBAREA_EDGES=['ne','e','se','sw','w','nw'];
+const SUBAREA_NICHE_TYPES=['guardian-brood','rooted-grove','current-nest','grazer-drift','seep-pool','shade-warren'];
+
+function subareaGridOf(region, layerId){
+  const terrain=region&&region.terrain&&region.terrain.layers?region.terrain.layers[layerId]:null;
+  if(!terrain||terrain.format!=='cell-grid'||!Array.isArray(terrain.cells)) return null;
+  return terrain;
+}
+function subareaParentCell(grid, x, y){
+  if(!grid||!Number.isInteger(x)||!Number.isInteger(y)) return null;
+  if(x<0||y<0||x>=grid.width||y>=grid.height) return null;
+  const i=y*grid.width+x;
+  return {
+    terrain:String(grid.cells[i]||'grass'),
+    occupancy:(Array.isArray(grid.occupancy)&&grid.occupancy[i]==='air')?'air':'solid',
+  };
+}
+// Odd-r pointy-top neighbors of a parent tile (same parity rule the renderer draws).
+function subareaNeighborCoords(x, y){
+  const odd=y%2!==0;
+  return {
+    ne:{x:odd?x+1:x, y:y-1}, e:{x:x+1, y},
+    se:{x:odd?x+1:x, y:y+1}, sw:{x:odd?x:x-1, y:y+1},
+    w:{x:x-1, y}, nw:{x:odd?x:x-1, y:y-1},
+  };
+}
+// The one-ring sample: per hex edge, the neighbor's {terrain, occupancy} or null
+// past the chart's edge. Part of the scene's identity; only rims consume it.
+function subareaNeighborSample(region, layerId, tile){
+  const grid=subareaGridOf(region, layerId);
+  const coords=subareaNeighborCoords(tile.x, tile.y);
+  const sample={};
+  SUBAREA_EDGES.forEach(edge=>{ const c=coords[edge]; sample[edge]=grid?subareaParentCell(grid, c.x, c.y):null; });
+  return sample;
+}
+
+function subareaRegionSeed(region){
+  const meta=region&&region.metadata;
+  return String((meta&&meta.seed)||region&&region.id||'region');
+}
+function subareaLayerWeights(region, layerId){
+  const inf=region&&region.elementalInfluence;
+  const local=inf&&inf.localLayers&&inf.localLayers[layerId];
+  const weights=local&&typeof local==='object'?local:(inf&&inf.region&&typeof inf.region==='object'?inf.region:{});
+  const out={};
+  Object.keys(weights).forEach(k=>{ const n=Number(weights[k]); if(Number.isFinite(n)&&n>0) out[k]=n; });
+  return out;
+}
+function subareaLayerType(region, layerId){
+  const layer=(region&&Array.isArray(region.localLayers)?region.localLayers:[]).find(l=>l&&l.id===layerId);
+  return layer?String(layer.type||''):'';
+}
+
+// One hash-seeded 0..1 value per (seed, address) — order-independent by construction.
+function subareaValue(seed, key){ return regionForgePrng(seed+'|'+key)(); }
+
+// Which rim band a fine cell sits in (or '' for interior). Top/bottom rows split
+// into the two pointy-top edges; side columns are e/w.
+function subareaCellEdge(x, y){
+  if(y===0) return x<SUBAREA_GRID_W/2?'nw':'ne';
+  if(y===SUBAREA_GRID_H-1) return x<SUBAREA_GRID_W/2?'sw':'se';
+  if(x===0) return 'w';
+  if(x===SUBAREA_GRID_W-1) return 'e';
+  return '';
+}
+
+// Terrain variants a parent cell may show at fine scale — drawn ONLY from the
+// Forge's existing terrain vocabulary, gated by the layer's element weights.
+function subareaVariantPool(parent, weights, layerType){
+  const pool=[parent];
+  const caveLike=/cave|cavern|ravine|interiors/.test(layerType);
+  if((weights.wood||0)>0.4&&/^(grass|meadow|forest)$/.test(parent)) pool.push('forest');
+  if((weights.water||0)>0.4&&parent!=='water'&&!caveLike) pool.push('water');
+  if((weights.crystal||0)>0.4) pool.push('crystal');
+  else if((weights.earth||0)>0.45&&parent!=='stone') pool.push('stone');
+  if(parent==='water'&&(weights.wood||0)>0.35) pool.push('marsh');
+  if(caveLike&&parent!=='tunnel') pool.push('cave-floor');
+  if((weights.fire||0)>0.55&&/^(grass|meadow|ash)$/.test(parent)) pool.push('ash');
+  return pool;
+}
+
+function subareaDeriveCell(x, y, parent, neighbors, seeds, weights, layerType){
+  const edge=subareaCellEdge(x, y);
+  const n=edge?neighbors[edge]:null;
+  const addr=x+','+y;
+  // Air parent: the scene IS open air — occupancy stays air everywhere (the
+  // standing occupancy rule), terrain stays the parent's void character.
+  if(parent.occupancy==='air'){
+    return {x, y, terrain:parent.terrain, occupancy:'air', steep:false, cover:false};
+  }
+  let terrain=parent.terrain, occupancy='solid';
+  if(edge&&n){
+    // Rim band: blend toward the neighbor — gradual, never a wall.
+    const v=subareaValue(seeds.edge[edge], addr);
+    if(n.occupancy==='air'){ if(v<0.45) occupancy='air'; }
+    else if(n.terrain!==parent.terrain&&v<0.4) terrain=n.terrain;
+  }else if(edge&&!n){
+    // Past the chart's edge: the world continues unseen; the rim thins to air.
+    if(subareaValue(seeds.edge[edge], addr)<0.3) occupancy='air';
+  }else{
+    const pool=subareaVariantPool(parent.terrain, weights, layerType);
+    const v=subareaValue(seeds.core, addr);
+    if(pool.length>1&&v>=0.62) terrain=pool[1+Math.floor((v-0.62)/0.38*(pool.length-1))%(pool.length-1)];
+  }
+  if(occupancy==='air') return {x, y, terrain, occupancy, steep:false, cover:false};
+  const steep=/^(cliff|stone|crystal)$/.test(terrain)&&subareaValue(seeds.core,'steep|'+addr)>0.55;
+  const cover=(terrain==='forest'||((weights.wood||0)>0.5&&subareaValue(seeds.core,'cover|'+addr)>0.75));
+  return {x, y, terrain, occupancy, steep, cover};
+}
+
+// Ecological NICHES — typed slots, never creatures: the world implies its life;
+// identity arrives in play via propose-accept (Slice 54). Scores read only the
+// stored weights + the parent tile's character; internal math, nothing stored.
+function subareaNicheScores(parent, weights, layerType){
+  const caveLike=/cave|cavern|ravine|interiors/.test(layerType);
+  const aerial=/airspace|floating|peaks/.test(layerType);
+  const t=parent.terrain, air=parent.occupancy==='air';
+  return {
+    'guardian-brood':(weights.wood||0)*0.4+(weights.shadow||0)*0.35+(caveLike?0.45:0)+(t==='forest'?0.3:0),
+    'rooted-grove':(weights.wood||0)+(weights.life||0)*0.8+(/^(forest|meadow)$/.test(t)?0.3:0)-(air?0.6:0),
+    'current-nest':(weights.air||0)+(air?0.9:0)+(aerial?0.4:0),
+    'grazer-drift':(/^(grass|meadow)$/.test(t)?0.6:0)+(weights.earth||0)*0.3+(weights.light||0)*0.2-(air?0.4:0),
+    'seep-pool':(weights.water||0)+(/^(water|marsh)$/.test(t)?0.5:0)-(air?0.5:0),
+    'shade-warren':(weights.shadow||0)+(caveLike?0.5:0)-(air?0.5:0),
+  };
+}
+function subareaNiches(parent, neighbors, seeds, weights, layerType, cells){
+  const scores=subareaNicheScores(parent, weights, layerType);
+  const ranked=SUBAREA_NICHE_TYPES.map(type=>({type, score:scores[type]||0})).sort((a,b)=>b.score-a.score||SUBAREA_NICHE_TYPES.indexOf(a.type)-SUBAREA_NICHE_TYPES.indexOf(b.type));
+  let count=1;
+  if(ranked[1]&&ranked[1].score>0.55) count++;
+  if(ranked[2]&&ranked[2].score>0.85) count++;
+  count=Math.min(count, SUBAREA_MAX_NICHES);
+  const byAddr={}; cells.forEach(c=>{ byAddr[c.x+','+c.y]=c; });
+  const niches=[];
+  for(let i=0;i<count;i++){
+    const type=ranked[i].type;
+    const ax=1+Math.floor(subareaValue(seeds.core,'niche-x|'+i)*(SUBAREA_GRID_W-2));
+    const ay=1+Math.floor(subareaValue(seeds.core,'niche-y|'+i)*(SUBAREA_GRID_H-2));
+    const ring=subareaNeighborCoords(ax, ay);
+    const cluster=[{x:ax,y:ay}].concat(SUBAREA_EDGES.map(e=>ring[e]))
+      .filter(c=>c.x>=0&&c.y>=0&&c.x<SUBAREA_GRID_W&&c.y<SUBAREA_GRID_H)
+      .filter(c=>{ const cell=byAddr[c.x+','+c.y]; return cell&&(type==='current-nest'?true:cell.occupancy==='solid'); })
+      .slice(0, 5)
+      .map(c=>c.x+','+c.y);
+    if(cluster.length) niches.push({id:'niche-'+(i+1), type, cells:cluster});
+  }
+  return niches;
+}
+
+// Region features on or adjacent to the tile appear as landmarks with their REAL ids.
+function subareaLandmarks(region, layerId, tile, seeds){
+  const out=[];
+  (region&&Array.isArray(region.features)?region.features:[]).forEach(feature=>{
+    if(!feature||feature.layerId!==layerId) return;
+    const p=feature.position;
+    if(!p||!Number.isFinite(p.x)||!Number.isFinite(p.y)) return;
+    const dx=Math.floor(p.x)-tile.x, dy=Math.floor(p.y)-tile.y;
+    if(Math.abs(dx)>1||Math.abs(dy)>1) return;
+    const onTile=dx===0&&dy===0;
+    let at;
+    if(onTile){
+      at={
+        x:2+Math.floor(subareaValue(seeds.core,'landmark-x|'+feature.id)*(SUBAREA_GRID_W-4)),
+        y:2+Math.floor(subareaValue(seeds.core,'landmark-y|'+feature.id)*(SUBAREA_GRID_H-4)),
+      };
+    }else{
+      at={
+        x:dx<0?0:dx>0?SUBAREA_GRID_W-1:Math.floor(SUBAREA_GRID_W/2),
+        y:dy<0?0:dy>0?SUBAREA_GRID_H-1:Math.floor(SUBAREA_GRID_H/2),
+      };
+    }
+    out.push({id:String(feature.id), type:String(feature.type||'site'), label:String(feature.label||feature.id), at, adjacent:!onTile});
+  });
+  return out;
+}
+
+// Per-edge blend descriptors — the transition-belt law one scale down.
+function subareaRim(parent, neighbors){
+  return SUBAREA_EDGES.map(edge=>{
+    const n=neighbors[edge];
+    if(!n) return {edge, blend:'edge-of-chart', toward:''};
+    if(n.occupancy==='air'&&parent.occupancy!=='air') return {edge, blend:'open-air', toward:''};
+    if(parent.occupancy==='air'&&n.occupancy!=='air') return {edge, blend:'landfall', toward:n.terrain};
+    if(n.terrain!==parent.terrain) return {edge, blend:'toward', toward:n.terrain};
+    return {edge, blend:'continuous', toward:n.terrain};
+  });
+}
+
+/* The engine: same inputs → byte-identical scene, always. Returns null for a
+   layer/tile the region does not actually have — the caller decides how to say so. */
+function subareaScene(region, layerId, tile, opts){
+  opts=opts||{};
+  const grid=subareaGridOf(region, layerId);
+  if(!grid) return null;
+  const tx=Number(tile&&tile.x), ty=Number(tile&&tile.y);
+  if(!Number.isInteger(tx)||!Number.isInteger(ty)) return null;
+  const parent=subareaParentCell(grid, tx, ty);
+  if(!parent) return null;
+  const neighbors=subareaNeighborSample(region, layerId, {x:tx, y:ty});
+  const base={
+    regionSeed:subareaRegionSeed(region),
+    versions:[REGION_FORGE_GENERATOR_VERSION, SUBAREA_ENGINE_VERSION],
+    layerId, tile:{x:tx, y:ty},
+    context:String(opts.context||''),
+  };
+  const seed='subarea-'+regionForgeHashLong({base, neighbors});
+  const seeds={
+    core:'subarea-core-'+regionForgeHash(base),
+    edge:{},
+  };
+  SUBAREA_EDGES.forEach(edge=>{ seeds.edge[edge]='subarea-edge-'+edge+'-'+regionForgeHash({base, edge, neighbor:neighbors[edge]}); });
+  const weights=subareaLayerWeights(region, layerId);
+  const layerType=subareaLayerType(region, layerId);
+  const cells=[];
+  for(let y=0;y<SUBAREA_GRID_H;y++) for(let x=0;x<SUBAREA_GRID_W;x++){
+    cells.push(subareaDeriveCell(x, y, parent, neighbors, seeds, weights, layerType));
+  }
+  return {
+    regionId:String(region&&region.id||''),
+    layerId,
+    tile:{x:tx, y:ty},
+    seed,
+    grid:{width:SUBAREA_GRID_W, height:SUBAREA_GRID_H, layout:'pointy-top-odd-r'},
+    parent:{terrain:parent.terrain, occupancy:parent.occupancy},
+    // region-level character, carried not invented (derive-or-omit rule)
+    elements:{ambientBand:String(region&&region.ambientMana&&region.ambientMana.band||'neutral'), weights},
+    cells,
+    niches:subareaNiches(parent, neighbors, seeds, weights, layerType, cells),
+    landmarks:subareaLandmarks(region, layerId, {x:tx, y:ty}, seeds),
+    rim:subareaRim(parent, neighbors),
+    sourceHash:regionForgeHash({base, neighbors, engine:SUBAREA_ENGINE_VERSION}),
+  };
+}
+/* ========================================================================== *
+   PLACE RECORDS (Slice 52 / SUBSCALE-001's heart) — deltas, anchoring, memory.
+
+   Derivation is weightless; what HAPPENS in a place persists here. Two laws
+   from the grill:
+     (a) persistence is DELTAS over derivation — never stored scenes for their
+         own sake; an un-anchored place stays pure derivation;
+     (b) anchoring pins IDENTITY, not coordinates — a place keeps its character,
+         may drift slightly over time, and only transforms or relocates
+         completely through the living-world minor/major law. (The in-world
+         principle is COS-005; this file is app machinery and claims nothing.)
+
+   Storage: a SIBLING file per region — campaign/<name>/regions/<region>.places.json
+   — written through the same conflict-safe guarded path as the world history.
+   All ops below are PURE (places in → new places out); the async helpers at the
+   bottom are the only I/O.
+ * ========================================================================== */
+const REGION_PLACES_SCHEMA_VERSION=1;
+const SUBAREA_DELTA_TYPES=['terrain-change','feature-state','item','named-feature','denizen-event'];
+// memory implies a rememberer: these anchor a place automatically; 'item' never does
+const SUBAREA_AUTO_ANCHOR_TYPES=['denizen-event','named-feature'];
+
+function placesPath(campaignName, regionId){ return 'campaign/'+campaignName+'/regions/'+regionId+'.places.json'; }
+function placeKeyOf(layerId, tile){ return String(layerId)+'|'+Number(tile&&tile.x)+','+Number(tile&&tile.y); }
+function placeKeyParse(key){
+  const m=/^(.+)\|(-?\d+),(-?\d+)$/.exec(String(key||''));
+  return m?{layerId:m[1], tile:{x:Number(m[2]), y:Number(m[3])}}:null;
+}
+function placesTemplate(regionId){ return { regionId:String(regionId||'').trim(), places:{} }; }
+function placesNow(opts){ return opts&&opts.now?String(opts.now):new Date().toISOString(); }
+
+/* ---- normalize + guards (the history file's discipline, applied here) ------ */
+function placesNormalizeDelta(delta){
+  if(!regionIsRecord(delta)) throw new Error('place delta must be an object');
+  const type=String(delta.type||'');
+  if(!SUBAREA_DELTA_TYPES.includes(type)) throw new Error('unknown place delta type: '+type);
+  return {
+    id:String(delta.id||''),
+    type,
+    at:String(delta.at||''),
+    cell:String(delta.cell||''),
+    note:String(delta.note||''),
+    value:String(delta.value||''),
+  };
+}
+function placesNormalizeMemory(entry){
+  if(!regionIsRecord(entry)) throw new Error('a disposition memory must be an object');
+  return { at:String(entry.at||''), note:String(entry.note||''), toward:String(entry.toward||'') };
+}
+function placesNormalizeDenizen(denizen){
+  if(!regionIsRecord(denizen)) throw new Error('a denizen must be an object');
+  const id=String(denizen.id||'').trim();
+  if(!id) throw new Error('a denizen needs an id');
+  return {
+    id,
+    name:String(denizen.name||''),
+    kind:String(denizen.kind||''),
+    nicheId:String(denizen.nicheId||''),
+    homeCell:String(denizen.homeCell||''),
+    disposition:(Array.isArray(denizen.disposition)?denizen.disposition:[]).map(placesNormalizeMemory),
+    instantiatedAt:String(denizen.instantiatedAt||''),
+  };
+}
+function placesNormalizeMove(move){
+  if(!regionIsRecord(move)) throw new Error('a move record must be an object');
+  return { from:String(move.from||''), to:String(move.to||''), at:String(move.at||''), severity:String(move.severity||'minor'), note:String(move.note||'') };
+}
+function placesNormalizePlace(place, key){
+  if(!regionIsRecord(place)) throw new Error('a place record must be an object');
+  const parsed=placeKeyParse(key);
+  if(!parsed) throw new Error('bad place key: '+key);
+  const tile=regionIsRecord(place.tile)&&Number.isInteger(place.tile.x)&&Number.isInteger(place.tile.y)?{x:place.tile.x,y:place.tile.y}:parsed.tile;
+  const out={
+    layerId:String(place.layerId||parsed.layerId),
+    tile,
+    anchored:place.anchored===true,
+    anchorSnapshot:place.anchorSnapshot?regionClone(place.anchorSnapshot):null,
+    generatorVersion:regionIsRecord(place.generatorVersion)?{forge:String(place.generatorVersion.forge||''),engine:String(place.generatorVersion.engine||'')}:null,
+    deltas:(Array.isArray(place.deltas)?place.deltas:[]).map(placesNormalizeDelta),
+    denizens:(Array.isArray(place.denizens)?place.denizens:[]).map(placesNormalizeDenizen),
+    moved:(Array.isArray(place.moved)?place.moved:[]).map(placesNormalizeMove),
+  };
+  if(place.markedNote) out.markedNote=String(place.markedNote);
+  if(place.markedAt) out.markedAt=String(place.markedAt);
+  if(out.anchored&&!out.anchorSnapshot) throw new Error('an anchored place needs its snapshot — identity must survive a re-roll');
+  return out;
+}
+function assertPlacesObject(value, options){
+  if(!regionIsRecord(value)) throw new Error('place records must be a JSON object');
+  const expected=options&&options.regionId;
+  const regionId=String(value.regionId||expected||'').trim();
+  if(!regionId) throw new Error('place records need a regionId');
+  if(expected&&regionId!==expected) throw new Error('place records regionId mismatch');
+  if(!regionIsRecord(value.places)) throw new Error('place records need a places map');
+  const places={};
+  Object.keys(value.places).forEach(key=>{ places[key]=placesNormalizePlace(value.places[key], key); });
+  return { regionId, places };
+}
+function parsePlaces(text, regionId){
+  const raw=String(text||'').trim();
+  if(!raw) return placesTemplate(regionId);
+  let parsed;
+  try{ parsed=JSON.parse(raw); }catch(error){ throw new Error('Malformed place records JSON: '+String(error&&error.message||error)); }
+  return assertPlacesObject(parsed,{regionId});
+}
+function serializePlaces(places){
+  const valid=assertPlacesObject(places);
+  return JSON.stringify({ regionId:valid.regionId, places:valid.places },null,2)+'\n';
+}
+function assertPlaces(text){
+  const raw=String(text||'').trim();
+  if(!raw) return text;
+  try{ assertPlacesObject(JSON.parse(raw)); }
+  catch(error){ throw new Error('refusing to write - that file is not a place-records file'); }
+  return text;
+}
+function assertPlacesWriteTarget(path, campaignName, places, currentText){
+  const valid=assertPlacesObject(places);
+  const expected=placesPath(campaignName, valid.regionId);
+  if(path!==expected) throw new Error('Refusing place-records write: expected '+expected+' but received '+path);
+  if(currentText!=null&&String(currentText).trim()) parsePlaces(currentText, valid.regionId);
+  return valid;
+}
+function placesTextMatches(currentText, expectedText, regionId){
+  const current=String(currentText||'').trim(), expected=String(expectedText||'').trim();
+  if(!current&&!expected) return true;
+  if(!current||!expected) return false;
+  return serializePlaces(parsePlaces(current,regionId))===serializePlaces(parsePlaces(expected,regionId));
+}
+
+/* ---- pure operations (places in → NEW places out) -------------------------- */
+function placeGet(places, key){
+  const valid=assertPlacesObject(places);
+  return valid.places[key]?regionClone(valid.places[key]):null;
+}
+function placesAnchoredEntries(places){
+  const valid=assertPlacesObject(places);
+  return Object.keys(valid.places).filter(key=>valid.places[key].anchored)
+    .map(key=>({key, layerId:valid.places[key].layerId, tile:valid.places[key].tile, place:valid.places[key]}));
+}
+function placesWith(places, key, place){
+  const valid=assertPlacesObject(places);
+  const next={ regionId:valid.regionId, places:{...valid.places} };
+  next.places[key]=placesNormalizePlace(place, key);
+  return next;
+}
+function placeEnsureRecord(places, scene){
+  const key=placeKeyOf(scene.layerId, scene.tile);
+  const existing=placeGet(places, key);
+  return { key, place:existing||{ layerId:scene.layerId, tile:{x:scene.tile.x,y:scene.tile.y}, anchored:false, anchorSnapshot:null, generatorVersion:null, deltas:[], denizens:[], moved:[] } };
+}
+function placeAnchor(place, scene){
+  // the moment a place matters, its derived base is pinned — a future generator
+  // bump can never quietly re-roll a remembered place
+  if(place.anchored) return place;
+  return {...place, anchored:true, anchorSnapshot:regionClone(scene),
+    generatorVersion:{forge:REGION_FORGE_GENERATOR_VERSION, engine:SUBAREA_ENGINE_VERSION}};
+}
+function placeApplyDelta(places, scene, delta, opts){
+  const {key, place}=placeEnsureRecord(places, scene);
+  const clean=placesNormalizeDelta({...delta, at:delta&&delta.at||placesNow(opts)});
+  if(!clean.id) clean.id='d'+(place.deltas.length+1)+'-'+clean.type;
+  let next={...place, deltas:place.deltas.concat([clean])};
+  if(SUBAREA_AUTO_ANCHOR_TYPES.includes(clean.type)) next=placeAnchor(next, scene);
+  return placesWith(places, key, next);
+}
+function placeMark(places, scene, note, opts){
+  // the manual "mark this place" — anchoring for places that matter to YOU
+  // before anything mechanical happened
+  const {key, place}=placeEnsureRecord(places, scene);
+  const anchored=placeAnchor(place, scene);
+  return placesWith(places, key, {...anchored, markedNote:String(note||''), markedAt:anchored.markedAt||placesNow(opts)});
+}
+function placeDenizenInstantiate(places, scene, denizen, opts){
+  // a denizen IS memory — instantiation auto-anchors the place
+  const {key, place}=placeEnsureRecord(places, scene);
+  const clean=placesNormalizeDenizen({...denizen, instantiatedAt:denizen&&denizen.instantiatedAt||placesNow(opts)});
+  if(place.denizens.some(existing=>existing.id===clean.id)) throw new Error('denizen already lives here: '+clean.id);
+  const next=placeAnchor({...place, denizens:place.denizens.concat([clean])}, scene);
+  return placesWith(places, key, next);
+}
+function placeDenizenRemember(places, key, denizenId, memory, opts){
+  // disposition is MEMORY: appended, never rewritten
+  const valid=assertPlacesObject(places);
+  const place=valid.places[key];
+  if(!place) throw new Error('no place at '+key);
+  const denizens=place.denizens.map(denizen=>denizen.id===String(denizenId)
+    ?{...denizen, disposition:denizen.disposition.concat([placesNormalizeMemory({...memory, at:memory&&memory.at||placesNow(opts)})])}
+    :denizen);
+  if(!place.denizens.some(denizen=>denizen.id===String(denizenId))) throw new Error('no denizen '+denizenId+' at '+key);
+  return placesWith(places, key, {...place, denizens});
+}
+/* The ONLY move primitive — identity, not coordinates. Callable solely by
+   living-world machinery under the minor/major law: slight drift is minor;
+   relocation as a MAJOR change must have come through the Slice-42 review
+   (why.reviewed) — it is never auto-applied. */
+function placeRelocate(places, fromKey, toKey, why){
+  why=regionIsRecord(why)?why:{};
+  const severity=String(why.severity||'');
+  if(severity!=='minor'&&severity!=='major') throw new Error('placeRelocate needs a minor/major severity — drift obeys the living-world law');
+  if(severity==='major'&&why.reviewed!==true) throw new Error('a major relocation must come through the world-turn review — never auto-applied');
+  const valid=assertPlacesObject(places);
+  const place=valid.places[fromKey];
+  if(!place) throw new Error('no place at '+fromKey);
+  if(!place.anchored) throw new Error('only an anchored place has identity to move — un-anchored tiles are pure derivation');
+  const dest=placeKeyParse(toKey);
+  if(!dest) throw new Error('bad destination key: '+toKey);
+  if(valid.places[toKey]) throw new Error('a place already lives at '+toKey);
+  const moved={from:fromKey, to:toKey, at:String(why.at||placesNow(why)), severity, note:String(why.note||'')};
+  const next={ regionId:valid.regionId, places:{...valid.places} };
+  delete next.places[fromKey];
+  next.places[toKey]=placesNormalizePlace({...place, layerId:dest.layerId, tile:dest.tile, moved:place.moved.concat([moved])}, toKey);
+  return next;
+}
+
+/* ---- I/O — the same conflict-safe guarded path the history file uses ------- */
+async function placesLoad(cfg, campaignName, regionId){
+  const path=placesPath(campaignName, regionId);
+  let read=null;
+  try{ read=await ghGetText(cfg, path); }catch(error){ read=null; }
+  return { path, text:read?read.text:'', places:parsePlaces(read?read.text:'', regionId) };
+}
+async function placesWrite(cfg, campaignName, path, nextPlaces, expectedText, message){
+  const valid=assertPlacesWriteTarget(path, campaignName, nextPlaces, expectedText);
+  const nextText=serializePlaces(valid);
+  await ghUpdate(cfg, path, current=>{
+    assertPlacesWriteTarget(path, campaignName, valid, current);
+    if(expectedText!=null&&!placesTextMatches(current, expectedText, valid.regionId)) throw new Error('Place records changed before the write could land; reload and try again.');
+    return nextText;
+  }, message, {create:true, guard:assertPlaces});
+}
+// The peek's one deliberate write: mark a place by hand. Loads fresh, marks, writes.
+async function subareaMarkPlace(cfg, campaignName, region, scene, note){
+  const state=await placesLoad(cfg, campaignName, region.id);
+  const next=placeMark(state.places, scene, note);
+  await placesWrite(cfg, campaignName, state.path, next, state.text, 'Mark place '+placeKeyOf(scene.layerId, scene.tile)+' in '+region.id);
+  return next;
+}
+/* ========================================================================== *
    REGION LIVING WORLD 1 — deterministic, headless world-turn engine.
 
    Pure logic only. No UI, no AI, no network, no repo writes, no wall clock.
@@ -13249,10 +14341,13 @@ function regionWorldGeneratedFeatureSafe(feature){
   const labels = REGION_WORLD_SAFE_FEATURE_LABELS[feature.id];
   return !!labels && labels.includes(feature.label || '');
 }
-function regionProtectedTargets(region){
+// extras.places (Slice 52): anchored place records — their parent tiles and
+// denizens become protected targets, so the lock logic keeps existing ONCE for
+// Slices 41/44 AND the place records.
+function regionProtectedTargets(region, extras){
   const valid = assertRegion(region);
   const generated = regionHasGenerationProvenance(valid);
-  const out = { features:[], connections:[], cells:[], reasons:{} };
+  const out = { features:[], connections:[], cells:[], places:[], reasons:{} };
   const revealed = regionWorldRevealedCellKeys(valid);
   revealed.forEach(key => regionWorldProtectedAdd(out, 'cells', key, 'revealed-cell'));
   (valid.features || []).forEach(feature => {
@@ -13267,7 +14362,22 @@ function regionProtectedTargets(region){
     if (protectedFeatures.has(connection.from) || protectedFeatures.has(connection.to)) regionWorldProtectedAdd(out, 'connections', connection.id, 'protected-endpoint');
     if (regionWorldHasReference(connection)) regionWorldProtectedAdd(out, 'connections', connection.id, 'quest-thread-reference');
   });
-  out.features.sort(); out.connections.sort(); out.cells.sort();
+  const placeMap = extras && regionIsRecord(extras.places) && regionIsRecord(extras.places.places) ? extras.places.places : null;
+  if (placeMap) Object.keys(placeMap).forEach(key => {
+    const place = placeMap[key];
+    if (!regionIsRecord(place) || place.anchored !== true) return;
+    const layerId = String(place.layerId || String(key).split('|')[0] || '');
+    const tile = regionIsRecord(place.tile) ? place.tile : null;
+    const grid = regionWorldTerrainGrid(valid, layerId);
+    regionWorldProtectedAdd(out, 'places', key, 'anchored-place');
+    (Array.isArray(place.denizens) ? place.denizens : []).forEach(denizen => {
+      if (denizen && denizen.id) regionWorldProtectedAdd(out, 'places', key + '#' + denizen.id, 'anchored-denizen');
+    });
+    if (!grid || !tile || !Number.isInteger(tile.x) || !Number.isInteger(tile.y)) return;
+    if (tile.x < 0 || tile.y < 0 || tile.x >= grid.width || tile.y >= grid.height) return;
+    regionWorldProtectedAdd(out, 'cells', regionWorldCellKey(layerId, tile.y * grid.width + tile.x), 'anchored-place');
+  });
+  out.features.sort(); out.connections.sort(); out.cells.sort(); out.places.sort();
   Object.keys(out.reasons).forEach(key => out.reasons[key].sort());
   return out;
 }
@@ -13658,7 +14768,16 @@ async function worldTurnAdvance(cfg, campaignName, regionId, trigger){
   const regionState=await worldTurnLoadRegion(cfg,campaignName,regionId);
   const historyState=await worldTurnLoadHistory(cfg,campaignName,regionId);
   const turn=historyState.history.turn+1, cleanTrigger=worldHistoryCleanTrigger(trigger);
-  const changes=worldTurnChanges(regionState.region,{campaign:campaignName,turn,trigger:cleanTrigger});
+  const ctx={campaign:campaignName,turn,trigger:cleanTrigger};
+  // Slice 52: anchored place records widen the protection descriptor — a turn
+  // may never touch a remembered place's tile. Absent/failed file → no places.
+  if(typeof placesLoad==='function'){
+    try{
+      const placesState=await placesLoad(cfg,campaignName,regionId);
+      ctx.protection=regionProtectedTargets(regionState.region,{places:placesState.places});
+    }catch(error){ /* protection falls back to the region-only default */ }
+  }
+  const changes=worldTurnChanges(regionState.region,ctx);
   const split=worldTurnSplitChanges(changes), applied=worldTurnApply(regionState.region,split.minor);
   const entry={
     turn, trigger:cleanTrigger, at:worldHistoryNow(cfg),
@@ -15462,6 +16581,10 @@ campRegion = async function(host, name){
       wrap.append(regionStatusCard(entry));
       if (entry.region && (!entry.errors || !entry.errors.length)){
         wrap.append(typeof regionEditableMapPanel === 'function' ? regionEditableMapPanel(entry, cfg, name) : regionMapPanel(entry));
+        // Slice 51: the read-only sub-area peek — derive inside a revealed tile.
+        // (Slice 52 hands it campaign context so saved place state paints and
+        // "mark this place" can write the guarded places file.)
+        if (typeof regionSubareaPeekPanel === 'function') wrap.append(regionSubareaPeekPanel(entry.region, { cfg, campaignName: name }));
       }
     });
     if (result.orphanMarkdown.length){
@@ -15473,6 +16596,276 @@ campRegion = async function(host, name){
     host.replaceChildren(h('p', { class:'hint' }, 'Region data unavailable: ' + String(error && error.message || error)));
   }
 };
+/* ========================================================================== *
+   SUB-AREA RENDERER + WORKSPACE PEEK (Slice 51 / SUBSCALE-001).
+
+   Draws a Slice-50 scene in the house doodle language. The visual rule, one
+   scale down from the God Games blueprint: a hex is a LOGICAL cell — the art is
+   organic blobs that sprawl across cell boundaries, never a honeycomb of
+   platforms; the logical grid appears only when the debug overlay asks.
+
+   ONE renderer, two mounts forever: the Region hub's read-only PEEK (this
+   slice — derivation + any existing state painted, nothing written, no play)
+   and live Play (Slice 54, the only write path). All randomness is the scene's
+   own seed through the Forge PRNG — same scene, same picture.
+ * ========================================================================== */
+
+function subareaJitter(scene, key){ return regionForgePrng(String(scene&&scene.seed||'')+'|art|'+key)(); }
+
+function subareaCellCenter(cell){ return regionHexCenter(cell.x, cell.y); }
+
+// Organic terrain: one soft blob per solid cell, jittered and oversized so
+// same-terrain neighbors merge into masses. Air cells draw nothing — the sky
+// rect shows through (bottomless air reads as the cosmic tint, like the ghost
+// cascade upstairs).
+function subareaTerrainBlobs(scene){
+  const g=regionSvg('g',{class:'subarea-terrain'});
+  scene.cells.forEach(cell=>{
+    if(cell.occupancy==='air') return;
+    const c=subareaCellCenter(cell);
+    const key=cell.x+','+cell.y;
+    const rx=0.52+subareaJitter(scene,'rx|'+key)*0.22;
+    const ry=0.42+subareaJitter(scene,'ry|'+key)*0.2;
+    const rot=Math.round(subareaJitter(scene,'rot|'+key)*60-30);
+    g.append(regionSvg('ellipse',{
+      class:'subarea-blob subarea-terrain-'+cell.terrain,
+      cx:c.cx, cy:c.cy, rx:rx.toFixed(2), ry:ry.toFixed(2),
+      transform:'rotate('+rot+' '+c.cx+' '+c.cy+')',
+      fill:regionCellColor(cell.terrain),
+    }));
+  });
+  return g;
+}
+
+// Character marks: steep cells get a short doodle stroke, covered cells a
+// scallop of canopy bumps — hints, not tiles.
+function subareaCharacterMarks(scene){
+  const g=regionSvg('g',{class:'subarea-marks','aria-hidden':'true'});
+  scene.cells.forEach(cell=>{
+    if(cell.occupancy==='air') return;
+    const c=subareaCellCenter(cell);
+    if(cell.steep) g.append(regionSvg('path',{
+      class:'subarea-steep',
+      d:'M '+(c.cx-0.28)+' '+(c.cy+0.16)+' L '+(c.cx+0.02)+' '+(c.cy-0.22)+' L '+(c.cx+0.3)+' '+(c.cy+0.12),
+      fill:'none'}));
+    if(cell.cover) g.append(regionSvg('path',{
+      class:'subarea-cover',
+      d:'M '+(c.cx-0.3)+' '+c.cy+' q 0.15 -0.3 0.3 0 q 0.15 -0.3 0.3 0',
+      fill:'none'}));
+  });
+  return g;
+}
+
+// Rim: each edge blends toward its neighbor — gradual, never a wall. Bands are
+// translucent gradients keyed to the neighbor's character; the chart's edge
+// gets haze; open air gets a fade into the sky.
+function subareaRimEdgeRect(edge, w, h){
+  const t=0.9;   // band thickness in hex units
+  if(edge==='w') return {x:-0.6, y:-0.6, width:t, height:h+1.2, dir:'0'};
+  if(edge==='e') return {x:w+0.6-t, y:-0.6, width:t, height:h+1.2, dir:'180'};
+  if(edge==='nw') return {x:-0.6, y:-0.6, width:(w+1.2)/2, height:t, dir:'90'};
+  if(edge==='ne') return {x:(w+1.2)/2-0.6, y:-0.6, width:(w+1.2)/2, height:t, dir:'90'};
+  if(edge==='sw') return {x:-0.6, y:h+0.6-t, width:(w+1.2)/2, height:t, dir:'270'};
+  return {x:(w+1.2)/2-0.6, y:h+0.6-t, width:(w+1.2)/2, height:t, dir:'270'};
+}
+function subareaRimBands(scene, defs){
+  const g=regionSvg('g',{class:'subarea-rim','aria-hidden':'true'});
+  const w=scene.grid.width, h=scene.grid.height*0.75;
+  scene.rim.forEach((rim,i)=>{
+    if(rim.blend==='continuous') return;
+    const rect=subareaRimEdgeRect(rim.edge, w, h);
+    const id='subrim-'+String(scene.sourceHash||'x')+'-'+i;
+    const color=rim.blend==='toward'||rim.blend==='landfall'?regionCellColor(rim.toward):'#dfe7f2';
+    const grad=regionSvg('linearGradient',{id, gradientTransform:'rotate('+rect.dir+' 0.5 0.5)'});
+    grad.append(regionSvg('stop',{offset:'0','stop-color':color,'stop-opacity':rim.blend==='open-air'?'0':'0.42'}));
+    grad.append(regionSvg('stop',{offset:'1','stop-color':color,'stop-opacity':rim.blend==='open-air'?'0.3':'0'}));
+    defs.append(grad);
+    g.append(regionSvg('rect',{
+      class:'subarea-rim-band subarea-rim-'+rim.blend, 'data-edge':rim.edge,
+      x:rect.x, y:rect.y, width:rect.width, height:rect.height, fill:'url(#'+id+')'}));
+  });
+  return g;
+}
+
+// Niches hint quietly at the life the scene implies — presence, not a spawn
+// marker: a nest whorl, grove bumps, a pool ripple.
+function subareaNicheHint(scene, niche){
+  const first=String(niche.cells[0]||'0,0').split(',');
+  const c=regionHexCenter(Number(first[0])||0, Number(first[1])||0);
+  const g=regionSvg('g',{class:'subarea-niche subarea-niche-'+niche.type,'aria-hidden':'true',
+    transform:'translate('+c.cx+' '+c.cy+')'});
+  if(niche.type==='rooted-grove'||niche.type==='grazer-drift'){
+    g.append(regionSvg('path',{d:'M -0.5 0.1 q 0.25 -0.42 0.5 0 q 0.25 -0.42 0.5 0', fill:'none'}));
+  }else if(niche.type==='seep-pool'){
+    g.append(regionSvg('path',{d:'M -0.45 0 q 0.22 0.16 0.45 0 q 0.22 -0.16 0.45 0', fill:'none'}));
+  }else{
+    g.append(regionSvg('circle',{r:'0.34', fill:'none'}));
+    g.append(regionSvg('circle',{r:'0.08'}));
+  }
+  return g;
+}
+
+function subareaLandmarkMark(scene, landmark){
+  const c=regionHexCenter(landmark.at.x, landmark.at.y);
+  const g=regionSvg('g',{class:'subarea-landmark subarea-landmark-'+landmark.type,
+    transform:'translate('+c.cx+' '+c.cy+')'});
+  g.append(regionSvg('circle',{r:'0.3'}));
+  g.append(regionSvg('text',{y:'-0.5', 'text-anchor':'middle', class:'subarea-landmark-label'}, landmark.label));
+  return g;
+}
+
+// Slice-52 state (deltas/denizens) is accepted but may be entirely absent —
+// painted when present, never required.
+function subareaStateMarks(scene, state){
+  const g=regionSvg('g',{class:'subarea-state'});
+  const denizens=state&&Array.isArray(state.denizens)?state.denizens:[];
+  denizens.forEach(denizen=>{
+    const at=String(denizen&&denizen.homeCell||'').split(',');
+    if(at.length!==2) return;
+    const c=regionHexCenter(Number(at[0])||0, Number(at[1])||0);
+    g.append(regionSvg('circle',{class:'subarea-denizen', cx:c.cx, cy:c.cy, r:'0.2'}));
+  });
+  return g;
+}
+
+function subareaHexOverlay(scene){
+  const g=regionSvg('g',{class:'subarea-hexes','aria-hidden':'true'});
+  scene.cells.forEach(cell=>{
+    g.append(regionSvg('path',{d:regionHexPath(), transform:regionHexTransform(cell), fill:'none'}));
+  });
+  return g;
+}
+
+/* The renderer: scene (+ optional Slice-52 state) → one SVG. Deterministic —
+   same scene model, byte-same drawing. */
+function subareaSceneSvg(scene, state, opts){
+  opts=opts||{};
+  const w=scene.grid.width, h=scene.grid.height*0.75;
+  const svg=regionSvg('svg',{
+    class:'region-subarea-svg', role:'img',
+    'aria-label':'Inside the tile — derived scene',
+    viewBox:(-0.7)+' '+(-0.8)+' '+(w+1.4)+' '+(h+1.8),
+    preserveAspectRatio:'xMidYMid meet',
+  });
+  const defs=regionSvg('defs');
+  svg.append(defs);
+  svg.append(regionSvg('rect',{class:'subarea-sky', x:-0.7, y:-0.8, width:w+1.4, height:h+1.8}));
+  svg.append(subareaTerrainBlobs(scene));
+  svg.append(subareaCharacterMarks(scene));
+  svg.append(subareaRimBands(scene, defs));
+  scene.niches.forEach(niche=>svg.append(subareaNicheHint(scene, niche)));
+  scene.landmarks.forEach(landmark=>svg.append(subareaLandmarkMark(scene, landmark)));
+  svg.append(subareaStateMarks(scene, state));
+  if(opts.hexOverlay) svg.append(subareaHexOverlay(scene));
+  return svg;
+}
+
+/* ---- the workspace peek — read-only by construction ------------------------
+   Lives on the Region tab under each valid region's map. Fog rule: only tiles
+   revealed in the layer's mask are offered. No writes, no denizen
+   instantiation, no play — Play's live mount is Slice 54's. */
+function subareaRevealedTiles(region, layerId){
+  const grid=subareaGridOf(region, layerId);
+  if(!grid) return [];
+  const mask=regionRevealMask(region, layerId);
+  const out=[];
+  for(let y=0;y<grid.height;y++) for(let x=0;x<grid.width;x++){
+    const i=y*grid.width+x;
+    if(regionCellRevealed(mask, i)) out.push({x, y, terrain:String(grid.cells[i]||'')});
+  }
+  return out;
+}
+
+function regionSubareaPeekPanel(region, ctx){
+  ctx=ctx||null;   // {cfg, campaignName} — enables painting saved place state + the mark affordance
+  const panel=h('section',{class:'region-subarea-peek glass'});
+  const layers=(Array.isArray(region.localLayers)?region.localLayers:[]).filter(l=>l&&subareaGridOf(region,l.id));
+  panel.append(h('div',{class:'region-readonly'},
+    h('b',null,'Peek inside · read-only'),
+    h('span',null,'Derived on the spot from this region’s own fields — nothing is stored, nothing changes here. Entering for real is Play’s door.')));
+  if(!layers.length){
+    panel.append(h('p',{class:'hint'},'No serialized local layers to peek into.'));
+    return panel;
+  }
+  const state={layerId:layers[0].id, tile:'', hexOverlay:false, placesState:null, scene:null};
+  // Slice 52: existing place records are PAINTED here, never written — except the
+  // one deliberate hand action below, "mark this place", which writes only the
+  // guarded places file (the same class of act as the fog tools beside this map).
+  if(ctx&&typeof placesLoad==='function'){
+    placesLoad(ctx.cfg, ctx.campaignName, region.id).then(loaded=>{ state.placesState=loaded; }).catch(()=>{ state.placesState=null; });
+  }
+  const layerRow=h('div',{class:'toolrow subarea-peek-layers'});
+  const tileSel=h('select',{class:'subarea-peek-tile','aria-label':'Revealed tile'});
+  const peekBtn=h('button',{class:'navbtn primary', type:'button'},'Peek inside');
+  const hexBtn=h('button',{class:'navbtn ghost', type:'button', 'aria-pressed':'false', title:'Reveal the logical hex cells'},'⬡ hexes');
+  const stage=h('div',{class:'subarea-peek-stage'});
+  const meta=h('p',{class:'hint subarea-peek-meta'},'');
+
+  function refreshTiles(){
+    const tiles=subareaRevealedTiles(region, state.layerId);
+    tileSel.replaceChildren(...tiles.map(tile=>h('option',{value:tile.x+','+tile.y}, tile.x+','+tile.y+' · '+tile.terrain)));
+    state.tile=tiles.length?tiles[0].x+','+tiles[0].y:'';
+    if(tiles.length) tileSel.value=state.tile;
+    peekBtn.disabled=!tiles.length;
+    if(!tiles.length){
+      stage.replaceChildren(h('p',{class:'hint'},'Nothing is revealed on this layer yet — lift some fog with the reveal tools first, then peek.'));
+      meta.textContent='';
+    }
+  }
+  function refreshLayers(){
+    layerRow.replaceChildren(...layers.map(layer=>{
+      const chip=h('button',{class:'chip '+(layer.id===state.layerId?'on':'dash'), type:'button'}, layer.label||layer.id);
+      chip.onclick=()=>{ state.layerId=layer.id; refreshLayers(); refreshTiles(); };
+      return chip;
+    }));
+  }
+  const markBtn=ctx?h('button',{class:'navbtn ghost', type:'button', disabled:'true', title:'Anchor this place — its derived base is pinned and drift obeys the world-turn law'},'📌 Mark this place'):null;
+  const markStatus=ctx?h('span',{class:'hint subarea-mark-status'},''):null;
+  function placeFor(scene){
+    if(!scene||!state.placesState||typeof placeGet!=='function') return null;
+    try{ return placeGet(state.placesState.places, scene.layerId+'|'+scene.tile.x+','+scene.tile.y); }catch(e){ return null; }
+  }
+  function drawScene(){
+    const parts=String(tileSel.value||state.tile||'').split(',');
+    const tile={x:Number(parts[0]), y:Number(parts[1])};
+    const tiles=subareaRevealedTiles(region, state.layerId);
+    if(!tiles.some(entry=>entry.x===tile.x&&entry.y===tile.y)){
+      stage.replaceChildren(h('p',{class:'hint'},'That tile isn’t revealed on this layer.'));
+      return;
+    }
+    const scene=subareaScene(region, state.layerId, tile);
+    if(!scene){ stage.replaceChildren(h('p',{class:'hint'},'That tile has nothing to derive.')); return; }
+    state.scene=scene;
+    const place=placeFor(scene);
+    const frame=h('div',{class:'region-map subarea-peek-frame cosmic-'+String(region.cosmicLayer||'middle')},
+      subareaSceneSvg(scene, place, {hexOverlay:state.hexOverlay}));
+    stage.replaceChildren(frame);
+    meta.textContent=scene.niches.length+' niche'+(scene.niches.length===1?'':'s')+' implied · '
+      +scene.landmarks.length+' landmark'+(scene.landmarks.length===1?'':'s')+' · rim: '
+      +scene.rim.filter(r=>r.blend!=='continuous').map(r=>r.edge+' '+r.blend+(r.toward?' '+r.toward:'')).join(', ')
+      +(scene.parent.occupancy==='air'?' · open air':'')
+      +(place&&place.anchored?' · 📌 anchored':'')
+      +(place&&place.denizens.length?' · '+place.denizens.length+' denizen'+(place.denizens.length===1?'':'s')+' remembered':'');
+    if(markBtn){ markBtn.disabled=!!(place&&place.anchored); markBtn.textContent=place&&place.anchored?'📌 Anchored':'📌 Mark this place'; }
+  }
+  tileSel.onchange=()=>{ state.tile=tileSel.value; };
+  peekBtn.onclick=drawScene;
+  hexBtn.onclick=()=>{ state.hexOverlay=!state.hexOverlay; hexBtn.setAttribute('aria-pressed', state.hexOverlay?'true':'false'); drawScene(); };
+  if(markBtn) markBtn.onclick=async()=>{
+    if(!state.scene||typeof subareaMarkPlace!=='function') return;
+    markBtn.disabled=true; markStatus.textContent='Anchoring…';
+    try{
+      const next=await subareaMarkPlace(ctx.cfg, ctx.campaignName, region, state.scene, '');
+      state.placesState={...(state.placesState||{}), places:next, text:''};
+      markStatus.textContent='Anchored — this place keeps its identity now.';
+      drawScene();
+    }catch(error){ markStatus.textContent=String(error&&error.message||error); markBtn.disabled=false; }
+  };
+  refreshLayers();
+  refreshTiles();
+  panel.append(layerRow, h('div',{class:'toolrow'}, tileSel, peekBtn, hexBtn, markBtn, markStatus), stage, meta);
+  return panel;
+}
 /* ========================================================================== *
    REGION EDIT — Region Update 3 pins/markers + Update 4 reveal/fog harness.
 
