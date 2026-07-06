@@ -1256,6 +1256,20 @@
 /* the GM deserves a wider seat by default — there's room at the sides on desktop */
 .companion-panel:has(.companion-gm){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
 .companion-panel.tall:has(.companion-gm){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+/* the canon assistant shares that wider seat (Slice 46) */
+.companion-panel:has(.companion-studio){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
+.companion-panel.tall:has(.companion-studio){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+/* the studio chat: transcript flexes; the ask row carries a compact persona select */
+.companion-studio{ display:flex; flex-direction:column; min-height:0; }
+.companion-studio .assistant-chat{ display:flex; flex-direction:column; min-height:0; flex:1 1 auto; gap:8px; }
+.companion-studio .companion-log{ flex:1 1 auto; }
+.companion-studio .assistant-chat-persona{ max-width:132px; }
+.companion-studio .assistant-chat-input{ min-height:44px; resize:none; }
+.companion-studio .assistant-chat-campaign{ max-width:110px; }
+.companion-studio .assistant-chat-answer{ max-width:96%; }
+.companion-studio .assistant-chat-answer .assistant-answer-text{ white-space:pre-wrap; margin:0; font:inherit; background:none; padding:0; }
+.companion-studio .assistant-chat-meta{ font-size:11px; opacity:.75; margin-top:4px; }
+.companion-studio .assistant-chat-status{ margin:0; font-size:11px; }
 /* 📖 reading mode: fold the writing area in EVERY chat so the transcript takes
    the whole panel — guide/messages input rows, and the GM's input card. */
 .companion-panel.reading .companion-inputrow,
@@ -7806,11 +7820,21 @@ function companionRenderLog(){
 }
 
 function companionRefreshContext(){
+  // The ✒ seat button follows the gm-button pattern one step further: it only
+  // appears once a studio seat exists (the desk's "Open the assistant" makes one).
+  const studioBtn=COMPANION.panel&&COMPANION.panel._studioBtn;
+  if(studioBtn) studioBtn.style.display=(typeof assistantSession==='function'&&assistantSession())?'':'none';
   const chip=COMPANION.panel&&COMPANION.panel._context;
   if(!chip) return;
   if(COMPANION.mode==='gm'){
     const s=typeof campPlaySession==='function'?campPlaySession():null;
     chip.textContent=s?('♟ '+s.name+' · live state + canon'):'♟ no table seated';
+    return;
+  }
+  if(COMPANION.mode==='studio'){
+    const s=typeof assistantSession==='function'?assistantSession():null;
+    const persona=s&&typeof assistantPersonaById==='function'?assistantPersonaById(s.state.personaId):null;
+    chip.textContent=s?('✒ '+(persona&&persona.label?persona.label:'Canon assistant')+' · promoted canon'):'✒ not seated';
     return;
   }
   chip.textContent=companionContext().line;
@@ -7850,12 +7874,12 @@ function companionChatBody(){
   return h('div',{class:'companion-body'}, log, h('div',{class:'companion-inputrow'}, input, send), h('div',{class:'companion-footrow'}, report));
 }
 
-const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master'};
+const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master', studio:'✒ Canon assistant'};
 function companionSetMode(mode){
   COMPANION.mode=mode;
   const body=COMPANION.panel&&COMPANION.panel._body;
   if(!body) return;
-  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():companionChatBody());
+  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():companionChatBody());
   const title=COMPANION.panel._title;
   if(title) title.textContent=COMPANION_TITLES[mode]||COMPANION_TITLES.chat;
   companionRefreshContext();
@@ -8016,6 +8040,8 @@ function companionEnsurePanel(){
   const body=h('div',{class:'companion-panel-body'});
   const gmBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Game Master', title:'The campaign table',
     onclick:()=>companionSetMode(COMPANION.mode==='gm'?'chat':'gm')}, '♟');
+  const studioBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Canon assistant', title:'The canon assistant',
+    onclick:()=>companionSetMode(COMPANION.mode==='studio'?'chat':'studio')}, '✒');
   const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
     onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
   const readBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
@@ -8023,7 +8049,7 @@ function companionEnsurePanel(){
   const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
-  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, msgBtn, readBtn, sizeBtn, closeBtn);
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, msgBtn, readBtn, sizeBtn, closeBtn);
   // Safari (iPad included) never renders the native CSS resize corner, so the
   // panel carries its own touch grip: the top-left corner resizes toward/away
   // from the bottom-right, which stays visually put.
@@ -8033,7 +8059,7 @@ function companionEnsurePanel(){
     body,
     grip);
   panel.style.display='none';
-  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn;
   COMPANION.panel=panel;
   companionWireDrag(panel, head);
   companionWireResize(panel);
@@ -8058,6 +8084,16 @@ function companionToggle(open){
 function companionOpenGm(){
   companionEnsurePanel();
   companionSetMode('gm');
+  companionToggle(true);
+}
+
+// Studio → Assistant's "✦ Open the assistant" (or the ✒ header button once a seat
+// exists) seats the canon assistant. The chat itself lives in assistant.js — the
+// panel only hosts it (no prompt pipeline here, same rule as the GM).
+function companionOpenStudio(){
+  if(typeof assistantEnsureSession==='function') assistantEnsureSession();
+  companionEnsurePanel();
+  companionSetMode('studio');
   companionToggle(true);
 }
 
@@ -10854,9 +10890,166 @@ async function assistantSendAnswerToLedger(campaignName, state){
   },'Ledger entry via Canon Assistant',{guard:assertLedger});
 }
 
+/* ---- the companion seat (Slice 46) ------------------------------------------
+   The GM merge set the house pattern (campPlaySeat / campPlayCompanionBody in
+   campaign-play.js): the chat is built ONCE into a module-level session and the
+   floating companion hosts it as mode '✒ studio', so the transcript survives
+   navigating anywhere in the app. The Assistant tab stays the DESK (personas,
+   engine + sampling, embeddings, usage); the ask pipeline below is the SAME one —
+   grounding, persona wrapper, escalation, usage recording — with no copy in
+   companion.js. */
+let ASSISTANT_SESSION=null;
+function assistantSession(){ return ASSISTANT_SESSION; }
+function assistantSeat(session){ ASSISTANT_SESSION=session||null; }
+function assistantEnsureSession(){
+  if(!ASSISTANT_SESSION) assistantSeat(assistantBuildChatSession());
+  return ASSISTANT_SESSION;
+}
+
+// One engine ask, shared by every mount: persona wrapper + grounding system, the
+// persona's preferred model when the engine can honor it, persona temperature via
+// assistantChatOptionsForRequest. The desk used to own a private copy of this.
+async function assistantRunAsk(engine, q, grounding, persona, onChunk){
+  persona=assistantNormalizePersona(persona,{builtIn:!!(persona&&persona.builtIn)});
+  const chat=Object.assign({
+    system:assistantBuildPersonaSystem(persona,grounding.system),
+    messages:[{role:'user',content:q}],
+    model:assistantPersonaModelFor(persona,engine)||String(engine&&engine.model||''),
+    maxTokens:ASSISTANT_MAX_TOKENS
+  },assistantChatOptionsForRequest(engine,persona,{}));
+  return assistantStreamAi(engine,chat,onChunk);
+}
+
+// A transcript message: streams chunks into a pre-wrap body, then wears its
+// grounding/usage line (per answer, as the desk's grounding line used to be).
+function assistantChatMessage(session, role, textValue){
+  const body=role==='you'?h('p',null,String(textValue||'')):h('pre',{class:'assistant-answer-text'},String(textValue||''));
+  const meta=role==='you'?null:h('div',{class:'hint assistant-chat-meta'});
+  const node=h('div',{class:'companion-msg '+(role==='you'?'you':'guide assistant-chat-answer')}, body, meta);
+  session.log.append(node);
+  const scroll=()=>{ try{ session.log.scrollTop=session.log.scrollHeight||0; }catch(e){} };
+  scroll();
+  return {
+    node,
+    append(piece){ body.append(h('span',{class:'chunk'},String(piece||''))); scroll(); },
+    reset(){ body.replaceChildren(); },
+    finish(grounding, info){
+      if(!meta) return;
+      grounding=assistantNormalizeGrounding(grounding); info=info||{};
+      const n=Number(grounding.truncated)||0;
+      meta.textContent='Grounded on: '+assistantIdsText(grounding.ids)
+        +(n>0?' · '+n+' entr'+(n===1?'y':'ies')+' shown in part':'')
+        +((grounding.entries||[]).some(e=>e&&e.fromPrivateBackend)?' · + private backend':'')
+        +(info.escalated?' · via API escalation (metered)':'')
+        +(grounding.warning?' · '+grounding.warning:'');
+      scroll();
+    },
+    fail(message){ body.replaceChildren(document.createTextNode(String(message||'The ask failed.'))); node.className='companion-msg guide assistant-chat-answer bad'; scroll(); },
+  };
+}
+
+// Build the floating chat once. Engine choice at ask time honors the Engine
+// settings ACTIVE badge (assistantDefaultEngine); the panel's persona select is a
+// request-time override only — it never mutates the saved engine OR the saved
+// active persona (the desk owns persisting that).
+function assistantBuildChatSession(){
+  const state={question:'',answer:'',grounding:{ids:[],entries:[],system:''},model:'',personaId:assistantDefaultPersonaId()};
+  const log=h('div',{class:'companion-log assistant-chat-log'},
+    h('p',{class:'hint companion-hello'},'Ask about promoted canon — answers are grounded and stay suggestions until you draft and promote them.'));
+  const personaSel=h('select',{class:'assistant-chat-persona','aria-label':'Persona'});
+  const input=h('textarea',{class:'companion-input assistant-chat-input',rows:'2',placeholder:'Ask about promoted canon…',
+    onkeydown:e=>{ if(e.key==='Enter'&&!e.shiftKey){ if(typeof e.preventDefault==='function') e.preventDefault(); session.send(); } }});
+  const sendBtn=h('button',{class:'navbtn primary',type:'button',onclick:()=>session.send()},'Ask');
+  const status=h('p',{class:'hint assistant-chat-status'},'');
+  const campaignIn=h('input',{class:'companion-input assistant-chat-campaign',placeholder:'Campaign…'});
+  const draftBtn=h('button',{class:'navbtn ghost',type:'button',onclick:()=>assistantDraftCanonCard(session.state)},'Draft a card');
+  const ledgerBtn=h('button',{class:'navbtn ghost',type:'button',onclick:async()=>{
+    ledgerBtn.disabled=true;
+    try{ await assistantSendAnswerToLedger(campaignIn.value,session.state); status.textContent='Sent to the campaign ledger as CAMPAIGN-ONLY.'; }
+    catch(e){ status.textContent=String(e&&e.message||e); }
+    finally{ ledgerBtn.disabled=!String(session.state.answer||'').trim(); }
+  }},'To ledger');
+  const deskBtn=h('button',{class:'navbtn ghost',type:'button',onclick:()=>go('studio',{tab:'assistant'})},'⚙ Desk');
+  draftBtn.disabled=true; ledgerBtn.disabled=true;
+  const chatNode=h('div',{class:'assistant-chat'},
+    log,
+    h('div',{class:'companion-inputrow assistant-chat-ask'}, personaSel, input, sendBtn),
+    h('div',{class:'companion-footrow assistant-chat-actions'}, draftBtn, campaignIn, ledgerBtn, deskBtn),
+    status);
+  const session={state, log, input, personaSel, status, chatNode, draftBtn, ledgerBtn, busy:false};
+  session.refreshPersonas=function(){
+    const personas=assistantPersonaList();
+    personaSel.replaceChildren(...personas.map(p=>h('option',{value:p.id},p.label)));
+    if(!personas.some(p=>p.id===state.personaId)) state.personaId=assistantDefaultPersonaId();
+    personaSel.value=state.personaId;
+  };
+  personaSel.onchange=()=>{ state.personaId=personaSel.value; if(typeof companionRefreshContext==='function') companionRefreshContext(); };
+  session.send=async function(){
+    const q=String(input.value||'').trim();
+    if(!q||session.busy) return;
+    input.value='';
+    assistantChatMessage(session,'you',q);
+    const profiles=assistantEngineProfiles();
+    const engine=assistantDefaultEngine(profiles);
+    if(!engine){
+      // the existing friendly keyless fallback, in chat form
+      assistantChatMessage(session,'assistant','No engine is set up yet — add one first. Open ⋯ More → ⚙ Engine settings, add a local or API profile, and ask again; the assistant is read-only on promoted canon either way.');
+      return;
+    }
+    session.busy=true; sendBtn.disabled=true;
+    status.textContent=assistantIsLocalEngine(engine)?'Asking local engine…':'Asking API engine. Metered usage will be recorded.';
+    const msg=assistantChatMessage(session,'assistant','');
+    try{
+      const grounding=await assistantCanonGrounding(q,engine,{});
+      const persona=assistantPersonaById(state.personaId);
+      const result=await assistantRunAsk(engine,q,grounding,persona,piece=>msg.append(piece));
+      let final=result, escalated=false;
+      const apiEngine=assistantFirstApiEngine(profiles);
+      if(assistantIsLocalEngine(engine)&&apiEngine&&shouldEscalate({
+        question:q,
+        localResult:{text:result.text||'',model:result.model,usage:result.usage,grounding},
+        settings:assistantPersonaSettings()
+      })){
+        status.textContent='Local answer looked weak; escalating to API… Metered usage will be recorded.';
+        try{
+          msg.reset();
+          final=await assistantRunAsk(apiEngine,q,grounding,persona,piece=>msg.append(piece));
+          escalated=true;
+        }catch(apiError){ msg.reset(); msg.append(result.text||''); final=result; }
+      }
+      if(!String(final.text||'').trim()) msg.append('(No text returned.)');
+      msg.finish(grounding,{escalated});
+      state.question=q; state.answer=String(final.text||''); state.grounding=grounding; state.model=String(final.model||'');
+      draftBtn.disabled=false; ledgerBtn.disabled=false;
+      status.textContent=escalated
+        ?'Answer ready after API escalation. Metered usage was recorded; promote through the normal pipeline.'
+        :'Answer ready. Suggestions only; promote through the normal pipeline.';
+    }catch(e){
+      msg.fail(e&&e.message?e.message:String(e));
+      status.textContent='The assistant could not complete the ask.';
+    }finally{
+      session.busy=false; sendBtn.disabled=false;
+    }
+  };
+  session.refreshPersonas();
+  return session;
+}
+
+// What the companion panel shows in 'studio' mode: the seated chat, or a gentle seat hint.
+function assistantCompanionBody(){
+  const s=assistantSession();
+  if(!s) return h('div',{class:'companion-body companion-studio'},
+    h('p',{class:'hint companion-hello'},'The canon assistant isn’t seated yet. Open Studio → Assistant and tap “✦ Open the assistant” — then the chat follows you anywhere in the app.'),
+    h('div',{class:'companion-footrow'}, h('button',{class:'navbtn',type:'button',onclick:()=>go('studio',{tab:'assistant'})},'✒ Open the Studio')));
+  s.refreshPersonas();
+  return h('div',{class:'companion-body companion-studio'}, s.chatNode);
+}
+
 function studioAssistant(host){
   const profiles=assistantEngineProfiles();
-  const state={question:'',answer:'',grounding:{ids:[],entries:[],system:''},model:'',personaId:assistantDefaultPersonaId()};
+  // Desk-local state: which persona/model the desk controls are editing. The chat
+  // transcript lives in the module-level seat (ASSISTANT_SESSION), not here.
+  const state={model:'',personaId:assistantDefaultPersonaId()};
   if(!profiles.length){
     const settingsBtn=h('button',{class:'primary'},'Open Engine settings');
     settingsBtn.onclick=()=>openEngineSettings();
@@ -10869,7 +11062,6 @@ function studioAssistant(host){
   }
 
   const defaultEngine=assistantDefaultEngine(profiles);
-  const apiEngine=assistantFirstApiEngine(profiles);
   const engineSel=h('select',{},...profiles.map(p=>h('option',{value:p.id},(p.name||p.type)+' - '+p.type)));
   if(defaultEngine) engineSel.value=defaultEngine.id;
   const modelSel=h('select',{class:'assistant-model'});
@@ -10940,7 +11132,8 @@ function studioAssistant(host){
     starterRow.append(h('span',{class:'hint'},'Starter prompts'));
     prompts.forEach(promptText=>{
       const btn=h('button',{class:'chip dash',type:'button'},promptText);
-      btn.onclick=()=>{ question.value=promptText; question.focus(); };
+      // Starters seat the floating chat and pre-fill its ask — the desk has no ask box.
+      btn.onclick=()=>{ const s=assistantEnsureSession(); s.input.value=promptText; if(typeof companionOpenStudio==='function') companionOpenStudio(); };
       starterRow.append(btn);
     });
   }
@@ -10995,6 +11188,10 @@ function studioAssistant(host){
   function selectPersona(id,opts){
     const persona=assistantSetActivePersona(id);
     state.personaId=persona.id;
+    // The panel's compact select mirrors the desk's active persona (one direction:
+    // desk persists, panel follows; the panel's own select stays a request-time override).
+    const seat=typeof assistantSession==='function'?assistantSession():null;
+    if(seat&&!seat.busy){ seat.state.personaId=persona.id; seat.refreshPersonas(); }
     if(!opts||!opts.skipDefaults) applyPersonaDefaults(persona);
     renderPersonaPicker();
   }
@@ -11068,27 +11265,15 @@ function studioAssistant(host){
   const spend=h('span',{class:'assistant-spend'},assistantSpendLabel(defaultEngine));
   const settingsBtn=h('button',{},'Engine settings');
   settingsBtn.onclick=()=>openEngineSettings();
-  const escalateBtn=h('button',{class:'secondary'},'Escalate to API');
-  escalateBtn.disabled=!apiEngine;
-  escalateBtn.onclick=()=>{
-    if(apiEngine) engineSel.value=apiEngine.id;
-    refreshEngineNote();
-  };
   const autoEscalateChk=h('input',{type:'checkbox'});
   autoEscalateChk.checked=assistantAutoEscalateEnabled();
   const autoEscalateLabel=h('label',{class:'assistant-check assistant-auto-escalate'},autoEscalateChk,h('span',null,'Auto-escalate weak local answers'));
-  const question=h('textarea',{class:'assistant-question',rows:'6',placeholder:'Ask a question about promoted canon...'});
-  const askBtn=h('button',{class:'primary'},'Ask');
+  // The desk's primary: seat the floating chat (Slice 46 — the ask box left the page).
+  const openBtn=h('button',{class:'primary',type:'button'},'✦ Open the assistant');
+  openBtn.onclick=()=>{ assistantEnsureSession(); if(typeof companionOpenStudio==='function') companionOpenStudio(); };
   const status=h('div',{class:'sync-status'});
   const embedStatus=h('div',{class:'assistant-embed-status hint'});
-  const groundingLine=h('div',{class:'assistant-grounding hint'});
-  const answerHost=h('div',{class:'assistant-answer'},h('p',{class:'hint'},'Ask a question to retrieve promoted canon and get a grounded answer.'));
-  const draftBtn=h('button',{class:'primary'},'Draft a Canon Card');
   const rebuildBtn=h('button',{class:'secondary'},'Rebuild canon index');
-  const campaignIn=h('input',{placeholder:'Campaign name'});
-  const ledgerBtn=h('button',{class:'secondary'},'Send to ledger');
-  draftBtn.disabled=true;
-  ledgerBtn.disabled=true;
   autoEscalateChk.onchange=()=>{
     const enabled=assistantSetAutoEscalate(autoEscalateChk.checked===true);
     status.textContent=enabled?'Weak local answers will visibly retry through the API meter.':'Auto-escalation is off; local answers stay local unless you choose the API.';
@@ -11121,17 +11306,8 @@ function studioAssistant(host){
   function refreshEngineNote(){
     const engine=assistantEngineById(profiles,engineSel.value);
     spend.textContent=assistantSpendLabel(engine);
-    escalateBtn.disabled=!apiEngine||engine&&engine.id===apiEngine.id;
     refreshAdvancedControls(engine);
     refreshModels(engine);
-  }
-
-  function setGroundingLine(ids, truncated){
-    // A-2 residual: flag when a shown entry reached the model only in part (budget boundary),
-    // so "the answer saw a cut" is visible rather than silent.
-    const n=Number(truncated)||0;
-    const note=n>0?'  ·  '+n+' entr'+(n===1?'y':'ies')+' shown in part (context budget)':'';
-    groundingLine.replaceChildren(document.createTextNode('Grounded on: '+assistantIdsText(ids)+note));
   }
 
   function setEmbedStatus(value, warning, usedPrivateBackend){
@@ -11145,109 +11321,6 @@ function studioAssistant(host){
     embedStatus.replaceChildren(document.createTextNode(text+(usedPrivateBackend?' + private backend':'')+(warning?' - '+warning:'')));
   }
 
-  function requestModelFor(engine){
-    return engine&&engine.id===engineSel.value?assistantModelFor(state,engine):String(engine&&engine.model||'');
-  }
-
-  function turnOptionsFor(engine){
-    return engine&&engine.id===engineSel.value?{temperature:tempUse.checked?temperatureIn.value:''}:{};
-  }
-
-  function renderAnswerShell(){
-    const answerPre=h('pre',{class:'assistant-answer-text stream-text'});
-    const cursor=h('span',{class:'cursor'},'▋');
-    answerPre.append(cursor);
-    answerHost.replaceChildren(answerPre);
-    return {
-      answerPre,
-      cursor,
-      onChunk(piece){
-        cursor.remove();
-        answerPre.append(h('span',{class:'chunk'},piece),cursor);
-        answerHost.scrollTop=answerHost.scrollHeight;
-      }
-    };
-  }
-
-  function renderStaticAnswer(text){
-    answerHost.replaceChildren(h('pre',{class:'assistant-answer-text'},String(text||'(No text returned.)')));
-  }
-
-  function storeAnswer(q, result, grounding, engine, finalStatus){
-    result=result||{};
-    state.question=q;
-    state.answer=result.text||'';
-    state.grounding=grounding;
-    if(engine&&engine.id===engineSel.value) state.model=result.model||requestModelFor(engine)||'';
-    setGroundingLine(grounding.ids,grounding.truncated);
-    setEmbedStatus(grounding.embeddingStatus||'ready',grounding.warning,(grounding.entries||[]).some(e=>e&&e.fromPrivateBackend));
-    status.textContent=finalStatus;
-    draftBtn.disabled=false;
-    ledgerBtn.disabled=false;
-  }
-
-  async function runEngineAsk(engine, q, grounding, statusText){
-    status.textContent=statusText;
-    const shell=renderAnswerShell();
-    const persona=assistantPersonaById(state.personaId);
-    const chat=Object.assign({
-      system:assistantBuildPersonaSystem(persona,grounding.system),
-      messages:[{role:'user',content:q}],
-      model:requestModelFor(engine),
-      maxTokens:ASSISTANT_MAX_TOKENS
-    },assistantChatOptionsForRequest(engine,persona,turnOptionsFor(engine)));
-    const result=await assistantStreamAi(engine,chat,shell.onChunk);
-    shell.cursor.remove();
-    if(!result.text) shell.answerPre.append(document.createTextNode('(No text returned.)'));
-    return result;
-  }
-
-  async function runAsk(){
-    const q=question.value.trim();
-    if(!q){
-      status.textContent='Ask a question first.';
-      return;
-    }
-    const engine=assistantEngineById(profiles,engineSel.value);
-    if(!engine){
-      status.textContent='Choose an engine first.';
-      return;
-    }
-    draftBtn.disabled=true;
-    ledgerBtn.disabled=true;
-    answerHost.replaceChildren(h('p',{class:'hint'},'Retrieving promoted canon...'));
-    setGroundingLine([]);
-    setEmbedStatus('checking');
-    try{
-      const grounding=await assistantCanonGrounding(q,engine,{onStatus:setEmbedStatus});
-      const localStatus=assistantIsLocalEngine(engine)?'Asking local engine...':'Asking API engine. Metered usage will be recorded.';
-      const result=await runEngineAsk(engine,q,grounding,localStatus);
-      const canAutoEscalate=assistantIsLocalEngine(engine)&&apiEngine&&shouldEscalate({
-        question:q,
-        localResult:{text:result.text||'',model:result.model,usage:result.usage,grounding},
-        settings:assistantPersonaSettings()
-      });
-      if(canAutoEscalate){
-        const localText=result.text||'';
-        status.textContent='Local answer looked weak; escalating to API... Metered usage will be recorded.';
-        try{
-          const apiResult=await runEngineAsk(apiEngine,q,grounding,'Escalating to API... Metered usage will be recorded.');
-          storeAnswer(q,apiResult,grounding,apiEngine,'Answer ready after API escalation. Metered usage was recorded; promote through the normal pipeline.');
-          return;
-        }catch(apiError){
-          renderStaticAnswer(localText);
-          storeAnswer(q,result,grounding,engine,'API escalation failed; local answer kept. Suggestions only; promote through the normal pipeline.');
-          return;
-        }
-      }
-      storeAnswer(q,result,grounding,engine,'Answer ready. Suggestions only; promote through the normal pipeline.');
-    }catch(e){
-      answerHost.replaceChildren(h('p',{class:'bad'},e&&e.message?e.message:String(e)));
-      status.textContent='The assistant could not complete the ask.';
-    }
-  }
-
-  askBtn.onclick=runAsk;
   rebuildBtn.onclick=async()=>{
     const engine=assistantEngineById(profiles,engineSel.value);
     rebuildBtn.disabled=true;
@@ -11263,24 +11336,11 @@ function studioAssistant(host){
       rebuildBtn.disabled=false;
     }
   };
-  draftBtn.onclick=()=>assistantDraftCanonCard(state);
-  ledgerBtn.onclick=async()=>{
-    ledgerBtn.disabled=true;
-    try{
-      await assistantSendAnswerToLedger(campaignIn.value,state);
-      status.textContent='Sent to the campaign ledger as CAMPAIGN-ONLY.';
-    }catch(e){
-      status.textContent=e&&e.message?e.message:String(e);
-    }finally{
-      ledgerBtn.disabled=false;
-    }
-  };
   // Switching engines can change whether the current persona's preferred model is honored
   // (assistantPersonaModelAllowed) — re-render the persona meta line so the CR-3 model-note
   // stays accurate instead of only updating on the next persona click.
   engineSel.onchange=()=>{ refreshEngineNote(); renderPersonaPicker(); };
   refreshEngineNote();
-  setGroundingLine([]);
   setEmbedStatus('');
   renderPersonaPicker();
 
@@ -11307,7 +11367,7 @@ function studioAssistant(host){
         h('label',{},'Model',modelSel),
         h('label',{},'Preset',presetSel)
       ),
-      h('div',{class:'assistant-engine-actions'},spend,autoEscalateLabel,settingsBtn,escalateBtn)
+      h('div',{class:'assistant-engine-actions'},spend,autoEscalateLabel,settingsBtn)
     ),
     h('div',{class:'assistant-advanced'},
       h('label',{class:'assistant-check'},tempUse,h('span',null,'Temperature'),temperatureValue),
@@ -11316,15 +11376,9 @@ function studioAssistant(host){
       h('label',{},'Context',numCtxSel),
       h('span',{class:'hint'},'Larger context uses more VRAM.')
     ),
-    question,
-    h('div',{class:'assistant-actions'},askBtn,status),
+    h('div',{class:'assistant-actions'},openBtn,status),
     h('div',{class:'assistant-actions assistant-embed-row'},embedStatus,rebuildBtn),
-    groundingLine,
-    answerHost,
-    h('div',{class:'assistant-outbound'},
-      h('p',{class:'hint'},'Outbound actions stay guarded: draft only, or CAMPAIGN-ONLY ledger note. Nothing writes promoted canon.'),
-      h('div',{class:'assistant-actions'},draftBtn,campaignIn,ledgerBtn)
-    )
+    h('p',{class:'hint'},'The chat floats in the ✦ companion and follows you anywhere in the app. Outbound actions there stay guarded: draft only, or CAMPAIGN-ONLY ledger note. Nothing writes promoted canon.')
   ));
 }
 /* ============================ Promote a card to canon ======================= *
