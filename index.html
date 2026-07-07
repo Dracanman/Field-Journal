@@ -1036,6 +1036,17 @@
 .subarea-rim-band{ pointer-events:none; }
 @media (max-width:700px){ .region-subarea-peek .toolrow{ flex-wrap:wrap; } }
 
+/* Slice 54 - enter the tile: the live sub-area mount (Play's write path) */
+.region-subarea-live{ margin-top:10px; padding:12px; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+.subarea-live-stage{ display:flex; flex-direction:column; gap:8px; }
+.subarea-live-delta,.subarea-live-niches,.subarea-live-denizens{ padding:8px 10px; border-radius:10px; border:1px solid var(--glass-edge, rgba(255,255,255,.14)); }
+.subarea-live-delta b,.subarea-live-niches b,.subarea-live-denizens b{ display:block; margin-bottom:6px; }
+.subarea-live-niche,.subarea-live-denizen{ margin-top:6px; }
+.subarea-live-niche .toolrow,.subarea-live-denizen .toolrow,.subarea-live-delta .toolrow{ flex-wrap:wrap; gap:6px; }
+.subarea-live-niche label{ display:flex; flex-direction:column; font-size:12px; gap:2px; }
+.subarea-live-delta input,.subarea-live-niche input,.subarea-live-denizen input{ max-width:220px; }
+@media (max-width:700px){ .region-subarea-live .toolrow{ flex-wrap:wrap; } }
+
 /* Slice 53 - the Dream: Session Zero's growing scene at the Play table */
 .play-dream{ margin:10px 0 14px; padding:14px 16px; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
 .play-dream .subarea-peek-frame{ margin:2px 0; }
@@ -16631,6 +16642,8 @@ campRegion = async function(host, name){
         // (Slice 52 hands it campaign context so saved place state paints and
         // "mark this place" can write the guarded places file.)
         if (typeof regionSubareaPeekPanel === 'function') wrap.append(regionSubareaPeekPanel(entry.region, { cfg, campaignName: name }));
+        // Slice 54: the LIVE mount — ▶ Play's door into a revealed tile; the only write path.
+        if (typeof subareaLivePanel === 'function') wrap.append(subareaLivePanel(entry.region, { cfg, campaignName: name }));
       }
     });
     if (result.orphanMarkdown.length){
@@ -16910,6 +16923,300 @@ function regionSubareaPeekPanel(region, ctx){
   refreshLayers();
   refreshTiles();
   panel.append(layerRow, h('div',{class:'toolrow'}, tileSel, peekBtn, hexBtn, markBtn, markStatus), stage, meta);
+  return panel;
+}
+/* ========================================================================== *
+   ENTER THE TILE (Slice 54 / SUBSCALE-001) — the sub-area goes LIVE.
+
+   One renderer, two mounts forever: the Region hub's PEEK stays read-only
+   (Slice 51); THIS is the second mount — the ▶ Play door. With the table
+   seated, a revealed tile can be ENTERED: the shared renderer mounts with the
+   live place record painted (deltas applied, denizens present), what happens
+   writes Slice-52 deltas through the guarded places writer, and the first
+   meaningful encounter with a niche instantiates its denizen via propose-accept
+   (the engine proposes name/kind/temperament from the niche type + tile
+   character; Del reviews and accepts — no proposal, no denizen; acceptance
+   auto-anchors the place). Leave clears the scene and the map above is exactly
+   where you were. The write path exists ONLY here — never in the peek.
+ * ========================================================================== */
+
+// The one entered scene at a time, read by the Play table (card + GM context).
+const SUBAREA_LIVE={current:null};
+function subareaLiveCurrent(){ return SUBAREA_LIVE.current; }
+function subareaLiveSetCurrent(next){ SUBAREA_LIVE.current=next||null; }
+
+// Enter is Play's door: only a seated table for THIS campaign opens it.
+function subareaLiveSeated(campaignName){
+  const s=typeof campPlaySession==='function'?campPlaySession():null;
+  return !!(s&&s.name===campaignName);
+}
+// Fog rule, same as the peek: only a tile revealed in its layer's mask.
+function subareaLiveCanEnter(region, layerId, tile){
+  const tx=Number(tile&&tile.x), ty=Number(tile&&tile.y);
+  if(!Number.isInteger(tx)||!Number.isInteger(ty)) return false;
+  return subareaRevealedTiles(region, layerId).some(entry=>entry.x===tx&&entry.y===ty);
+}
+
+/* ---- denizen propose-accept (pure parts) ------------------------------------ */
+function subareaDenizenProposalPrompt(niche, scene){
+  const weights=scene&&scene.elements&&scene.elements.weights||{};
+  const lean=Object.keys(weights).sort((a,b)=>(weights[b]||0)-(weights[a]||0)).slice(0,2).join(' + ')||'none recorded';
+  return [
+    'Cast ONE denizen for an ecological niche inside a wild place. Do not invent setting facts;',
+    'this is a table suggestion the player will review, edit, and accept or dismiss.',
+    'Niche type: '+String(niche&&niche.type||'unknown')+'.',
+    'Tile character: '+String(scene&&scene.parent&&scene.parent.terrain||'unknown')+' ('+String(scene&&scene.parent&&scene.parent.occupancy||'solid')+'), element lean: '+lean+', ambient band: '+String(scene&&scene.elements&&scene.elements.ambientBand||'neutral')+'.',
+    'Answer with EXACTLY three lines and nothing else:',
+    'Name: <one short evocative name>',
+    'Kind: <what they are — creature, spirit, or small folk that fits the niche>',
+    'Temperament: <one short line of how they meet strangers>',
+  ].join('\n');
+}
+function subareaParseDenizenProposal(text){
+  const src=String(text||'');
+  const grab=label=>{ const m=new RegExp('^\\s*'+label+'\\s*:\\s*(.+)$','mi').exec(src); return m?m[1].trim():''; };
+  const name=grab('Name'), kind=grab('Kind'), temperament=grab('Temperament');
+  if(!name) return null;   // no proposal, no denizen
+  return { name, kind, temperament };
+}
+function subareaDenizenFromProposal(niche, proposal, opts){
+  if(!proposal||!String(proposal.name||'').trim()) throw new Error('no proposal, no denizen — the review comes first');
+  const name=String(proposal.name).trim();
+  return {
+    id:'dz-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''),
+    name, kind:String(proposal.kind||'').trim(),
+    nicheId:String(niche&&niche.id||''),
+    homeCell:String(niche&&niche.cells&&niche.cells[0]||''),
+    disposition:[{ note:'first met — '+(String(proposal.temperament||'').trim()||'temperament unreadable'), toward:'', at:(opts&&opts.now)||'' }],
+  };
+}
+// Accept = the Slice-52 instantiation (auto-anchors: a denizen IS memory).
+function subareaAcceptDenizen(places, scene, niche, proposal, opts){
+  return placeDenizenInstantiate(places, scene, subareaDenizenFromProposal(niche, proposal, opts), opts);
+}
+
+/* ---- what the seated GM sees while entered ---------------------------------- */
+function subareaLiveDenizenLine(denizen){
+  const last=denizen.disposition[denizen.disposition.length-1];
+  return (denizen.name||denizen.id)+(denizen.kind?' ('+denizen.kind+')':'')
+    +(last?' — remembers: '+last.note+(last.toward?' ['+last.toward+']':''):'');
+}
+function subareaLiveContextBlock(campaignName){
+  const cur=SUBAREA_LIVE.current;
+  if(!cur||cur.campaignName!==campaignName||!cur.scene) return '';
+  const place=cur.place, scene=cur.scene;
+  const deltas=(place&&place.deltas||[]).slice(-3);
+  return [
+    'ENTERED PLACE (live sub-area scene — the player is INSIDE this tile):',
+    'Region '+scene.regionId+', layer '+scene.layerId+', tile '+scene.tile.x+','+scene.tile.y+'.',
+    (place&&place.markedNote?'Known as: '+place.markedNote+'.':''),
+    (place&&place.anchored?'This place is ANCHORED — it keeps its identity; drift obeys the world-turn law.':'This place is pure derivation so far — nothing has marked it yet.'),
+    'Tile character: '+scene.parent.terrain+' ('+scene.parent.occupancy+'); niches implied: '+(scene.niches.map(n=>n.type).join(', ')||'none')+'.',
+    (deltas.length?'What has happened here: '+deltas.map(d=>d.type+(d.note?' — '+d.note:'')).join('; ')+'.':''),
+    ((place&&place.denizens||[]).length
+      ?'Who lives here (they remember): '+place.denizens.map(subareaLiveDenizenLine).join(' | ')
+      :'No denizen has been met here yet — a niche only becomes SOMEONE through the propose-accept review.'),
+    'Narrate from this. State stays review-only; place changes land as reviewed deltas, never silently.',
+  ].filter(Boolean).join('\n');
+}
+function subareaLiveCard(campaignName){
+  const cur=SUBAREA_LIVE.current;
+  if(!cur||cur.campaignName!==campaignName||!cur.scene) return null;
+  const place=cur.place;
+  return {id:'place', label:'This Place', items:[
+    'Inside '+cur.scene.regionId+' · '+cur.scene.layerId+' · tile '+cur.scene.tile.x+','+cur.scene.tile.y,
+    (place&&place.markedNote?'Known as: '+place.markedNote:''),
+    (place&&place.anchored?'📌 anchored — identity pinned':'un-anchored — pure derivation'),
+    ((place&&place.denizens||[]).length?'Present: '+place.denizens.map(subareaLiveDenizenLine).join(' · '):'No denizens met yet.'),
+    ((place&&place.deltas||[]).length?String(place.deltas.length)+' delta'+(place.deltas.length===1?'':'s')+' recorded':''),
+  ].filter(Boolean), empty:''};
+}
+
+/* ---- the live panel ---------------------------------------------------------- */
+function subareaLivePanel(region, ctx){
+  ctx=ctx||{};
+  const campaignName=String(ctx.campaignName||'');
+  const panel=h('section',{class:'region-subarea-live glass'});
+  const layers=(Array.isArray(region.localLayers)?region.localLayers:[]).filter(l=>l&&subareaGridOf(region,l.id));
+  if(!subareaLiveSeated(campaignName)){
+    panel.append(h('div',{class:'region-readonly'},
+      h('b',null,'Enter the tile · Play’s door'),
+      h('span',null,'Entering a place for real — where deltas write and niches become someones — needs the table seated. Open ▶ Play first; the GM chat follows you back here.')),
+      h('div',{class:'toolrow'}, h('button',{class:'navbtn', type:'button', onclick:()=>go('campaign',{camp:campaignName, tab:'play'})},'▶ Seat the table')));
+    return panel;
+  }
+  if(!layers.length){
+    panel.append(h('p',{class:'hint'},'No serialized local layers to enter.'));
+    return panel;
+  }
+  const state={layerId:layers[0].id, placesState:null, busyEnter:false};
+  const status=h('span',{class:'hint subarea-live-status', role:'status'},'');
+  const layerRow=h('div',{class:'toolrow subarea-live-layers'});
+  const tileSel=h('select',{class:'subarea-live-tile','aria-label':'Revealed tile'});
+  const enterBtn=h('button',{class:'navbtn primary', type:'button'},'Enter the tile');
+  const stage=h('div',{class:'subarea-live-stage'});
+
+  function refreshTiles(){
+    const tiles=subareaRevealedTiles(region, state.layerId);
+    tileSel.replaceChildren(...tiles.map(tile=>h('option',{value:tile.x+','+tile.y}, tile.x+','+tile.y+' · '+tile.terrain)));
+    if(tiles.length) tileSel.value=tiles[0].x+','+tiles[0].y;
+    enterBtn.disabled=!tiles.length;
+    if(!tiles.length) status.textContent='Nothing is revealed on this layer yet — lift some fog first.';
+    else status.textContent='';
+  }
+  function refreshLayers(){
+    layerRow.replaceChildren(...layers.map(layer=>{
+      const chip=h('button',{class:'chip '+(layer.id===state.layerId?'on':'dash'), type:'button'}, layer.label||layer.id);
+      chip.onclick=()=>{ state.layerId=layer.id; refreshLayers(); refreshTiles(); };
+      return chip;
+    }));
+  }
+  // Every write is the atomic unit: load fresh, apply pure, write guarded; the
+  // painted scene only advances when the write LANDS — a failure leaves it consistent.
+  async function persist(mutate, message){
+    const fresh=await placesLoad(ctx.cfg, campaignName, region.id);
+    const next=mutate(fresh.places);
+    await placesWrite(ctx.cfg, campaignName, fresh.path, next, fresh.text, message);
+    state.placesState={...fresh, places:next, text:''};
+    return next;
+  }
+  function currentPlace(scene){
+    try{ return placeGet(state.placesState&&state.placesState.places, placeKeyOf(scene.layerId, scene.tile)); }
+    catch(e){ return null; }
+  }
+  function syncCurrent(scene){
+    subareaLiveSetCurrent({campaignName, regionId:region.id, layerId:scene.layerId, tile:scene.tile, scene, place:currentPlace(scene)});
+  }
+  function leave(){
+    subareaLiveSetCurrent(null);
+    stage.replaceChildren();
+    status.textContent='Back on the region map — exactly where you were.';
+  }
+  function deltaForm(scene){
+    const typeSel=h('select',null,...SUBAREA_DELTA_TYPES.map(x=>h('option',{value:x},x)));
+    const cellIn=h('input',{placeholder:'cell x,y (optional)'});
+    const noteIn=h('input',{placeholder:'what happened here'});
+    const applyBtn=h('button',{class:'navbtn', type:'button'},'Record it');
+    applyBtn.onclick=async()=>{
+      const note=noteIn.value.trim();
+      if(!note){ status.textContent='Say what happened first.'; return; }
+      applyBtn.disabled=true; status.textContent='Recording…';
+      try{
+        await persist(places=>placeApplyDelta(places, scene, {type:typeSel.value, note, cell:cellIn.value.trim()}), 'Play delta at '+placeKeyOf(scene.layerId, scene.tile)+' in '+region.id);
+        noteIn.value=''; status.textContent='Recorded.';
+        syncCurrent(scene); drawScene(scene);
+      }catch(error){ status.textContent=String(error&&error.message||error); }
+      applyBtn.disabled=false;
+    };
+    return h('div',{class:'subarea-live-delta'},
+      h('b',null,'What happened here'),
+      h('div',{class:'toolrow'}, typeSel, cellIn, noteIn, applyBtn),
+      h('p',{class:'hint'},'Deltas over derivation — named features and denizen events anchor the place; items never do.'));
+  }
+  function nicheRow(scene, niche){
+    const place=currentPlace(scene);
+    const lived=(place&&place.denizens||[]).find(d=>d.nicheId===niche.id);
+    if(lived) return h('div',{class:'subarea-live-niche'}, h('b',null,niche.type), h('span',{class:'hint'},' · '+subareaLiveDenizenLine(lived)));
+    const row=h('div',{class:'subarea-live-niche'});
+    const askBtn=h('button',{class:'navbtn ghost', type:'button'},'Who lives here?');
+    askBtn.onclick=async()=>{
+      askBtn.disabled=true; status.textContent='The table considers who lives here…';
+      const profiles=(typeof assistantEngineProfiles==='function')?assistantEngineProfiles():[];
+      const engine=profiles.length?assistantDefaultEngine(profiles):null;
+      if(!engine){ status.textContent='Add an AI engine profile first — the proposal comes from the table.'; askBtn.disabled=false; return; }
+      let raw='';
+      try{
+        await assistantStreamAi(engine, { system:'You cast wildlife and small presences for a tabletop scene. Suggestions only; the player reviews.',
+          messages:[{role:'user', content:subareaDenizenProposalPrompt(niche, scene)}],
+          model:assistantModelFor({}, engine), maxTokens:160, temperature:0.8 }, piece=>{ raw+=piece; });
+      }catch(error){ status.textContent='No proposal: '+String(error&&error.message||error); askBtn.disabled=false; return; }
+      const proposal=subareaParseDenizenProposal(raw);
+      if(!proposal){ status.textContent='The proposal was unreadable — ask again.'; askBtn.disabled=false; return; }
+      status.textContent='';
+      const nameIn=h('input',{value:proposal.name}); const kindIn=h('input',{value:proposal.kind}); const tempIn=h('input',{value:proposal.temperament});
+      const acceptBtn=h('button',{class:'navbtn primary', type:'button'},'Accept — they live here');
+      const dismissBtn=h('button',{class:'navbtn ghost', type:'button'},'Dismiss');
+      acceptBtn.onclick=async()=>{
+        acceptBtn.disabled=true; status.textContent='Instantiating…';
+        try{
+          await persist(places=>subareaAcceptDenizen(places, scene, niche, {name:nameIn.value, kind:kindIn.value, temperament:tempIn.value}), 'Denizen accepted at '+placeKeyOf(scene.layerId, scene.tile)+' in '+region.id);
+          status.textContent='They live here now — the place is anchored.';
+          syncCurrent(scene); drawScene(scene);
+        }catch(error){ status.textContent=String(error&&error.message||error); acceptBtn.disabled=false; }
+      };
+      dismissBtn.onclick=()=>{ row.replaceChildren(h('b',null,niche.type), h('span',{class:'hint'},' · still just a niche'), askBtn); askBtn.disabled=false; };
+      row.replaceChildren(h('b',null,niche.type),
+        h('div',{class:'toolrow'}, h('label',null,'Name',nameIn), h('label',null,'Kind',kindIn), h('label',null,'Temperament',tempIn)),
+        h('div',{class:'toolrow'}, acceptBtn, dismissBtn));
+    };
+    row.append(h('b',null,niche.type), h('span',{class:'hint'},' · someone could live here'), askBtn);
+    return row;
+  }
+  function denizenMemoryRow(scene, denizen){
+    const memIn=h('input',{placeholder:'what they will remember of this'});
+    const memBtn=h('button',{class:'navbtn ghost', type:'button'},'They remember');
+    memBtn.onclick=async()=>{
+      const note=memIn.value.trim();
+      if(!note){ status.textContent='Write the memory first.'; return; }
+      memBtn.disabled=true;
+      try{
+        const key=placeKeyOf(scene.layerId, scene.tile);
+        await persist(places=>placeDenizenRemember(places, key, denizen.id, {note, toward:''}), 'Denizen memory at '+key+' in '+region.id);
+        status.textContent='Remembered.'; syncCurrent(scene); drawScene(scene);
+      }catch(error){ status.textContent=String(error&&error.message||error); memBtn.disabled=false; }
+    };
+    return h('div',{class:'subarea-live-denizen'}, h('span',null,subareaLiveDenizenLine(denizen)), h('div',{class:'toolrow'}, memIn, memBtn));
+  }
+  function drawScene(scene){
+    const place=currentPlace(scene);
+    const frame=h('div',{class:'region-map subarea-peek-frame cosmic-'+String(region.cosmicLayer||'middle')},
+      subareaSceneSvg(scene, place, {}));
+    const meta=h('p',{class:'hint subarea-live-meta'},
+      (place&&place.markedNote?'“'+place.markedNote+'” · ':'')
+      +(place&&place.anchored?'📌 anchored':'un-anchored')
+      +' · '+scene.niches.length+' niche'+(scene.niches.length===1?'':'s')
+      +((place&&place.deltas||[]).length?' · '+place.deltas.length+' delta'+(place.deltas.length===1?'':'s'):''));
+    const leaveBtn=h('button',{class:'navbtn', type:'button', onclick:leave},'← Leave (back to the map)');
+    stage.replaceChildren(...[
+      h('div',{class:'region-readonly'},
+        h('b',null,'Inside the tile · live'),
+        h('span',null,'This is the write path: what happens here persists as deltas, and whoever is accepted here remembers.')),
+      frame, meta,
+      deltaForm(scene),
+      scene.niches.length?h('div',{class:'subarea-live-niches'}, h('b',null,'The life this place implies'), ...scene.niches.map(n=>nicheRow(scene, n))):null,
+      (place&&place.denizens||[]).length?h('div',{class:'subarea-live-denizens'}, h('b',null,'Who is here'), ...place.denizens.map(d=>denizenMemoryRow(scene, d))):null,
+      h('div',{class:'toolrow'}, leaveBtn),
+    ].filter(Boolean));
+  }
+  async function enter(tile){
+    if(state.busyEnter) return;
+    if(!subareaLiveCanEnter(region, state.layerId, tile)){ status.textContent='That tile isn’t revealed on this layer.'; return; }
+    state.busyEnter=true; enterBtn.disabled=true; status.textContent='Deriving the scene…';
+    try{
+      state.placesState=await placesLoad(ctx.cfg, campaignName, region.id);
+      const scene=subareaScene(region, state.layerId, tile);
+      if(!scene) throw new Error('that tile has nothing to derive');
+      syncCurrent(scene);
+      drawScene(scene);
+      status.textContent='';
+    }catch(error){ status.textContent=String(error&&error.message||error); }
+    state.busyEnter=false; enterBtn.disabled=false;
+  }
+  enterBtn.onclick=()=>{
+    const parts=String(tileSel.value||'').split(',');
+    enter({x:Number(parts[0]), y:Number(parts[1])});
+  };
+  panel.append(h('div',{class:'region-readonly'},
+    h('b',null,'Enter the tile · live (Play)'),
+    h('span',null,'The second mount: derivation plus everything this place remembers. Re-entering re-derives and repaints — anchored content stays put.')));
+  refreshLayers(); refreshTiles();
+  panel.append(layerRow, h('div',{class:'toolrow'}, tileSel, enterBtn, status), stage);
+  // Re-entry resume: still entered here from earlier? Re-derive fresh and repaint.
+  const cur=SUBAREA_LIVE.current;
+  if(cur&&cur.campaignName===campaignName&&cur.regionId===region.id){
+    state.layerId=cur.layerId; refreshLayers(); refreshTiles();
+    enter({x:cur.tile.x, y:cur.tile.y});
+  }
   return panel;
 }
 /* ========================================================================== *
@@ -18495,7 +18802,9 @@ function regionRegenerateWorkspace(host,cfg,campaignName,regionId){
   }
   function collectScopeChecks(root){
     return Array.from((root&&root.children)||[]).map(label=>{
-      const input=(label.children||[]).find(child=>child&&child.tagName==='INPUT');
+      // label.children is an HTMLCollection in the browser (no .find) — the DOM stub's
+      // plain arrays hid this, so keep the Array.from or the whole view crash-loops.
+      const input=Array.from(label.children||[]).find(child=>child&&child.tagName==='INPUT');
       return {node:input,value:input&&input.value};
     }).filter(item=>item.node&&item.value);
   }
@@ -18507,8 +18816,11 @@ function regionRegenerateWorkspace(host,cfg,campaignName,regionId){
     status='';
     draw();
   }).catch(error=>{
+    // Render the failure directly — draw() itself may be what threw (live already set
+    // by then), and re-entering it would loop the throw and freeze the view on the
+    // initial "Loading region..." text.
     status='Regenerate unavailable: '+String(error&&error.message||error);
-    draw();
+    host.replaceChildren(h('p',{class:'hint'},status));
   });
 }
 function regionRegenerateView(campaignName, regionId){
@@ -19560,6 +19872,7 @@ function campPlayBuildSystem(opts){
     'CAMPAIGN PLAY MODE:\n'+mode.label+'\n'+mode.prompt,
     sessionBoot?CAMP_PLAY_SESSION_BOOT:'',
     String(opts.dreamContext||''),   // Slice 53: the live dream scene rides the GM context
+    String(opts.placeContext||''),   // Slice 54: the entered place — the GM knows what she remembers
     (opts.draftResolution||mode.draftResolution)?CAMP_PLAY_DRAFT_3D6_CONTEXT:'',
     'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(opts.campaignName||'', opts.parsed||{}, opts.threads||{}),
     CAMP_PLAY_TABLE_PROTOCOL,
@@ -19577,7 +19890,7 @@ function campPlayShortText(text, max){
   return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
 }
 
-function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges, dreamCard){
+function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges, extraCards){
   const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
   const clocks=campPlayCleanList(sections.clocks);
   const people=campPlayCleanList(sections.people);
@@ -19608,7 +19921,9 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
     {id:'state', label:'State Review', items:pendingProposal?[campPlayProposalSummary(pendingProposal)]:['No pending state proposal.'], empty:''},
     {id:'draft3d6', label:'Draft 3d6', items:['Optional SYS-002 playtest lens. Draft / campaign-only, not promoted canon. Render mechanics as in-world fiction.'], empty:''},
   ];
-  if(dreamCard) cards.unshift(dreamCard);   // Session Zero's dream takes the head of the table
+  // live extras (the dream, an entered place) take the head of the table, in order
+  const extras=Array.isArray(extraCards)?extraCards.filter(Boolean):(extraCards?[extraCards]:[]);
+  for(let i=extras.length-1;i>=0;i--) cards.unshift(extras[i]);
   return cards;
 }
 
@@ -19973,11 +20288,13 @@ async function campPlayBuildSession(name, profiles){
     modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
-    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges,
-      dream?dreamTableCard(dream.scene, dream.state):null);
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges,[
+      dream?dreamTableCard(dream.scene, dream.state):null,
+      typeof subareaLiveCard==='function'?subareaLiveCard(name):null,   // Slice 54: the entered place
+    ]);
     tablePanel.replaceChildren(...cards.map(card=>{
       const list=(card.items||[]).filter(Boolean);
-      return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'||card.id==='dream'?true:null},
+      return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'||card.id==='dream'||card.id==='place'?true:null},
         h('summary',null,card.label),
         list.length?h('ul',null,...list.slice(0,8).map(item=>h('li',null,item))):h('p',{class:'hint'},card.empty||'No notes yet.')
       );
@@ -20036,7 +20353,8 @@ async function campPlayBuildSession(name, profiles){
       threads,
       groundingSystem,
       groundingMode:turnGroundingMode,
-      dreamContext:dream?dreamContextBlock(dream.scene, dream.state):''
+      dreamContext:dream?dreamContextBlock(dream.scene, dream.state):'',
+      placeContext:typeof subareaLiveContextBlock==='function'?subareaLiveContextBlock(name):''   // Slice 54
     });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
     const chat=Object.assign({ system, messages:history, model:modelSel.value||campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
