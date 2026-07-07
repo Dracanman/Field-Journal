@@ -1035,6 +1035,20 @@
 .subarea-hexes path{ stroke:rgba(40,40,60,.4); stroke-width:.03; stroke-dasharray:.09 .07; }
 .subarea-rim-band{ pointer-events:none; }
 @media (max-width:700px){ .region-subarea-peek .toolrow{ flex-wrap:wrap; } }
+
+/* Slice 53 - the Dream: Session Zero's growing scene at the Play table */
+.play-dream{ margin:10px 0 14px; padding:14px 16px; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
+.play-dream .subarea-peek-frame{ margin:2px 0; }
+.region-map.cosmic-dream{ border-top:4px solid #b9a7e0; }
+.region-map.cosmic-dream .subarea-sky{ fill:#2b2440; opacity:.96; }
+.play-dream-things{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:8px; align-items:start; }
+.play-dream-thing{ padding:8px 10px; border-radius:10px; border:1px solid var(--glass-edge, rgba(255,255,255,.14)); }
+.play-dream-thing b{ display:block; margin-bottom:6px; }
+.play-dream-thing .toolrow{ flex-wrap:wrap; gap:6px; }
+.play-dream-verbs{ flex-wrap:wrap; gap:6px; }
+.play-dream-denizens input{ max-width:220px; }
+.play-dream-wake{ align-items:center; }
+@media (max-width:700px){ .play-dream-things{ grid-template-columns:1fr; } }
 /* ---------- Region Update 1: read-only saved-region status ---------- */
 .region-view{display:grid;gap:14px}
 .region-readonly{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:12px 14px;border:1px solid var(--gold-soft);border-radius:10px;background:#fff8}
@@ -18747,6 +18761,549 @@ campResume=async function(host,name){
   }catch(e){ host.append(h('p',{class:'hint'},'Survival editor unavailable: '+e.message)); }
 };
 /* ========================================================================== *
+   THE DREAM (Slice 53 / SUBSCALE-001) — Session Zero's growing scene.
+
+   Every godling's story starts death → DREAM → arrival, and this is the dream:
+   it derives from THE CHARACTER — personal, deterministic, replayable — same
+   character, same dream, always. It starts as a small pocket with a few things
+   to notice; the FIRST use of each core verb of play (move, reach, call, rest)
+   unfurls ONE new pocket keyed to that verb, so the scene teaches the verbs by
+   responding to them. It ends only when the dreamer CHOOSES to leave — and
+   leaving is arriving.
+
+   Mechanism only: what the dream IS in-world stays deliberately unclaimed — no
+   canon claims, ever. Reuses the Slice-50 derivation discipline (per-address
+   values hash-seeded through the Forge PRNG, never a shared sequence) and the
+   Slice-51 renderer unchanged (the scene model is subarea-shaped). Needs NO
+   region: reads no region files; its one persisted artifact is the guarded
+   dream file beside the campaign save. Growth state is the ordered verb list,
+   per character; beings met here reuse the Slice-52 denizen shape (disposition
+   is MEMORY — appended, never rewritten), dream-scoped.
+ * ========================================================================== */
+const DREAM_SCHEMA_VERSION=1;
+const DREAM_ENGINE_VERSION='1.0.0';
+// The core verbs of play. Each unfurls its own pocket on FIRST use only.
+const DREAM_VERBS=[
+  {id:'move',  label:'move / look',   pocket:'paths',        unfurl:'first movement opens paths'},
+  {id:'reach', label:'reach / shape', pocket:'making-space', unfurl:'first reaching opens a making-space'},
+  {id:'call',  label:'call / speak',  pocket:'encounter',    unfurl:'first calling opens an encounter — someone may answer'},
+  {id:'rest',  label:'rest',          pocket:'still-place',  unfurl:'first rest opens a still place'},
+];
+// Choice grains (the standing principle): two immersive doors now; a third
+// NON-immersive grain (direct picks) is added later as one more entry here and
+// one more key in each interactable's doors — consumers iterate this list.
+const DREAM_DOOR_GRAINS=[
+  {id:'detailed', label:'in fine grain',  hint:'detailed-immersive — spell out exactly what you do'},
+  {id:'broad',    label:'one warm stroke', hint:'broad-immersive — one gesture, let it unfold'},
+];
+// Dream-stuff wears the Forge's existing terrain vocabulary (derive-or-omit:
+// carried, never invented) — element leanings pick which of it the dream is made of.
+const DREAM_ELEMENT_TERRAIN={
+  earth:['stone','dirt'], water:['water','marsh'], air:['path','snow'], fire:['ash','lava'],
+  wood:['forest','meadow'], light:['sand','meadow'], shadow:['void','cave-floor'], metal:['rock','stone'],
+  lightning:['peak','stone'], ice:['ice','frost'], crystal:['crystal','stone'], life:['grass','meadow'],
+};
+const DREAM_ELEMENT_NOTICE={
+  earth:'a patient weight of ground', water:'a still pool of sky', air:'a current that almost speaks',
+  fire:'a warmth banked under ash', wood:'a rooted shape, slowly breathing', light:'a glow with no source',
+  shadow:'a soft dark that keeps its distance', metal:'a cold gleam waiting for a hand',
+  lightning:'a held charge, hair-fine', ice:'a hush of frost', crystal:'a lattice humming almost-notes',
+  life:'a green pulse under everything',
+};
+const DREAM_START={x:6, y:5};
+
+/* ---- who is dreaming: essence from the character sheet --------------------- */
+// A sheet line like "NAME: Elias  (past life: ...)   RACE: Vael [CANON]" carries
+// several fields on one line; match the label anywhere a field can start, cut at
+// the next ALL-CAPS field, drop (asides) and [markers].
+function dreamSheetField(text, label){
+  const m=new RegExp('(?:^|\\s)'+label+':[ \\t]*(.+)$','mi').exec(String(text||''));
+  if(!m) return '';
+  const v=m[1].split(/\s{2,}(?=[A-Z]{2,}:)/)[0].replace(/\(.*?\)/g,'').replace(/\[.*?\]/g,'').trim();
+  return /^\[.*\]?$/.test(v)?'':v;   // an untouched template placeholder is "not filled in"
+}
+// Deterministic across devices: leans on the FIXED canon ELEMENTS roster only,
+// never DB-local custom elements — a per-device roster would change the dream.
+function dreamElementLeanings(text){
+  const src=String(text||'');
+  const out={};
+  const known={};
+  ELEMENTS.forEach(e=>{ known[e.key]=e; known[String(e.label).toLowerCase()]=e; });
+  const section=/—\s*ELEMENTS\s*—([\s\S]*?)(?:\n\s*—\s*[A-Z]|$)/i.exec(src);
+  if(section){
+    section[1].split('\n').forEach(line=>{
+      const m=/^\s*([A-Za-z]+)\s*:/.exec(line);
+      const el=m&&known[m[1].toLowerCase()];
+      if(el&&out[el.key]===undefined) out[el.key]=Math.max(0.35, 1-0.2*Object.keys(out).length);
+    });
+  }
+  if(!Object.keys(out).length){
+    // no ELEMENTS section: the strongest three element words across the sheet lean the dream
+    ELEMENTS.map(e=>({key:e.key, n:(src.match(new RegExp('\\b'+e.label+'\\b','gi'))||[]).length}))
+      .filter(x=>x.n>0).sort((a,b)=>b.n-a.n||(a.key<b.key?-1:1)).slice(0,3)
+      .forEach((x,i)=>{ out[x.key]=Math.max(0.35, 1-0.25*i); });
+  }
+  if(!Object.keys(out).length){ out.light=0.5; out.air=0.4; }   // an unformed character still dreams
+  return out;
+}
+function dreamCharacterEssence(sheetText){
+  const name=dreamSheetField(sheetText,'NAME');
+  const race=dreamSheetField(sheetText,'RACE');
+  const leanings=dreamElementLeanings(sheetText);
+  const id=name?name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''):'';
+  return { id, name, race, leanings, sourceHash:regionForgeHash({name, race, leanings}) };
+}
+function dreamTopLeanings(leanings){
+  return Object.keys(leanings||{}).map(key=>({key, w:Number(leanings[key])||0}))
+    .filter(x=>x.w>0).sort((a,b)=>b.w-a.w||(a.key<b.key?-1:1));
+}
+
+/* ---- derivation (pure; the Slice-50 discipline, no region anywhere) -------- */
+function dreamSeedBase(campaignName, essence){
+  return { campaign:String(campaignName||''), character:String(essence&&essence.id||''),
+    leanings:(essence&&essence.leanings)||{}, engine:DREAM_ENGINE_VERSION };
+}
+function dreamGrowthVerbs(growth){
+  const known=DREAM_VERBS.map(v=>v.id), seen={}, out=[];
+  (Array.isArray(growth)?growth:[]).forEach(v=>{ v=String(v||''); if(known.includes(v)&&!seen[v]){ seen[v]=1; out.push(v); } });
+  return out;
+}
+function dreamCellKey(x,y){ return x+','+y; }
+function dreamClampCoord(c){
+  return { x:Math.max(1, Math.min(SUBAREA_GRID_W-2, c.x)), y:Math.max(1, Math.min(SUBAREA_GRID_H-2, c.y)) };
+}
+function dreamCluster(center, seed, salt, keepAll){
+  const ring=subareaNeighborCoords(center.x, center.y);
+  const cells=[{x:center.x, y:center.y}];
+  SUBAREA_EDGES.forEach(edge=>{
+    const c=dreamClampCoord(ring[edge]);
+    if(cells.some(k=>k.x===c.x&&k.y===c.y)) return;
+    if(keepAll||subareaValue(seed, salt+'|keep|'+edge)<0.72) cells.push(c);
+  });
+  return cells;
+}
+function dreamWalk(from, edge, steps){
+  let at={x:from.x, y:from.y};
+  const out=[];
+  for(let i=0;i<steps;i++){
+    at=dreamClampCoord(subareaNeighborCoords(at.x, at.y)[edge]);
+    if(!out.some(c=>c.x===at.x&&c.y===at.y)) out.push({x:at.x, y:at.y});
+  }
+  return out;
+}
+function dreamTerrainPool(leanings){
+  const top=dreamTopLeanings(leanings);
+  const primary=DREAM_ELEMENT_TERRAIN[top[0]&&top[0].key]||['meadow','grass'];
+  const secondary=DREAM_ELEMENT_TERRAIN[top[1]&&top[1].key]||primary;
+  return { primary, secondary };
+}
+function dreamCellTerrain(pool, seed, addr){
+  const v=subareaValue(seed,'terra|'+addr);
+  if(v<0.55) return pool.primary[0];
+  if(v<0.8) return pool.primary[1]||pool.primary[0];
+  return pool.secondary[0];
+}
+function dreamDoors(label, verb){
+  const detailed={
+    move:'I walk toward '+label+', slowly, noticing how the way changes underfoot.',
+    reach:'I reach for '+label+' and shape my attention around it — texture, weight, what it wants to become.',
+    call:'I face '+label+' and call to it — my name first, then the question underneath.',
+    rest:'I settle into '+label+' and let myself be still, breath by breath.',
+  };
+  const broad={
+    move:'I drift toward '+label+' and let the way carry me.',
+    reach:'I lay one hand on '+label+' and let it answer.',
+    call:'I call out, once, and listen.',
+    rest:'I rest.',
+  };
+  return {
+    detailed:detailed[verb]||('I take in '+label+', every fine detail.'),
+    broad:broad[verb]||('I let '+label+' wash over me.'),
+  };
+}
+function dreamInteractable(id, verb, type, label, at){
+  return { id, verb, type, label, at:{x:at.x, y:at.y}, doors:dreamDoors(label, verb) };
+}
+// The starting pocket's "few things to notice" — one per verb, so the scene
+// quietly offers all four verbs of play from the first moment.
+function dreamStartInteractables(top, cells){
+  const spot=i=>cells[Math.min(i, cells.length-1)]||cells[0];
+  const lead=top[0]&&top[0].key;
+  return [
+    dreamInteractable('dream-notice-touch','reach','dream-stuff',
+      DREAM_ELEMENT_NOTICE[lead]||'a half-shaped mass of dream-stuff', spot(1)),
+    dreamInteractable('dream-notice-call','call','far-presence',
+      'a far-off presence that has not noticed you yet', spot(3)),
+    dreamInteractable('dream-notice-rest','rest','still-hollow',
+      'a hollow of stillness, shaped like rest', spot(5)),
+    dreamInteractable('dream-notice-edge','move','soft-edge',
+      'the soft edge where the near dream thins into farther dream', spot(6)),
+  ];
+}
+function dreamNicheTypeFor(top){
+  const lead=top[0]&&top[0].key;
+  if(lead==='wood'||lead==='life') return 'rooted-grove';
+  if(lead==='water'||lead==='ice') return 'seep-pool';
+  if(lead==='shadow') return 'shade-warren';
+  if(lead==='air'||lead==='lightning') return 'current-nest';
+  return 'guardian-brood';
+}
+// One pocket per verb. Placement derives from the SAME base seed per verb (never
+// from growth order), so a replayed dream is identical however the ordered list
+// was earned — the order is narrative memory, not geometry.
+function dreamApplyPocket(def, core, pool, top, put, interactables, niches){
+  const index=DREAM_VERBS.findIndex(v=>v.id===def.id);
+  const spin=Math.floor(subareaValue(core,'pocket-spin')*6);
+  const edge=SUBAREA_EDGES[(spin+index)%6];
+  const steps=3+(subareaValue(core,'pocket-dist|'+def.id)<0.5?0:1);
+  const trail=dreamWalk(DREAM_START, edge, steps);
+  const center=trail[trail.length-1]||DREAM_START;
+  const cluster=dreamCluster(center, core, 'pocket|'+def.id, false);
+  if(def.pocket==='paths'){
+    trail.forEach(c=>put(c,'path',false));
+    cluster.forEach(c=>{ const addr=dreamCellKey(c.x,c.y); put(c, dreamCellTerrain(pool, core, addr), false); });
+    interactables.push(dreamInteractable('dream-pocket-move','move','paths',
+      'paths that keep unfolding as you walk', center));
+  }else if(def.pocket==='making-space'){
+    cluster.forEach((c,i)=>put(c, i%2?'crystal':'stone', false));
+    interactables.push(dreamInteractable('dream-pocket-reach','reach','making-space',
+      'a making-space — raw dream-stuff that answers the hand', center));
+  }else if(def.pocket==='encounter'){
+    cluster.forEach(c=>{ const addr=dreamCellKey(c.x,c.y); put(c, dreamCellTerrain(pool, core, addr), false); });
+    niches.push({id:'dream-niche-encounter', type:dreamNicheTypeFor(top), cells:cluster.map(c=>dreamCellKey(c.x,c.y))});
+    interactables.push(dreamInteractable('dream-pocket-call','call','encounter',
+      'the presence you called — nearer now, waiting', center));
+  }else{
+    cluster.forEach((c,i)=>put(c, i%2?'water':'meadow', false));
+    interactables.push(dreamInteractable('dream-pocket-rest','rest','still-place',
+      'a still place that holds you gently', center));
+  }
+}
+/* The dream itself: (campaign id + character essence + growth) → one scene,
+   byte-identical for the same inputs. Subarea-SHAPED so subareaSceneSvg draws
+   it unchanged; everything outside the pockets is open dream-air. */
+function dreamScene(campaignName, essence, growth){
+  if(!essence||!essence.id) return null;
+  const base=dreamSeedBase(campaignName, essence);
+  const seed='dream-'+regionForgeHashLong(base);
+  const core='dream-core-'+regionForgeHash(base);
+  const pool=dreamTerrainPool(essence.leanings);
+  const top=dreamTopLeanings(essence.leanings);
+  const verbs=dreamGrowthVerbs(growth);
+  const solid={};
+  const put=(c, terrain, cover)=>{ solid[dreamCellKey(c.x,c.y)]={terrain, cover:!!cover}; };
+  const interactables=[];
+  const niches=[];
+  // growth pockets first, in canonical verb order; the starting pocket lands
+  // last so its heart is never overwritten (paths may still lap its rim)
+  DREAM_VERBS.filter(v=>verbs.includes(v.id)).forEach(def=>{
+    dreamApplyPocket(def, core, pool, top, put, interactables, niches);
+  });
+  const startCells=dreamCluster(DREAM_START, core, 'start', true);
+  startCells.forEach(c=>{
+    const addr=dreamCellKey(c.x,c.y);
+    put(c, dreamCellTerrain(pool, core, addr), (essence.leanings.wood||0)>0.5&&subareaValue(core,'cover|'+addr)>0.75);
+  });
+  const starts=dreamStartInteractables(top, startCells);
+  const cells=[];
+  for(let y=0;y<SUBAREA_GRID_H;y++) for(let x=0;x<SUBAREA_GRID_W;x++){
+    const hit=solid[dreamCellKey(x,y)];
+    if(hit) cells.push({x, y, terrain:hit.terrain, occupancy:'solid', steep:false, cover:!!hit.cover});
+    else cells.push({x, y, terrain:'void', occupancy:'air', steep:false, cover:false});
+  }
+  const all=starts.concat(interactables);
+  return {
+    dream:true,
+    campaign:String(campaignName||''), characterId:essence.id,
+    seed,
+    versions:[DREAM_ENGINE_VERSION],
+    grid:{width:SUBAREA_GRID_W, height:SUBAREA_GRID_H, layout:'pointy-top-odd-r'},
+    parent:{terrain:'dream-stuff', occupancy:'solid'},
+    elements:{ambientBand:'dream', weights:(essence&&essence.leanings)||{}},
+    cells,
+    niches,
+    landmarks:all.map(it=>({id:it.id, type:it.type, label:it.label, at:it.at, adjacent:false})),
+    interactables:all,
+    rim:SUBAREA_EDGES.map(edge=>({edge, blend:'edge-of-chart', toward:''})),
+    growth:{verbs:verbs.slice(), remaining:DREAM_VERBS.filter(v=>!verbs.includes(v.id)).map(v=>v.id)},
+    sourceHash:regionForgeHash({base, verbs:DREAM_VERBS.filter(v=>verbs.includes(v.id)).map(v=>v.id)}),
+  };
+}
+// Free-typed play grows the dream too — the scene answers the verb wherever it
+// came from. Rest/call/reach are checked before move (movement words are common).
+function dreamDetectVerb(text){
+  const s=String(text||'').toLowerCase();
+  if(!s.trim()) return '';
+  if(/\b(rest|sit|lie down|sleep|breathe|settle|be still|stillness)\b/.test(s)) return 'rest';
+  if(/\b(call|speak|say|shout|whisper|sing|greet|hello|talk)\b/.test(s)) return 'call';
+  if(/\b(reach|touch|shape|grasp|take|hold|mold|mould|make|form|press)\b/.test(s)) return 'reach';
+  if(/\b(move|walk|step|go|wander|follow|approach|climb|drift|run|explore|look around)\b/.test(s)) return 'move';
+  return '';
+}
+
+/* ---- growth state: the guarded dream file ----------------------------------
+   Persistence is the ordered verb list + beings met — never the scene (deltas
+   over derivation, one scale further in). Same conflict-safe guarded path
+   discipline as the place records. */
+function dreamPath(campaignName){ return CAMP_DIR+'/'+campaignName+'/CAMPAIGN DREAM '+campaignName+'.json'; }
+function dreamTemplate(campaignName, characterId){
+  return { schema:DREAM_SCHEMA_VERSION, campaign:String(campaignName||''), characterId:String(characterId||''), verbs:[], denizens:[], arrivedAt:'' };
+}
+function assertDreamObject(value, options){
+  if(!regionIsRecord(value)) throw new Error('dream state must be a JSON object');
+  const expected=options&&options.campaign;
+  const campaign=String(value.campaign||expected||'').trim();
+  if(!campaign) throw new Error('dream state needs its campaign');
+  if(expected&&campaign!==expected) throw new Error('dream state campaign mismatch');
+  return {
+    schema:DREAM_SCHEMA_VERSION,
+    campaign,
+    characterId:String(value.characterId||''),
+    verbs:dreamGrowthVerbs(value.verbs),
+    denizens:(Array.isArray(value.denizens)?value.denizens:[]).map(placesNormalizeDenizen),
+    arrivedAt:String(value.arrivedAt||''),
+  };
+}
+function parseDream(text, campaignName, characterId){
+  const raw=String(text||'').trim();
+  if(!raw) return dreamTemplate(campaignName, characterId);
+  let parsed;
+  try{ parsed=JSON.parse(raw); }catch(error){ throw new Error('Malformed dream state JSON: '+String(error&&error.message||error)); }
+  return assertDreamObject(parsed,{campaign:campaignName});
+}
+function serializeDream(state){
+  return JSON.stringify(assertDreamObject(state),null,2)+'\n';
+}
+function assertDreamState(text){
+  const raw=String(text||'').trim();
+  if(!raw) return text;
+  try{
+    const v=JSON.parse(raw);
+    if(!regionIsRecord(v)||v.schema!==DREAM_SCHEMA_VERSION||!Array.isArray(v.verbs)) throw new Error('shape');
+    assertDreamObject(v);
+  }catch(error){ throw new Error('refusing to write - that file is not a dream state file'); }
+  return text;
+}
+function assertDreamWriteTarget(path, campaignName, state, currentText){
+  const valid=assertDreamObject(state,{campaign:campaignName});
+  const expected=dreamPath(campaignName);
+  if(path!==expected) throw new Error('Refusing dream write: expected '+expected+' but received '+path);
+  if(currentText!=null&&String(currentText).trim()) parseDream(currentText, campaignName);
+  return valid;
+}
+function dreamTextMatches(currentText, expectedText, campaignName){
+  const current=String(currentText||'').trim(), expected=String(expectedText||'').trim();
+  if(!current&&!expected) return true;
+  if(!current||!expected) return false;
+  return serializeDream(parseDream(current, campaignName))===serializeDream(parseDream(expected, campaignName));
+}
+
+/* ---- pure ops (state in → NEW state out) ------------------------------------ */
+function dreamIsOver(state){ return !!(state&&state.arrivedAt); }
+function dreamWithVerb(state, verb, opts){
+  const valid=assertDreamObject(state);
+  if(valid.arrivedAt) throw new Error('the dreamer has already left — the dream does not grow after arrival');
+  if(!DREAM_VERBS.some(v=>v.id===verb)) throw new Error('unknown dream verb: '+verb);
+  if(valid.verbs.includes(verb)) return valid;   // each verb unfurls exactly once
+  return {...valid, verbs:valid.verbs.concat([verb])};
+}
+function dreamWithDenizen(state, denizen, opts){
+  const valid=assertDreamObject(state);
+  const clean=placesNormalizeDenizen({...denizen, instantiatedAt:(denizen&&denizen.instantiatedAt)||placesNow(opts)});
+  if(valid.denizens.some(existing=>existing.id===clean.id)) throw new Error('that being already lives in this dream: '+clean.id);
+  return {...valid, denizens:valid.denizens.concat([clean])};
+}
+function dreamDenizenRemember(state, denizenId, memory, opts){
+  const valid=assertDreamObject(state);
+  if(!valid.denizens.some(d=>d.id===String(denizenId))) throw new Error('no '+denizenId+' in this dream');
+  return {...valid, denizens:valid.denizens.map(d=>d.id===String(denizenId)
+    ?{...d, disposition:d.disposition.concat([placesNormalizeMemory({...memory, at:(memory&&memory.at)||placesNow(opts)})])}
+    :d)};
+}
+function dreamWithArrival(state, opts){
+  const valid=assertDreamObject(state);
+  if(valid.arrivedAt) throw new Error('arrival already recorded — the dream is over');
+  return {...valid, arrivedAt:placesNow(opts)};
+}
+
+/* ---- I/O — the conflict-safe guarded path ----------------------------------- */
+async function dreamLoad(cfg, campaignName, characterId){
+  const path=dreamPath(campaignName);
+  let read=null;
+  try{ read=await ghGetText(cfg, path); }catch(error){ read=null; }
+  let state=parseDream(read?read.text:'', campaignName, characterId);
+  // same character, same dream — a DIFFERENT character dreams anew
+  if(characterId&&state.characterId&&state.characterId!==String(characterId)) state=dreamTemplate(campaignName, characterId);
+  else if(characterId&&!state.characterId) state={...state, characterId:String(characterId)};
+  return { path, text:read?read.text:'', state };
+}
+async function dreamWrite(cfg, campaignName, path, nextState, expectedText, message){
+  const valid=assertDreamWriteTarget(path, campaignName, nextState, expectedText);
+  const nextText=serializeDream(valid);
+  await ghUpdate(cfg, path, current=>{
+    assertDreamWriteTarget(path, campaignName, valid, current);
+    if(expectedText!=null&&!dreamTextMatches(current, expectedText, campaignName)) throw new Error('The dream state changed before the write could land; reload and try again.');
+    return nextText;
+  }, message, {create:true, guard:assertDreamState});
+  return nextText;
+}
+// Arrival lands in the campaign through the EXISTING guarded ledger writer —
+// never a canon file, never the tracker directly (state stays review-only).
+async function dreamRecordArrival(cfg, files, essence){
+  if(!files||!files.ledger) throw new Error('no campaign ledger to record the arrival');
+  await ghUpdate(cfg, files.ledger, t=>addLedgerEntry(t,{
+    id:ledgerNextId(parseLedger(t)), date:new Date().toISOString().slice(0,10),
+    phase:'arrival', label:'MOMENT',
+    body:((essence&&essence.name)||'The dreamer')+' chose to leave the dream — leaving is arriving. The Session Zero dream is over; the story begins.',
+    status:'CAMPAIGN-ONLY',
+  }),'Arrival — the dreamer leaves the dream',{guard:assertLedger});
+}
+
+/* ---- what the GM sees, and the table card ----------------------------------- */
+function dreamContextBlock(scene, state){
+  if(!scene) return '';
+  const tried=scene.growth.verbs, remaining=scene.growth.remaining;
+  return [
+    'THE DREAM (Session Zero scene — mechanism, not canon):',
+    'The character is between death and arrival, inside their own dream. What the dream IS in-world is deliberately unclaimed — never state what it is; keep it felt.',
+    'Dreamscape now: '+scene.interactables.map(i=>i.label).join('; ')+'.',
+    'Growth law: the FIRST use of each core verb of play grows the dream by one pocket — '+DREAM_VERBS.map(v=>v.unfurl).join('; ')+'.',
+    'Verbs already answered: '+(tried.length?tried.join(', '):'none yet')+'. Still waiting: '+(remaining.length?remaining.join(', '):'none — the dream is fully unfurled')+'.',
+    (state&&state.denizens.length?'Beings met here (they may remember the dreamer): '+state.denizens.map(d=>(d.name||d.id)+(d.kind?' ('+d.kind+')':'')).join(', ')+'.':''),
+    'The dream ends ONLY when the dreamer chooses to leave — never end it for them, never rush them. Leaving is arriving.',
+  ].filter(Boolean).join('\n');
+}
+function dreamTableCard(scene, state){
+  if(!scene) return null;
+  return {id:'dream', label:'The Dream', items:[
+    'Session Zero — the dream between death and arrival. Leaving is arriving.',
+    'Things to notice: '+scene.interactables.map(i=>i.label).join(' · '),
+    'Verbs answered: '+(scene.growth.verbs.length?scene.growth.verbs.join(', '):'none yet')+' · still waiting: '+(scene.growth.remaining.join(', ')||'none'),
+    (state&&state.denizens.length?'Met here: '+state.denizens.map(d=>d.name||d.id).join(', '):''),
+  ].filter(Boolean), empty:''};
+}
+
+/* ---- the Play table's gate + panel ------------------------------------------ */
+// The dream mounts only when a REAL character exists (the Session Zero meta got
+// far enough to have a name), the campaign hasn't started, and arrival hasn't
+// been recorded. Reads the character sheet + the dream file — no region files.
+async function campPlayDreamSetup(cfg, name, files, parsed, threads){
+  if(!files||!files.character) return null;
+  if(!campPlayIsUnstarted(parsed, threads)) return null;
+  const sheet=await ghGetText(cfg, files.character);
+  if(!sheet) return null;
+  const essence=dreamCharacterEssence(sheet.text);
+  if(!essence.id) return null;   // the meta isn't done — the GM runs Session Zero first
+  const loaded=await dreamLoad(cfg, name, essence.id);
+  if(dreamIsOver(loaded.state)) return null;
+  return { essence, state:loaded.state, path:loaded.path, text:loaded.text,
+    scene:dreamScene(name, essence, loaded.state.verbs) };
+}
+// The live mount: renders the scene, offers each interactable's two doors,
+// grows on first verbs (guarded write, then re-derive + redraw), remembers who
+// answered the call, and holds the one explicit exit. ctx={cfg, files,
+// campaignName, dream, runTurn, onChange}.
+function dreamPanel(ctx){
+  const dream=ctx.dream;
+  const host=h('section',{class:'play-dream glass'});
+  const status=h('span',{class:'hint play-dream-status', role:'status'},'');
+  async function persist(next, message){
+    const written=await dreamWrite(ctx.cfg, ctx.campaignName, dream.path, next, dream.text, message);
+    dream.state=next; dream.text=written;
+  }
+  async function useVerb(verb){
+    if(!verb||dreamIsOver(dream.state)||dream.state.verbs.includes(verb)) return false;
+    const next=dreamWithVerb(dream.state, verb);
+    await persist(next, 'The dream grows — first '+verb);
+    dream.scene=dreamScene(ctx.campaignName, dream.essence, next.verbs);
+    draw();
+    if(ctx.onChange) ctx.onChange();
+    return true;
+  }
+  function noteText(text){
+    const verb=dreamDetectVerb(text);
+    if(!verb) return;
+    useVerb(verb).catch(error=>{ status.textContent=String(error&&error.message||error); });
+  }
+  async function openDoor(interactable, grainId){
+    try{ await useVerb(interactable.verb); }
+    catch(error){ status.textContent=String(error&&error.message||error); return; }
+    const doorText=interactable.doors[grainId]||interactable.doors.broad;
+    if(typeof ctx.runTurn==='function') ctx.runTurn(doorText);
+  }
+  function denizenFold(scene, state){
+    if(!state.verbs.includes('call')) return null;
+    const nameIn=h('input',{placeholder:'their name (as the dream gave it)'});
+    const kindIn=h('input',{placeholder:'what they seem to be'});
+    const addBtn=h('button',{class:'navbtn', type:'button'},'Remember them');
+    addBtn.onclick=async()=>{
+      const dname=nameIn.value.trim();
+      if(!dname){ status.textContent='The dream needs their name first.'; return; }
+      addBtn.disabled=true;
+      try{
+        const encounter=scene.interactables.find(i=>i.type==='encounter')||scene.interactables.find(i=>i.verb==='call');
+        const next=dreamWithDenizen(dream.state,{
+          id:'dream-'+dname.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''),
+          name:dname, kind:kindIn.value.trim(),
+          nicheId:(scene.niches[0]&&scene.niches[0].id)||'',
+          homeCell:encounter?encounter.at.x+','+encounter.at.y:'',
+          disposition:[{note:'met the dreamer inside the dream', toward:dream.essence.name||dream.essence.id}],
+        });
+        await persist(next,'A being of the dream is remembered');
+        draw();
+        if(ctx.onChange) ctx.onChange();
+      }catch(error){ status.textContent=String(error&&error.message||error); addBtn.disabled=false; }
+    };
+    return h('details',{class:'play-dream-denizens', open:state.denizens.length?true:null},
+      h('summary',null,'Who answered the call'),
+      state.denizens.length
+        ?h('ul',null,...state.denizens.map(d=>h('li',null,(d.name||d.id)+(d.kind?' — '+d.kind:'')
+          +(d.disposition.length?' · remembers '+d.disposition.length+' moment'+(d.disposition.length===1?'':'s'):''))))
+        :h('p',{class:'hint'},'No one yet — the presence keeps its distance until it is called by someone with a name.'),
+      h('div',{class:'toolrow'}, nameIn, kindIn, addBtn));
+  }
+  function draw(){
+    const scene=dream.scene, state=dream.state;
+    const frame=h('div',{class:'region-map subarea-peek-frame cosmic-dream'},
+      subareaSceneSvg(scene, {denizens:state.denizens}, {}));
+    const verbChips=h('div',{class:'toolrow play-dream-verbs'}, ...DREAM_VERBS.map(v=>
+      h('span',{class:'chip '+(state.verbs.includes(v.id)?'on':'dash'), title:v.unfurl},
+        v.label+(state.verbs.includes(v.id)?' ✓':''))));
+    const things=h('div',{class:'play-dream-things'}, ...scene.interactables.map(it=>
+      h('div',{class:'play-dream-thing'},
+        h('b',null,it.label),
+        h('div',{class:'toolrow'}, ...DREAM_DOOR_GRAINS.map(grain=>
+          h('button',{class:'navbtn ghost', type:'button', title:grain.hint, onclick:()=>openDoor(it, grain.id)}, grain.label))))));
+    const wakeBtn=h('button',{class:'navbtn primary', type:'button'},'Leave the dream — arrive');
+    wakeBtn.onclick=async()=>{
+      if(typeof confirm==='function'&&!confirm('Leave the dream? Leaving is arriving — the Session Zero dream ends and the story begins. This is recorded to the campaign.')) return;
+      wakeBtn.disabled=true; status.textContent='Waking…';
+      try{
+        const next=dreamWithArrival(dream.state);
+        await persist(next,'Arrival — the dreamer leaves the dream');
+        await dreamRecordArrival(ctx.cfg, ctx.files, dream.essence);
+        status.textContent='';
+        if(typeof ctx.runTurn==='function') ctx.runTurn('I choose to leave the dream. I wake — I arrive.');
+        host.replaceChildren(
+          h('div',{class:'region-readonly'},
+            h('b',null,'The Dream · arrived'),
+            h('span',null,'Leaving was arriving — Session Zero is complete. The table takes it from here.')),
+          status);
+        if(ctx.onChange) ctx.onChange({arrived:true});
+      }catch(error){ status.textContent=String(error&&error.message||error); wakeBtn.disabled=false; }
+    };
+    host.replaceChildren(...[
+      h('div',{class:'region-readonly'},
+        h('b',null,'The Dream · Session Zero'),
+        h('span',null,'Personal and replayable — the same character always dreams the same dream. It grows as you try the verbs of play, and it ends only when you choose to leave. Leaving is arriving.')),
+      frame, verbChips, things, denizenFold(scene, state),
+      h('div',{class:'toolrow play-dream-wake'}, wakeBtn, status),
+    ].filter(Boolean));
+  }
+  draw();
+  return { node:host, noteText };
+}
+/* ========================================================================== *
    CAMPAIGN PLAY — the in-app Game Master.
 
    A turn-by-turn chat that drops the GM persona into a campaign with its LIVE
@@ -19002,6 +19559,7 @@ function campPlayBuildSystem(opts){
     personaSystem,
     'CAMPAIGN PLAY MODE:\n'+mode.label+'\n'+mode.prompt,
     sessionBoot?CAMP_PLAY_SESSION_BOOT:'',
+    String(opts.dreamContext||''),   // Slice 53: the live dream scene rides the GM context
     (opts.draftResolution||mode.draftResolution)?CAMP_PLAY_DRAFT_3D6_CONTEXT:'',
     'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(opts.campaignName||'', opts.parsed||{}, opts.threads||{}),
     CAMP_PLAY_TABLE_PROTOCOL,
@@ -19019,7 +19577,7 @@ function campPlayShortText(text, max){
   return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
 }
 
-function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges){
+function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges, dreamCard){
   const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
   const clocks=campPlayCleanList(sections.clocks);
   const people=campPlayCleanList(sections.people);
@@ -19029,7 +19587,7 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
   const castList=(Array.isArray(cast)?cast:[]).map(c=>[c.name,c.status,c.relationship].filter(Boolean).join(' - ')).filter(Boolean);
   const ids=(Array.isArray(groundingIds)?groundingIds:[]).filter(Boolean);
   const worldItems=(Array.isArray(worldChanges)?worldChanges:[]).map(item=>String(item||'').trim()).filter(Boolean);
-  return [
+  const cards=[
     {id:'scene', label:'Scene', items:[
       t.scene&&('Scene: '+t.scene),
       t.location&&('Location: '+t.location),
@@ -19050,6 +19608,8 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
     {id:'state', label:'State Review', items:pendingProposal?[campPlayProposalSummary(pendingProposal)]:['No pending state proposal.'], empty:''},
     {id:'draft3d6', label:'Draft 3d6', items:['Optional SYS-002 playtest lens. Draft / campaign-only, not promoted canon. Render mechanics as in-world fiction.'], empty:''},
   ];
+  if(dreamCard) cards.unshift(dreamCard);   // Session Zero's dream takes the head of the table
+  return cards;
 }
 
 // Remove every ```state``` block from a reply, leaving the narration. A misbehaving model
@@ -19174,6 +19734,7 @@ function campPlayMountTable(host, s){
   host.replaceChildren(
     h('div',{class:'play-shell'},
       s.commandCard,
+      s.dreamPanel||null,   // Slice 53: Session Zero's dream sits at the table until arrival
       h('div',{class:'play-table-stage table-only'}, s.toolsWrap)
     )
   );
@@ -19204,6 +19765,7 @@ async function campPlayBuildSession(name, profiles){
   let files, parsed={}, runtime={}, threads={}, messages=[], logLoadFailed=false;
   let cast=[], groundingIds=[], groundingUsedPrivateBackend=false, groundingTruncated=0, pendingProposal=null, worldChanges=[];
   let warmPrediction=null;   // Slice 45: {text, ids} — the quiet typing-time canon prediction
+  let dream=null, dreamUi=null;   // Slice 53: Session Zero's dream, when the character hasn't arrived yet
   try{
     files=await campaignFiles(cfg,name);
     if(!files.tracker){ return {error:'No state tracker for '+name+' yet — start play once the campaign is scaffolded.'}; }
@@ -19214,6 +19776,8 @@ async function campPlayBuildSession(name, profiles){
     const log=await campPlayLoadLog(cfg, name);
     messages=log.messages; logLoadFailed=log.failed;
     if(typeof worldCampaignTableChanges==='function') worldChanges=await worldCampaignTableChanges(cfg,name,8).catch(()=>[]);
+    // a dream that can't load never blocks the table — Session Zero just runs chat-only
+    try{ dream=typeof campPlayDreamSetup==='function'?await campPlayDreamSetup(cfg, name, files, parsed, threads):null; }catch(e){ dream=null; }
   }catch(e){ return {error:'Error: '+e.message}; }
 
   const defaultEngine=assistantDefaultEngine(profiles);
@@ -19409,10 +19973,11 @@ async function campPlayBuildSession(name, profiles){
     modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
-    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges);
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges,
+      dream?dreamTableCard(dream.scene, dream.state):null);
     tablePanel.replaceChildren(...cards.map(card=>{
       const list=(card.items||[]).filter(Boolean);
-      return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'?true:null},
+      return h('details',{class:'play-tool-card', open:card.id==='scene'||card.id==='threads'||card.id==='state'||card.id==='dream'?true:null},
         h('summary',null,card.label),
         list.length?h('ul',null,...list.slice(0,8).map(item=>h('li',null,item))):h('p',{class:'hint'},card.empty||'No notes yet.')
       );
@@ -19455,6 +20020,7 @@ async function campPlayBuildSession(name, profiles){
     const turnGroundingMode=campPlayGroundingMode(persona,turnGroundingOverride);
     const mode=campPlayModeById(forceModeId || (activeMode==='auto'?campPlayDetectMode(userText):activeMode));
     busy=true; sendBtn.disabled=true; sceneBtn.disabled=true;
+    if(dreamUi) dreamUi.noteText(userText);   // free-typed verbs grow the dream too
     messages.push({role:'user', content:userText, modeLabel:mode.label});
     const gm={role:'assistant', content:'', proposal:null};
     messages.push(gm); drawTranscript();
@@ -19469,7 +20035,8 @@ async function campPlayBuildSession(name, profiles){
       parsed,
       threads,
       groundingSystem,
-      groundingMode:turnGroundingMode
+      groundingMode:turnGroundingMode,
+      dreamContext:dream?dreamContextBlock(dream.scene, dream.state):''
     });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
     const chat=Object.assign({ system, messages:history, model:modelSel.value||campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
@@ -19493,6 +20060,11 @@ async function campPlayBuildSession(name, profiles){
   lensToggle.onclick=()=>setLensCollapsed(!lensCollapsed);
   sendBtn.onclick=()=>{ const v=input.value.trim(); if(!v){ status.textContent='Type what you do first.'; return; } input.value=''; updateModeHelp(); runTurn(v); };
   sceneBtn.onclick=()=>{ runTurn('Begin the session: briefly recap where we are from the live state, then set the immediate scene and give me my options.','scene'); };
+
+  // Slice 53: the dream's live mount — grows on first verbs, exits only by choice;
+  // once arrival lands the panel retires itself and the table card goes with it.
+  if(dream) dreamUi=dreamPanel({cfg, files, campaignName:name, dream, runTurn,
+    onChange:done=>{ if(done&&done.arrived){ dream=null; dreamUi=null; } drawTools(); }});
 
   applyLensCollapse();
   drawModeRow(); drawTools(); drawTranscript();
@@ -19520,7 +20092,7 @@ async function campPlayBuildSession(name, profiles){
     ),
     tablePanel
   );
-  return { name, chatNode:chatStack, commandCard, toolsWrap };
+  return { name, chatNode:chatStack, commandCard, toolsWrap, dreamPanel:dreamUi?dreamUi.node:null };
 }
 
 // The one campaign write with no content guard until now: the transform ignores the
