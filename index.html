@@ -1045,6 +1045,20 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
 .subarea-rim-band{ pointer-events:none; }
 @media (max-width:700px){ .region-subarea-peek .toolrow{ flex-wrap:wrap; } }
 
+/* Slice 55 - travel tiers 1: the mid-tier sea + the travel clock */
+.region-travel-stage{ display:flex; flex-direction:column; gap:6px; }
+.region-travel-frame{ border-radius:10px; overflow:hidden; }
+.region-travel-frame .region-travel-svg{ display:block; width:100%; height:auto; max-height:64vh; }
+.region-travel-svg text{ font-size:.5px; }
+.region-travel-label{ fill:rgba(50,40,25,.85); paint-order:stroke; stroke:rgba(255,250,235,.7); stroke-width:.1; }
+.region-travel-hex{ stroke:rgba(60,50,30,.28); stroke-width:.045; }
+.region-travel-atmosphere circle{ fill:#f4efe0; }
+.region-travel-ark-bow{ fill:rgba(120,90,40,.7); stroke:rgba(60,45,20,.75); stroke-width:.06; }
+.region-travel-ark-stern{ fill:rgba(120,90,40,.4); stroke:rgba(60,45,20,.5); stroke-width:.05; }
+.region-travel-sail,.region-travel-pan{ flex-wrap:wrap; gap:6px; }
+.region-travel-clock{ margin:2px 0 0; }
+@media (max-width:700px){ .region-travel-sail .navbtn{ flex:1 1 30%; } }
+
 /* Slice 54 - enter the tile: the live sub-area mount (Play's write path) */
 .region-subarea-live{ margin-top:10px; padding:12px; border-radius:12px; display:flex; flex-direction:column; gap:8px; }
 .subarea-live-stage{ display:flex; flex-direction:column; gap:8px; }
@@ -19248,6 +19262,411 @@ function regionWorldHubPanel(entry, cfg, campaignName, refresh){
   loadHistory();
   return section;
 }
+/* ========================================================================== *
+   TRAVEL TIERS 1 (Slice 55 / SUBSCALE-001) — the mid-tier sea + the clock.
+
+   A neighborhood-scale pointy-top axial hex map where the campaign's accepted
+   regions sit at TRUE scale — each projects a deterministic footprint of hexes
+   derived from its own terrain extents + features (stable for a given region +
+   generator version; islands/Arkborne span 1+ hexes, never a fixed token).
+   Everything unforged is HAZE: cosmic tint + atmosphere and NOTHING else —
+   Region Forge stays the only generator, and the chart is always a slice with
+   trailing edges (the sea out-scales it; the viewport scrolls freely past the
+   charted edge, never clipped).
+
+   The TRAVEL CLOCK makes journeys age the world: each hex transit ticks a
+   per-campaign counter by a tier weight (relative ordering is law — high ≫
+   mid ≫ sub-area; the weights are game-phase constants, never shown as
+   durations: no travel-time numbers anywhere, "long" stays character). Every
+   TRAVEL_TICKS_PER_WORLD_TURN ticks the clock runs `worldTurnAdvance` for the
+   campaign's regions with the 'travel' trigger — which by construction applies
+   MINORS ONLY; majors queue for the Slice-42/43 review, never auto-fired.
+   Transit rolls seed from (campaign save seed + cell + world-turn + leg
+   ordinal): reloading never rerolls. Slice 56 spends these rolls as event
+   cards; here they only mark a leg as quiet or stirred.
+ * ========================================================================== */
+const TRAVEL_SCHEMA_VERSION=1;
+const TRAVEL_ENGINE_VERSION='1.0.0';
+// Tier weights — game-phase pacing constants. RELATIVE ORDERING IS LAW:
+// a high-tier hex is a haul, a mid hex a passage, a sub-area step barely time.
+const TRAVEL_TICK_WEIGHTS={ high:6, mid:3, subarea:1 };
+// How many clock ticks quietly age the world by one minor-only turn.
+const TRAVEL_TICKS_PER_WORLD_TURN=12;
+// Mid-tier scale: roughly this many local terrain cells per mid hex.
+const TRAVEL_MID_SCALE_CELLS=6;
+const TRAVEL_STIRRED_THRESHOLD=0.8;   // Slice 56 spends this; v1 only marks the leg
+const TRAVEL_LOG_LIMIT=12;
+// Pointy-top axial neighbors, clockwise from east.
+const TRAVEL_DIRS=[
+  {id:'e',  label:'E',  q:1,  r:0},
+  {id:'se', label:'SE', q:0,  r:1},
+  {id:'sw', label:'SW', q:-1, r:1},
+  {id:'w',  label:'W',  q:-1, r:0},
+  {id:'nw', label:'NW', q:0,  r:-1},
+  {id:'ne', label:'NE', q:1,  r:-1},
+];
+
+function travelHexKey(q,r){ return q+','+r; }
+// Same hex metric as the region maps (unit pointy-top, 0.75 row pitch).
+function travelHexCenter(q,r){
+  return { cx:regionMapRound((Number(q)||0)+(Number(r)||0)/2), cy:regionMapRound((Number(r)||0)*0.75) };
+}
+function travelValue(seed,key){ return regionForgePrng(String(seed)+'|'+key)(); }
+
+/* ---- footprints: a region at true mid-tier scale ---------------------------- */
+function travelRegionExtents(region){
+  let width=0, height=0;
+  (Array.isArray(region&&region.localLayers)?region.localLayers:[]).forEach(layer=>{
+    const grid=layer&&regionTerrainGrid(region, layer.id);
+    if(!grid) return;
+    width=Math.max(width, grid.width); height=Math.max(height, grid.height);
+  });
+  return { width, height };
+}
+function travelRegionTone(region){
+  let best=null, counts={};
+  (Array.isArray(region&&region.localLayers)?region.localLayers:[]).forEach(layer=>{
+    const grid=regionTerrainGrid(region, layer.id);
+    if(!grid) return;
+    grid.cells.forEach(cell=>{
+      if(cell.occupancy==='air') return;
+      const key=String(cell.value||'');
+      counts[key]=(counts[key]||0)+1;
+      if(!best||counts[key]>counts[best]) best=key;
+    });
+  });
+  return regionCellColor(best||'water');
+}
+// Deterministic footprint: an organic blob sized by the region's own terrain
+// extents (one mid hex ≈ TRAVEL_MID_SCALE_CELLS local cells), with one spur per
+// feature. Stable for a given region + generator version — hash-addressed
+// per-hex, never a shared sequence.
+function travelRegionFootprint(region){
+  const extents=travelRegionExtents(region);
+  const seed='travel-fp-'+regionForgeHash({
+    regionId:String(region&&region.id||''),
+    seed:String(region&&region.metadata&&region.metadata.seed||''),
+    extents,
+    versions:[REGION_FORGE_GENERATOR_VERSION, TRAVEL_ENGINE_VERSION],
+  });
+  const a=Math.max(1, Math.round(extents.width/TRAVEL_MID_SCALE_CELLS));
+  const b=Math.max(1, Math.round(extents.height/TRAVEL_MID_SCALE_CELLS));
+  const hexes=[];
+  for(let r=-b;r<=b;r++) for(let q=-a-Math.ceil(b/2);q<=a+Math.ceil(b/2);q++){
+    const c=travelHexCenter(q,r);
+    const fit=(c.cx*c.cx)/(a*a||1)+(c.cy*c.cy)/((b*0.75)*(b*0.75)||1);
+    const jitter=(travelValue(seed,'edge|'+travelHexKey(q,r))-0.5)*0.35;
+    if(fit<=1+jitter) hexes.push({q,r});
+  }
+  if(!hexes.length) hexes.push({q:0,r:0});
+  // features pull one spur hex each off the rim — landmarks tug the coastline
+  const taken={}; hexes.forEach(hx=>{ taken[travelHexKey(hx.q,hx.r)]=true; });
+  (Array.isArray(region&&region.features)?region.features:[]).map(f=>String(f&&f.id||''))
+    .filter(Boolean).sort().slice(0,4).forEach(fid=>{
+      const base=hexes[Math.floor(travelValue(seed,'spur-base|'+fid)*hexes.length)]||hexes[0];
+      const dir=TRAVEL_DIRS[Math.floor(travelValue(seed,'spur-dir|'+fid)*TRAVEL_DIRS.length)%TRAVEL_DIRS.length];
+      const spur={q:base.q+dir.q, r:base.r+dir.r};
+      const key=travelHexKey(spur.q,spur.r);
+      if(!taken[key]){ taken[key]=true; hexes.push(spur); }
+    });
+  hexes.sort((x,y)=>x.r-y.r||x.q-y.q);
+  const radius=hexes.reduce((max,hx)=>{ const c=travelHexCenter(hx.q,hx.r); return Math.max(max, Math.hypot(c.cx,c.cy)); },0)+0.5;
+  return { regionId:String(region&&region.id||''), title:String(region&&region.title||region&&region.id||'region'),
+    tone:travelRegionTone(region), hexes, radius };
+}
+/* Chart layout: the campaign's accepted regions on one shared plane. No stored
+   inter-region geometry exists yet — the overworld "layout" IS the atlas — so
+   placement derives deterministically from the sorted region identities: first
+   region anchors the chart, each next steps outward on a hashed bearing until
+   clear. Same regions, same chart, every load. */
+function travelChartLayout(regions){
+  const prints=(Array.isArray(regions)?regions:[]).filter(r=>r&&r.id).slice()
+    .sort((x,y)=>String(x.id)<String(y.id)?-1:1).map(travelRegionFootprint);
+  const placed=[], occupied={};
+  prints.forEach((print,index)=>{
+    let anchor={q:0,r:0};
+    if(index){
+      const seed='travel-place-'+print.regionId;
+      const dir=TRAVEL_DIRS[Math.floor(travelValue(seed,'bearing')*TRAVEL_DIRS.length)%TRAVEL_DIRS.length];
+      const prev=placed[index-1];
+      let dist=Math.ceil(prev.radius+print.radius+2);
+      for(let guard=0;guard<60;guard++,dist++){
+        anchor={q:prev.anchor.q+dir.q*dist, r:prev.anchor.r+dir.r*dist};
+        const clash=print.hexes.some(hx=>occupied[travelHexKey(anchor.q+hx.q, anchor.r+hx.r)]);
+        if(!clash) break;
+      }
+    }
+    const hexes=print.hexes.map(hx=>({q:anchor.q+hx.q, r:anchor.r+hx.r}));
+    hexes.forEach(hx=>{ occupied[travelHexKey(hx.q,hx.r)]=print.regionId; });
+    placed.push({...print, anchor, hexes});
+  });
+  return placed;
+}
+function travelChartIndex(layout){
+  const index={};
+  (layout||[]).forEach(print=>print.hexes.forEach(hx=>{ index[travelHexKey(hx.q,hx.r)]=print.regionId; }));
+  return index;
+}
+/* Beyond the charted edge there is ONLY haze: tint + atmosphere. No terrain,
+   no features, no invented anything — what the overworld doesn't know, the
+   mid tier doesn't show. (Key set is test-enforced.) */
+function travelHazeAt(q,r){
+  return { q:Number(q)||0, r:Number(r)||0, haze:true,
+    tint:regionMapCosmicTint('middle'),
+    atmosphere:regionMapRound(0.25+travelValue('travel-haze','at|'+travelHexKey(q,r))*0.5) };
+}
+// Free scroll is law: the viewport may drift past every charted bound — the
+// sea visibly out-scales the chart, so panning is NEVER clamped.
+function travelViewportPan(viewport, dx, dy){
+  const v=viewport||{};
+  return { scale:Number.isFinite(v.scale)&&v.scale>0?v.scale:1,
+    panX:(Number.isFinite(v.panX)?v.panX:0)+(Number(dx)||0),
+    panY:(Number.isFinite(v.panY)?v.panY:0)+(Number(dy)||0) };
+}
+
+/* ---- the clock (pure parts) -------------------------------------------------- */
+function travelTickWeight(tier){
+  if(!Object.prototype.hasOwnProperty.call(TRAVEL_TICK_WEIGHTS, tier)) throw new Error('unknown travel tier: '+tier);
+  return TRAVEL_TICK_WEIGHTS[tier];
+}
+function travelWorldTurnEpoch(ticks){ return Math.floor(Math.max(0, Number(ticks)||0)/TRAVEL_TICKS_PER_WORLD_TURN); }
+function travelWorldTurnsDue(state){
+  const valid=assertTravelObject(state);
+  return Math.max(0, travelWorldTurnEpoch(valid.ticks)-valid.worldTurnsFired);
+}
+// The transit roll: (campaign save seed + cell + world-turn + leg ordinal) →
+// the same leg always rolls the same — reloading never rerolls history.
+function travelTransitRoll(campaignName, hex, worldTurn, legOrdinal){
+  const value=regionForgePrng('travel-roll-'+regionForgeHashLong({
+    save:String(campaignName||''), cell:travelHexKey(hex&&hex.q||0, hex&&hex.r||0),
+    worldTurn:Number(worldTurn)||0, leg:Number(legOrdinal)||0, engine:TRAVEL_ENGINE_VERSION,
+  }))();
+  return { value:regionMapRound(value,4), stirred:value>=TRAVEL_STIRRED_THRESHOLD };
+}
+
+/* ---- travel state: the guarded campaign file --------------------------------- */
+function travelPath(campaignName){ return CAMP_DIR+'/'+campaignName+'/CAMPAIGN TRAVEL '+campaignName+'.json'; }
+function travelTemplate(campaignName){
+  return { schema:TRAVEL_SCHEMA_VERSION, campaign:String(campaignName||''), position:{q:0,r:0},
+    ticks:0, legs:0, worldTurnsFired:0, log:[] };
+}
+function travelNormalizeLog(entry){
+  if(!regionIsRecord(entry)) throw new Error('a travel log entry must be an object');
+  return { leg:Number(entry.leg)||0, from:String(entry.from||''), to:String(entry.to||''),
+    dir:String(entry.dir||''), stirred:entry.stirred===true };
+}
+function assertTravelObject(value, options){
+  if(!regionIsRecord(value)) throw new Error('travel state must be a JSON object');
+  const expected=options&&options.campaign;
+  const campaign=String(value.campaign||expected||'').trim();
+  if(!campaign) throw new Error('travel state needs its campaign');
+  if(expected&&campaign!==expected) throw new Error('travel state campaign mismatch');
+  const position=regionIsRecord(value.position)?value.position:{};
+  return {
+    schema:TRAVEL_SCHEMA_VERSION,
+    campaign,
+    position:{ q:Number.isInteger(position.q)?position.q:0, r:Number.isInteger(position.r)?position.r:0 },
+    ticks:Math.max(0, Number(value.ticks)||0),
+    legs:Math.max(0, Number(value.legs)||0),
+    worldTurnsFired:Math.max(0, Number(value.worldTurnsFired)||0),
+    log:(Array.isArray(value.log)?value.log:[]).map(travelNormalizeLog).slice(-TRAVEL_LOG_LIMIT),
+  };
+}
+function parseTravel(text, campaignName){
+  const raw=String(text||'').trim();
+  if(!raw) return travelTemplate(campaignName);
+  let parsed;
+  try{ parsed=JSON.parse(raw); }catch(error){ throw new Error('Malformed travel state JSON: '+String(error&&error.message||error)); }
+  return assertTravelObject(parsed,{campaign:campaignName});
+}
+function serializeTravel(state){ return JSON.stringify(assertTravelObject(state),null,2)+'\n'; }
+function assertTravelState(text){
+  const raw=String(text||'').trim();
+  if(!raw) return text;
+  try{
+    const v=JSON.parse(raw);
+    if(!regionIsRecord(v)||v.schema!==TRAVEL_SCHEMA_VERSION||!regionIsRecord(v.position)) throw new Error('shape');
+    assertTravelObject(v);
+  }catch(error){ throw new Error('refusing to write - that file is not a travel state file'); }
+  return text;
+}
+function assertTravelWriteTarget(path, campaignName, state, currentText){
+  const valid=assertTravelObject(state,{campaign:campaignName});
+  const expected=travelPath(campaignName);
+  if(path!==expected) throw new Error('Refusing travel write: expected '+expected+' but received '+path);
+  if(currentText!=null&&String(currentText).trim()) parseTravel(currentText, campaignName);
+  return valid;
+}
+function travelTextMatches(currentText, expectedText, campaignName){
+  const current=String(currentText||'').trim(), expected=String(expectedText||'').trim();
+  if(!current&&!expected) return true;
+  if(!current||!expected) return false;
+  return serializeTravel(parseTravel(current, campaignName))===serializeTravel(parseTravel(expected, campaignName));
+}
+// One mid-tier leg: move one hex, tick the clock by the MID weight, remember
+// whether the crossing stirred. Pure — state in, NEW state out.
+function travelWithTransit(state, dirId, roll){
+  const valid=assertTravelObject(state);
+  const dir=TRAVEL_DIRS.find(d=>d.id===dirId);
+  if(!dir) throw new Error('unknown travel direction: '+dirId);
+  const from=valid.position, to={q:from.q+dir.q, r:from.r+dir.r};
+  return {
+    ...valid,
+    position:to,
+    ticks:valid.ticks+travelTickWeight('mid'),
+    legs:valid.legs+1,
+    log:valid.log.concat([travelNormalizeLog({ leg:valid.legs+1, from:travelHexKey(from.q,from.r),
+      to:travelHexKey(to.q,to.r), dir:dir.id, stirred:!!(roll&&roll.stirred) })]).slice(-TRAVEL_LOG_LIMIT),
+  };
+}
+function travelWithWorldTurns(state, fired){
+  const valid=assertTravelObject(state);
+  return {...valid, worldTurnsFired:valid.worldTurnsFired+Math.max(0, Number(fired)||0)};
+}
+
+/* ---- I/O — the conflict-safe guarded path ------------------------------------ */
+async function travelLoad(cfg, campaignName){
+  const path=travelPath(campaignName);
+  let read=null;
+  try{ read=await ghGetText(cfg, path); }catch(error){ read=null; }
+  return { path, text:read?read.text:'', state:parseTravel(read?read.text:'', campaignName) };
+}
+async function travelWrite(cfg, campaignName, path, nextState, expectedText, message){
+  const valid=assertTravelWriteTarget(path, campaignName, nextState, expectedText);
+  const nextText=serializeTravel(valid);
+  await ghUpdate(cfg, path, current=>{
+    assertTravelWriteTarget(path, campaignName, valid, current);
+    if(expectedText!=null&&!travelTextMatches(current, expectedText, campaignName)) throw new Error('Travel state changed before the write could land; reload and try again.');
+    return nextText;
+  }, message, {create:true, guard:assertTravelState});
+  return nextText;
+}
+// The clock's due turns age the world through worldTurnAdvance ONLY — the
+// engine applies minors and queues majors for the Slice-42/43 review; travel
+// can never auto-fire a major, by construction.
+async function travelAdvanceWorld(cfg, campaignName, regionIds, turnsDue){
+  const fired=[];
+  for(let turn=0;turn<turnsDue;turn++){
+    for(const regionId of regionIds){
+      const result=await worldTurnAdvance(cfg, campaignName, regionId, 'travel');
+      fired.push({regionId, turn:result.turn, applied:result.applied.length, pending:result.pending.length});
+    }
+  }
+  return fired;
+}
+
+/* ---- the map ------------------------------------------------------------------ */
+function travelMapSvg(layout, state, viewport){
+  const valid=assertTravelObject(state||travelTemplate('chart'));
+  const v=viewport||{};
+  const scale=Number.isFinite(v.scale)&&v.scale>0?v.scale:1;
+  const here=travelHexCenter(valid.position.q, valid.position.r);
+  const w=18/scale, hgt=13/scale;
+  const cx=here.cx+(Number.isFinite(v.panX)?v.panX:0), cy=here.cy+(Number.isFinite(v.panY)?v.panY:0);
+  const svg=regionSvg('svg',{ class:'region-travel-svg', role:'img', 'aria-label':'Mid-tier travel chart',
+    viewBox:[regionMapRound(cx-w/2), regionMapRound(cy-hgt/2), regionMapRound(w), regionMapRound(hgt)].join(' '),
+    preserveAspectRatio:'xMidYMid meet' });
+  // the sea first: haze without edges — the chart floats in it, never the reverse
+  svg.append(regionSvg('rect',{ class:'region-travel-haze', x:regionMapRound(cx-w), y:regionMapRound(cy-hgt),
+    width:regionMapRound(w*2), height:regionMapRound(hgt*2), fill:travelHazeAt(0,0).tint }));
+  const drift=regionSvg('g',{class:'region-travel-atmosphere','aria-hidden':'true'});
+  for(let i=0;i<14;i++){
+    const hz=travelHazeAt(Math.round(cx-w/2)+Math.floor(travelValue('travel-drift','x|'+i)*Math.max(1,Math.round(w))),
+      Math.round(cy-hgt/2)+Math.floor(travelValue('travel-drift','y|'+i)*Math.max(1,Math.round(hgt))));
+    const at=travelHexCenter(hz.q,hz.r);
+    drift.append(regionSvg('circle',{ cx:at.cx, cy:at.cy, r:regionMapRound(0.12+hz.atmosphere*0.25), opacity:regionMapRound(hz.atmosphere*0.3) }));
+  }
+  svg.append(drift);
+  const hexPath=regionHexPath();
+  (layout||[]).forEach(print=>{
+    const g=regionSvg('g',{class:'region-travel-region','data-region':print.regionId});
+    print.hexes.forEach(hx=>{
+      const c=travelHexCenter(hx.q,hx.r);
+      g.append(regionSvg('path',{ class:'region-travel-hex', d:hexPath, transform:'translate('+c.cx+' '+c.cy+')', fill:print.tone }));
+    });
+    const at=travelHexCenter(print.anchor.q, print.anchor.r);
+    g.append(regionSvg('text',{ x:at.cx, y:regionMapRound(at.cy-(print.radius||1)-0.25), 'text-anchor':'middle', class:'region-travel-label' }, print.title));
+    svg.append(g);
+  });
+  // the Arkborne spans hexes at this scale too — a bow and a stern, no dot tokens
+  const lastDir=TRAVEL_DIRS.find(d=>d.id===(valid.log.length?valid.log[valid.log.length-1].dir:''))||TRAVEL_DIRS[0];
+  const stern=travelHexCenter(valid.position.q-lastDir.q, valid.position.r-lastDir.r);
+  const ark=regionSvg('g',{class:'region-travel-arkborne'});
+  ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+stern.cx+' '+stern.cy+')', class:'region-travel-ark-stern' }));
+  ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+here.cx+' '+here.cy+')', class:'region-travel-ark-bow' }));
+  ark.append(regionSvg('text',{ x:here.cx, y:regionMapRound(here.cy-0.7), 'text-anchor':'middle', class:'region-travel-label' },'Arkborne'));
+  svg.append(ark);
+  return svg;
+}
+
+/* ---- the campaign tab ----------------------------------------------------------- */
+async function campTravel(host, name){
+  const cfg=ghCfg();
+  host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Charting the sea…'));
+  let regions=[], travel=null;
+  try{
+    const result=await loadCampaignRegions(cfg, name);
+    regions=result.regions.filter(entry=>entry.region&&(!entry.errors||!entry.errors.length)).map(entry=>entry.region);
+    travel=await travelLoad(cfg, name);
+  }catch(error){ host.replaceChildren(h('p',{class:'hint'},'Travel unavailable: '+String(error&&error.message||error))); return; }
+  const layout=travelChartLayout(regions);
+  const viewport={scale:1, panX:0, panY:0};
+  const status=h('span',{class:'hint region-travel-status', role:'status'},'');
+  const stage=h('div',{class:'region-travel-stage'});
+  let busy=false;
+  function clockLine(){
+    const due=travelWorldTurnsDue(travel.state);
+    const last=travel.state.log[travel.state.log.length-1];
+    return 'The journey so far: '+travel.state.legs+' leg'+(travel.state.legs===1?'':'s')
+      +' · the world has drifted '+travel.state.worldTurnsFired+' turn'+(travel.state.worldTurnsFired===1?'':'s')
+      +(due?' · drift is due':'')
+      +(last&&last.stirred?' · the last crossing stirred something':'');
+  }
+  function draw(){
+    stage.replaceChildren(
+      h('div',{class:'region-map region-travel-frame cosmic-middle'}, travelMapSvg(layout, travel.state, viewport)),
+      h('p',{class:'hint region-travel-clock'}, clockLine()));
+  }
+  async function sail(dirId){
+    if(busy) return;
+    busy=true; status.textContent='Sailing…';
+    try{
+      const epoch=travelWorldTurnEpoch(travel.state.ticks);
+      const roll=travelTransitRoll(name, travel.state.position, epoch, travel.state.legs+1);
+      const next=travelWithTransit(travel.state, dirId, roll);
+      const written=await travelWrite(cfg, name, travel.path, next, travel.text, 'Travel leg '+next.legs);
+      travel.state=next; travel.text=written;
+      status.textContent=roll.stirred?'The crossing stirred something — the sea noticed you.':'A quiet crossing.';
+      const due=travelWorldTurnsDue(travel.state);
+      if(due&&regions.length){
+        status.textContent='The world drifts as the journey lengthens…';
+        const fired=await travelAdvanceWorld(cfg, name, regions.map(r=>r.id).sort(), due);
+        const afterTurns=travelWithWorldTurns(travel.state, due);
+        const writtenTurns=await travelWrite(cfg, name, travel.path, afterTurns, travel.text, 'Travel clock — world drift x'+due);
+        travel.state=afterTurns; travel.text=writtenTurns;
+        const pending=fired.reduce((sum,f)=>sum+f.pending,0);
+        status.textContent='The world drifted (minors only'+(pending?'; '+pending+' major'+(pending===1?'':'s')+' wait for review':'')+').';
+      }
+      draw();
+    }catch(error){ status.textContent=String(error&&error.message||error); }
+    busy=false;
+  }
+  const sailRow=h('div',{class:'toolrow region-travel-sail'}, ...TRAVEL_DIRS.map(dir=>
+    h('button',{class:'navbtn', type:'button', title:'Sail one hex '+dir.label, onclick:()=>sail(dir.id)},'⛵ '+dir.label)));
+  const panRow=h('div',{class:'toolrow region-travel-pan'},
+    h('span',{class:'hint'},'Drift the view'),
+    ...[['←',-3,0],['→',3,0],['↑',0,-2.25],['↓',0,2.25]].map(([label,dx,dy])=>
+      h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ const v=travelViewportPan(viewport,dx,dy); viewport.panX=v.panX; viewport.panY=v.panY; draw(); }},label)),
+    h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ viewport.panX=0; viewport.panY=0; draw(); }},'⌖ Arkborne'));
+  host.replaceChildren(
+    h('div',{class:'region-readonly'},
+      h('b',null,'The mid-tier sea · travel'),
+      h('span',null,'Your forged regions at true scale amid honest haze — the chart is always a slice; the sea keeps going past its edge. Sailing ticks the travel clock, and the world quietly drifts (minors only; majors always wait for your review).')),
+    regions.length?null:h('p',{class:'hint'},'No accepted regions yet — the Forge is the only chart-maker. Forge a region and it will appear here at scale.'),
+    stage, sailRow, panRow, h('div',{class:'toolrow'}, status));
+  draw();
+}
+registerCampaignTab(['travel','Travel','Sail the mid-tier sea between your forged regions — the travel clock quietly ages the world.'], (host,name)=>campTravel(host,name), {after:'region'});
 /* ========================================================================== *
    REGION REGENERATE - candidate compare, scoped merge, history snapshot.
  * ========================================================================== */
