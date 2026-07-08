@@ -13961,6 +13961,11 @@ function classifyRegionEntries(items,campaignName){
   const list=Array.isArray(items)?items:[], byBase=new Map(), ignored=[];
   list.forEach(item=>{
     if(!item || item.type!=='file' || typeof item.name!=='string'){ ignored.push(item); return; }
+    // Sidecar data files live beside a region save (<id>.history.json from the
+    // world turns, <id>.places.json from the place records). They are NOT
+    // region saves — classifying them as regions painted a phantom
+    // "Unreadable region / NEEDS ATTENTION" card the moment a world turn ran.
+    if(/\.(history|places)\.json$/i.test(item.name)){ ignored.push(item); return; }
     const match=/^(.+)\.(json|md)$/i.exec(item.name);
     if(!match){ ignored.push(item); return; }
     const base=match[1], ext=match[2].toLowerCase();
