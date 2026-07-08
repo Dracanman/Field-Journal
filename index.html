@@ -179,6 +179,8 @@
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
     .rail-card{ background:rgba(255,255,255,.86); }
   }
+  /* calm visuals: skip the persistent blur (theme-cloud.css owns the policy) */
+  body.fx-calm .rail-card{ -webkit-backdrop-filter:none; backdrop-filter:none; background:var(--glass-solid); }
   .rail-card .rail-title{ margin:0 0 9px; font-size:12px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--gold); }
   .rail-stats{ display:grid; gap:9px; }
   .rail-stat{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
@@ -246,6 +248,8 @@
   -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.15); backdrop-filter:blur(var(--glass-blur)) saturate(1.15);
   box-shadow:0 14px 34px -26px var(--glow);
 }
+/* calm visuals: skip the persistent blur (theme-cloud.css owns the policy) */
+body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; background:var(--glass-solid); }
 .start-here-title{ display:block; font-size:17px; color:var(--ink); margin-bottom:4px; }
 .start-here-line{ margin:0 0 10px; color:var(--ink-soft); line-height:1.5; max-width:56ch; }
 .start-here-dismiss{ position:absolute; top:8px; right:10px; padding:2px 8px; line-height:1; }
@@ -847,6 +851,10 @@
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
     .play-command-card,.play-transcript-card,.play-input-card{ background:rgba(255,255,255,.9); }
   }
+  /* calm visuals: skip the persistent blur (theme-cloud.css owns the policy) */
+  body.fx-calm :is(.play-command-card,.play-transcript-card,.play-input-card){
+    -webkit-backdrop-filter:none; backdrop-filter:none; background:var(--glass-solid);
+  }
   .play-command-card{ padding:14px; }
   .play-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:14px; flex-wrap:wrap; }
   .play-head .usage-meter{ margin-left:auto; }
@@ -878,6 +886,7 @@
   @supports not ((backdrop-filter:blur(2px)) or (-webkit-backdrop-filter:blur(2px))){
     .play-tools-wrap{ background:rgba(255,255,255,.9); }
   }
+  body.fx-calm .play-tools-wrap{ -webkit-backdrop-filter:none; backdrop-filter:none; background:var(--glass-solid); }
   .play-tools-head{ display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:0 0 8px; }
   .play-tools-head b{ color:var(--ink); font-size:17px; }
   .play-tools-head .hint{ font-size:12px; }
@@ -1279,6 +1288,8 @@
   -webkit-backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12); backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12);
   box-shadow:0 24px 60px -30px var(--glow), 0 0 0 1px var(--glass-border);
 }
+/* calm visuals: the panel is already solid — just skip the per-frame re-blur */
+body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:none; }
 .companion-head{
   display:flex; align-items:center; gap:8px; padding:10px 12px;
   border-bottom:1px solid var(--glass-border);
@@ -1840,6 +1851,25 @@ body.fx-rich .ambient-art svg:nth-child(2n){ animation-duration:19s; animation-d
   @keyframes stream-fade{ from{ opacity:0; transform:translateY(2px); } to{ opacity:1; transform:none; } }
   @keyframes caret-blink{ 0%,100%{ opacity:1; } 50%{ opacity:0; } }
 
+  /* ---- calm visuals (body.fx-calm): still sky, solid glass ---------------- */
+  /* The two steady GPU costs — the ever-drifting fixed backdrop and the
+     backdrop-filter blur re-computed beneath it every frame — are what run a
+     phone warm. fx-calm stills the sky, drops the fixed attachment, and swaps
+     the glass for its solid fallback. Auto-on at the phone breakpoint
+     (core/mode.js); the ❄ More-menu toggle can flip it anywhere, and calm
+     always beats .fx-rich. Interaction motion (hover lift) stays — it costs
+     nothing at rest. */
+  body.fx-calm{ animation:none; background-attachment:scroll; }
+  body.fx-calm.fx-rich::after{ content:none; }
+  body.fx-calm .glow-accent,
+  body.fx-calm .navbtn.primary,
+  body.fx-calm .studio-tabs .tab.on,
+  body.fx-calm .bottom-nav-tab.current{ animation:none; }
+  body.fx-calm :is(.glass, .topbar, .assistant-answer){
+    -webkit-backdrop-filter:none; backdrop-filter:none;
+    background:var(--glass-solid);
+  }
+
   /* ---- respect reduced-motion: hold everything still --------------------- */
   @media (prefers-reduced-motion:reduce){
     body{ animation:none; }
@@ -1952,6 +1982,12 @@ body.fx-rich .ambient-art svg:nth-child(2n){ animation-duration:19s; animation-d
       background:var(--glass-solid);
       -webkit-backdrop-filter:blur(var(--glass-blur)) saturate(1.18);
       backdrop-filter:blur(var(--glass-blur)) saturate(1.18);
+    }
+    /* calm visuals: the background is already solid here — just stop re-blurring
+       what's beneath it every frame (the steady GPU cost that warms a phone) */
+    body.fx-calm :is(.topbar,.content-subnav,.bottom-nav){
+      -webkit-backdrop-filter:none;
+      backdrop-filter:none;
     }
     .bottom-nav-tab{ color:var(--ink-soft); }
     .bottom-nav-tab.current{
@@ -4269,7 +4305,7 @@ function normalizeUsageLedger(value){
     lastPriceGap:!!source.lastPriceGap,
   };
 }
-function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, who:'', people:[], whoActiveAt:0, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault(), primerPos:null }; }
+function defaults(){ return { creations:[], sparks:[], roots:{}, counters:{}, elements:[], expressions:[], github:null, engines:{activeId:'',profiles:[]}, usageLedger:usageLedgerDefault(), assistant:assistantSettingsDefault(), mode:'simple', seenIntro:false, profile:'maker', profileChosen:false, who:'', people:[], whoActiveAt:0, openTo:'frontdoor', openToSeen:false, syncOnOpen:false, syncPractice:false, fxRich:false, fxCalm:'auto', themeMode:'auto', favorites:[], collections:[], collapsed:[], campaignScratch:{}, tombstones:{}, naming:namingDefault(), practice:practiceDefault(), primerPos:null }; }
 function hydrate(d){
   d=d||{};
   const merged=Object.assign(defaults(), d), engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -4280,6 +4316,9 @@ function hydrate(d){
   merged.openTo=openToSeen&&d.openTo==='last'?'last':'frontdoor';
   merged.openToSeen=true;
   merged.fxRich=!!d.fxRich;
+  // Calm visuals: tri-state, device-local like fxRich. 'auto' = calm on phones
+  // (cooler GPU), full sky elsewhere; an explicit true/false always wins.
+  merged.fxCalm=d.fxCalm===true?true:d.fxCalm===false?false:'auto';
   merged.themeMode=d.themeMode==='dark'||d.themeMode==='light'?d.themeMode:'auto';
   merged.syncPractice=!!d.syncPractice;
   // Identity: the ROSTER (people + removal tombstones) syncs across devices via
@@ -4609,6 +4648,7 @@ function moreMenu(){
     item((DB.liveRefresh!==false?'⟳ Live refresh: on':'⟳ Live refresh: off'), ()=>setLiveRefresh(DB.liveRefresh===false)),
     item('◐ Theme: '+themeModeLabel(), ()=>cycleThemeMode()),
     item((DB.fxRich?'✦ Atmospherics: on':'✧ Atmospherics: off'), ()=>setAtmospherics(!DB.fxRich)),
+    item((document.body.classList.contains('fx-calm')?'❄ Calm visuals: on':'❄ Calm visuals: off'), ()=>setCalmVisuals(!document.body.classList.contains('fx-calm'))),
     item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
     item('🐞 Report a problem', ()=>companionOpenReport()),
@@ -5603,10 +5643,20 @@ function applyMode(){ const b=document.body; b.classList.remove('mode-simple','m
   // Aliveness ceiling: .fx-rich opts into extra ambient motion (drifting motes, glow
   // pulse). OS reduce-motion still overrides it in CSS — meaning never depends on motion.
   b.classList.toggle('fx-rich', !!DB.fxRich);
+  // Calm visuals: stills the always-on sky drift and solidifies the blur-glass —
+  // the two steady GPU costs that run a phone warm. Auto-on at the phone
+  // breakpoint; an explicit choice (the More-menu toggle) wins over auto.
+  b.classList.toggle('fx-calm', DB.fxCalm===true || (DB.fxCalm!==false && PHONE_MQ.matches));
 }
+// The app's own phone breakpoint (mobile.css); re-apply on rotation/resize across it.
+const PHONE_MQ=matchMedia('(max-width:560px)');
+if(PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', ()=>applyMode());
 // Opt-in "generous atmospherics" — a device-local visual preference (not synced, like mode).
 function setAtmospherics(on){ DB.fxRich=!!on; save(); applyMode();
   toast(DB.fxRich? 'Atmospherics on — the sky breathes a little.' : 'Atmospherics calm — motion only when you act.'); }
+// Calm visuals — device-local like atmospherics; an explicit pick overrides the phone auto.
+function setCalmVisuals(on){ DB.fxCalm=!!on; save(); applyMode();
+  toast(DB.fxCalm? 'Calm visuals — still sky, cooler phone.' : 'Full sky restored — the aether drifts again.'); }
 // Device-local theme preference. Auto follows the operating system; Night/Day pin it here.
 function setThemeMode(value){ DB.themeMode=themeModeValue(value); save(); applyMode();
   toast(DB.themeMode==='dark'?'Night theme — softer for late work.' : DB.themeMode==='light'?'Day theme — bright sky restored.' : 'Theme auto — following this device.'); }
