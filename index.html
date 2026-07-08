@@ -1055,8 +1055,14 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
 .region-travel-atmosphere circle{ fill:#f4efe0; }
 .region-travel-ark-bow{ fill:rgba(120,90,40,.7); stroke:rgba(60,45,20,.75); stroke-width:.06; }
 .region-travel-ark-stern{ fill:rgba(120,90,40,.4); stroke:rgba(60,45,20,.5); stroke-width:.05; }
-.region-travel-sail,.region-travel-pan{ flex-wrap:wrap; gap:6px; }
+.region-travel-sail,.region-travel-pan,.region-travel-tiers,.region-travel-chart{ flex-wrap:wrap; gap:6px; }
 .region-travel-clock{ margin:2px 0 0; }
+.region-travel-horizon{ pointer-events:none; }
+/* Slice 56 - the event card: a paused crossing */
+.region-travel-event{ margin:2px 0 10px; padding:12px 14px; border-radius:12px; display:flex; flex-direction:column; gap:8px; border-left:3px solid var(--accent-game, #cdb25e); }
+.region-travel-event-doors{ flex-wrap:wrap; gap:6px; }
+.region-travel-event-denizen input{ max-width:220px; }
+.region-travel-event-status{ min-height:1.2em; }
 @media (max-width:700px){ .region-travel-sail .navbtn{ flex:1 1 30%; } }
 
 /* Slice 54 - enter the tile: the live sub-area mount (Play's write path) */
@@ -17669,9 +17675,14 @@ function regionSubareaPeekPanel(region, ctx){
  * ========================================================================== */
 
 // The one entered scene at a time, read by the Play table (card + GM context).
-const SUBAREA_LIVE={current:null};
+const SUBAREA_LIVE={current:null, request:null};
 function subareaLiveCurrent(){ return SUBAREA_LIVE.current; }
 function subareaLiveSetCurrent(next){ SUBAREA_LIVE.current=next||null; }
+// Slice 56: a travel event's "Enter the scene" door asks the live mount to open
+// on a specific tile the moment its panel next builds (fog rule still applies).
+function subareaLiveRequest(regionId, layerId, tile){
+  SUBAREA_LIVE.request=regionId?{regionId:String(regionId), layerId:String(layerId||''), tile:{x:Number(tile&&tile.x)||0, y:Number(tile&&tile.y)||0}}:null;
+}
 
 // Enter is Play's door: only a seated table for THIS campaign opens it.
 function subareaLiveSeated(campaignName){
@@ -17939,6 +17950,15 @@ function subareaLivePanel(region, ctx){
     h('span',null,'The second mount: derivation plus everything this place remembers. Re-entering re-derives and repaints — anchored content stays put.')));
   refreshLayers(); refreshTiles();
   panel.append(layerRow, h('div',{class:'toolrow'}, tileSel, enterBtn, status), stage);
+  // A travel event's Enter door asked for a specific tile — honor it once.
+  const req=SUBAREA_LIVE.request;
+  if(req&&req.regionId===region.id){
+    SUBAREA_LIVE.request=null;
+    if(layers.some(layer=>layer.id===req.layerId)) state.layerId=req.layerId;
+    refreshLayers(); refreshTiles();
+    enter({x:req.tile.x, y:req.tile.y});
+    return panel;
+  }
   // Re-entry resume: still entered here from earlier? Re-derive fresh and repaint.
   const cur=SUBAREA_LIVE.current;
   if(cur&&cur.campaignName===campaignName&&cur.regionId===region.id){
@@ -19300,6 +19320,9 @@ const TRAVEL_TICKS_PER_WORLD_TURN=12;
 const TRAVEL_MID_SCALE_CELLS=6;
 const TRAVEL_STIRRED_THRESHOLD=0.8;   // Slice 56 spends this; v1 only marks the leg
 const TRAVEL_LOG_LIMIT=12;
+// High tier: one high hex spans this many mid hexes (game-phase constant —
+// wider strides, heavier ticks; still no durations anywhere).
+const TRAVEL_HIGH_SCALE=4;
 // Pointy-top axial neighbors, clockwise from east.
 const TRAVEL_DIRS=[
   {id:'e',  label:'E',  q:1,  r:0},
@@ -19419,6 +19442,42 @@ function travelHazeAt(q,r){
     tint:regionMapCosmicTint('middle'),
     atmosphere:regionMapRound(0.25+travelValue('travel-haze','at|'+travelHexKey(q,r))*0.5) };
 }
+/* High tier (Slice 56): the same axial grid seen wider — every mid hex
+   compresses by TRAVEL_HIGH_SCALE. A footprint collapses to its compact marks
+   (~1–4 by size); the Arkborne compresses to ONE hex. Zoom between tiers keeps
+   the same position because both tiers share the mid coordinates underneath. */
+function travelCompressHex(hx, scale){
+  const s=Math.max(1, Number(scale)||TRAVEL_HIGH_SCALE);
+  return { q:Math.round((Number(hx&&hx.q)||0)/s), r:Math.round((Number(hx&&hx.r)||0)/s) };
+}
+function travelCompressFootprint(print, scale){
+  const seen={}, out=[];
+  (print&&Array.isArray(print.hexes)?print.hexes:[]).forEach(hx=>{
+    const c=travelCompressHex(hx, scale), key=travelHexKey(c.q,c.r);
+    if(!seen[key]){ seen[key]=true; out.push(c); }
+  });
+  return out;
+}
+/* Transition belts as DISTANT HORIZONS — derived ONLY from the overworld's
+   cosmicBlend data, render-only truth: you can see THAT the world continues
+   above or below, never WHAT it contains. No coordinates, no terrain, no
+   features — a horizon is not a hex and can never be sailed onto. */
+function travelBeltHorizons(regions){
+  const byLayer={};
+  (Array.isArray(regions)?regions:[]).forEach(region=>{
+    const blend=region&&region.cosmicBlend;
+    if(!regionIsRecord(blend)||!blend.active) return;
+    const primary=String(region.cosmicLayer||'middle').toLowerCase();
+    const neighbor=String(blend.neighborLayer||'').toLowerCase();
+    if(!neighbor||!regionMapCosmicAdjacent(primary, neighbor)) return;
+    const strength=Math.min(1, Math.max(0, Number(blend.strength)||0.25));
+    if(!byLayer[neighbor]||byLayer[neighbor].strength<strength){
+      byLayer[neighbor]={ neighborLayer:neighbor, edge:neighbor==='top'?'top':'bottom',
+        tint:regionMapCosmicTint(neighbor), strength:regionMapRound(strength) };
+    }
+  });
+  return Object.keys(byLayer).sort().map(key=>byLayer[key]);
+}
 // Free scroll is law: the viewport may drift past every charted bound — the
 // sea visibly out-scales the chart, so panning is NEVER clamped.
 function travelViewportPan(viewport, dx, dy){
@@ -19456,8 +19515,23 @@ function travelTemplate(campaignName){
 }
 function travelNormalizeLog(entry){
   if(!regionIsRecord(entry)) throw new Error('a travel log entry must be an object');
-  return { leg:Number(entry.leg)||0, from:String(entry.from||''), to:String(entry.to||''),
+  const out={ leg:Number(entry.leg)||0, from:String(entry.from||''), to:String(entry.to||''),
     dir:String(entry.dir||''), stirred:entry.stirred===true };
+  if(entry.tier) out.tier=String(entry.tier);
+  if(entry.event) out.event=String(entry.event);
+  if(entry.choice) out.choice=String(entry.choice);
+  return out;
+}
+// Slice 56: a fired transit check waits here as an EVENT CARD until the player
+// picks a door — the same leg always deals the same card (reload-safe).
+function travelNormalizePendingEvent(event){
+  if(event==null) return null;
+  if(!regionIsRecord(event)) throw new Error('a pending travel event must be an object');
+  const out={ leg:Number(event.leg)||0, hex:String(event.hex||''), type:String(event.type||''),
+    title:String(event.title||''), heavy:event.heavy===true, regionId:String(event.regionId||''),
+    layerId:String(event.layerId||'') };
+  if(regionIsRecord(event.tile)&&Number.isInteger(event.tile.x)&&Number.isInteger(event.tile.y)) out.tile={x:event.tile.x, y:event.tile.y};
+  return out;
 }
 function assertTravelObject(value, options){
   if(!regionIsRecord(value)) throw new Error('travel state must be a JSON object');
@@ -19466,7 +19540,7 @@ function assertTravelObject(value, options){
   if(!campaign) throw new Error('travel state needs its campaign');
   if(expected&&campaign!==expected) throw new Error('travel state campaign mismatch');
   const position=regionIsRecord(value.position)?value.position:{};
-  return {
+  const out={
     schema:TRAVEL_SCHEMA_VERSION,
     campaign,
     position:{ q:Number.isInteger(position.q)?position.q:0, r:Number.isInteger(position.r)?position.r:0 },
@@ -19475,6 +19549,9 @@ function assertTravelObject(value, options){
     worldTurnsFired:Math.max(0, Number(value.worldTurnsFired)||0),
     log:(Array.isArray(value.log)?value.log:[]).map(travelNormalizeLog).slice(-TRAVEL_LOG_LIMIT),
   };
+  const pending=travelNormalizePendingEvent(value.pendingEvent);
+  if(pending) out.pendingEvent=pending;
+  return out;
 }
 function parseTravel(text, campaignName){
   const raw=String(text||'').trim();
@@ -19507,21 +19584,46 @@ function travelTextMatches(currentText, expectedText, campaignName){
   if(!current||!expected) return false;
   return serializeTravel(parseTravel(current, campaignName))===serializeTravel(parseTravel(expected, campaignName));
 }
-// One mid-tier leg: move one hex, tick the clock by the MID weight, remember
-// whether the crossing stirred. Pure — state in, NEW state out.
-function travelWithTransit(state, dirId, roll){
+// One leg: move (one mid hex, or TRAVEL_HIGH_SCALE at the high tier), tick the
+// clock by the TIER weight, remember the crossing. Only planar directions exist
+// — cosmic bands are never an adjacent hex (COS-003: belts are the only way
+// between bands, and they are render-only horizons here). Pure.
+function travelWithTransit(state, dirId, roll, tier, event){
   const valid=assertTravelObject(state);
+  if(valid.pendingEvent) throw new Error('an event card waits — choose a door before sailing on');
   const dir=TRAVEL_DIRS.find(d=>d.id===dirId);
   if(!dir) throw new Error('unknown travel direction: '+dirId);
-  const from=valid.position, to={q:from.q+dir.q, r:from.r+dir.r};
-  return {
+  const cleanTier=tier==='high'?'high':'mid';
+  const steps=cleanTier==='high'?TRAVEL_HIGH_SCALE:1;
+  const from=valid.position, to={q:from.q+dir.q*steps, r:from.r+dir.r*steps};
+  const next={
     ...valid,
     position:to,
-    ticks:valid.ticks+travelTickWeight('mid'),
+    ticks:valid.ticks+travelTickWeight(cleanTier),
     legs:valid.legs+1,
     log:valid.log.concat([travelNormalizeLog({ leg:valid.legs+1, from:travelHexKey(from.q,from.r),
-      to:travelHexKey(to.q,to.r), dir:dir.id, stirred:!!(roll&&roll.stirred) })]).slice(-TRAVEL_LOG_LIMIT),
+      to:travelHexKey(to.q,to.r), dir:dir.id, tier:cleanTier, stirred:!!(roll&&roll.stirred),
+      event:event?String(event.type||''):'' })]).slice(-TRAVEL_LOG_LIMIT),
   };
+  delete next.pendingEvent;
+  const pending=travelNormalizePendingEvent(event?{...event, leg:next.legs, hex:travelHexKey(to.q,to.r)}:null);
+  if(pending) next.pendingEvent=pending;
+  return next;
+}
+// Choosing a door resolves the card: the choice is remembered in the log and
+// the sea is sailable again. Pure — the guarded consequences write elsewhere.
+function travelWithEventChoice(state, choice){
+  const valid=assertTravelObject(state);
+  if(!valid.pendingEvent) throw new Error('no event card is waiting');
+  const clean=choice==='enter'?'enter':'table';
+  const next={
+    ...valid,
+    log:valid.log.concat([travelNormalizeLog({ leg:valid.pendingEvent.leg, from:valid.pendingEvent.hex,
+      to:valid.pendingEvent.hex, dir:'held', tier:'mid', stirred:true,
+      event:valid.pendingEvent.type, choice:clean })]).slice(-TRAVEL_LOG_LIMIT),
+  };
+  delete next.pendingEvent;
+  return next;
 }
 function travelWithWorldTurns(state, fired){
   const valid=assertTravelObject(state);
@@ -19560,14 +19662,20 @@ async function travelAdvanceWorld(cfg, campaignName, regionIds, turnsDue){
 }
 
 /* ---- the map ------------------------------------------------------------------ */
-function travelMapSvg(layout, state, viewport){
+function travelMapSvg(layout, state, viewport, options){
+  const opts=options||{};
+  const tier=opts.tier==='high'?'high':'mid';
+  const zoom=tier==='high'?TRAVEL_HIGH_SCALE:1;
   const valid=assertTravelObject(state||travelTemplate('chart'));
   const v=viewport||{};
   const scale=Number.isFinite(v.scale)&&v.scale>0?v.scale:1;
-  const here=travelHexCenter(valid.position.q, valid.position.r);
+  const pos=travelCompressHex(valid.position, zoom);
+  const here=travelHexCenter(pos.q, pos.r);
   const w=18/scale, hgt=13/scale;
-  const cx=here.cx+(Number.isFinite(v.panX)?v.panX:0), cy=here.cy+(Number.isFinite(v.panY)?v.panY:0);
-  const svg=regionSvg('svg',{ class:'region-travel-svg', role:'img', 'aria-label':'Mid-tier travel chart',
+  // pan lives in mid units so zooming between tiers never loses the position
+  const cx=here.cx+(Number.isFinite(v.panX)?v.panX:0)/zoom, cy=here.cy+(Number.isFinite(v.panY)?v.panY:0)/zoom;
+  const svg=regionSvg('svg',{ class:'region-travel-svg region-travel-tier-'+tier, role:'img',
+    'aria-label':(tier==='high'?'High':'Mid')+'-tier travel chart',
     viewBox:[regionMapRound(cx-w/2), regionMapRound(cy-hgt/2), regionMapRound(w), regionMapRound(hgt)].join(' '),
     preserveAspectRatio:'xMidYMid meet' });
   // the sea first: haze without edges — the chart floats in it, never the reverse
@@ -19584,20 +19692,36 @@ function travelMapSvg(layout, state, viewport){
   const hexPath=regionHexPath();
   (layout||[]).forEach(print=>{
     const g=regionSvg('g',{class:'region-travel-region','data-region':print.regionId});
-    print.hexes.forEach(hx=>{
+    const hexes=tier==='high'?travelCompressFootprint(print, zoom):print.hexes;
+    hexes.forEach(hx=>{
       const c=travelHexCenter(hx.q,hx.r);
       g.append(regionSvg('path',{ class:'region-travel-hex', d:hexPath, transform:'translate('+c.cx+' '+c.cy+')', fill:print.tone }));
     });
-    const at=travelHexCenter(print.anchor.q, print.anchor.r);
-    g.append(regionSvg('text',{ x:at.cx, y:regionMapRound(at.cy-(print.radius||1)-0.25), 'text-anchor':'middle', class:'region-travel-label' }, print.title));
+    const anchor=travelCompressHex(print.anchor, zoom);
+    const at=travelHexCenter(anchor.q, anchor.r);
+    g.append(regionSvg('text',{ x:at.cx, y:regionMapRound(at.cy-((print.radius||1)/zoom)-0.25), 'text-anchor':'middle', class:'region-travel-label' }, print.title));
     svg.append(g);
   });
-  // the Arkborne spans hexes at this scale too — a bow and a stern, no dot tokens
-  const lastDir=TRAVEL_DIRS.find(d=>d.id===(valid.log.length?valid.log[valid.log.length-1].dir:''))||TRAVEL_DIRS[0];
-  const stern=travelHexCenter(valid.position.q-lastDir.q, valid.position.r-lastDir.r);
+  // Transition belts loom at the world's rim — pinned to the viewport edge, so
+  // they stay visible however far past the chart you scroll. Render-only truth.
+  travelBeltHorizons(opts.regions||[]).forEach(horizon=>{
+    const band=hgt*0.09;
+    svg.append(regionSvg('rect',{ class:'region-travel-horizon region-travel-horizon-'+horizon.neighborLayer,
+      x:regionMapRound(cx-w), y:regionMapRound(horizon.edge==='top'?cy-hgt/2:cy+hgt/2-band),
+      width:regionMapRound(w*2), height:regionMapRound(band),
+      fill:horizon.tint, opacity:regionMapRound(0.2+horizon.strength*0.4) }));
+  });
   const ark=regionSvg('g',{class:'region-travel-arkborne'});
-  ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+stern.cx+' '+stern.cy+')', class:'region-travel-ark-stern' }));
-  ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+here.cx+' '+here.cy+')', class:'region-travel-ark-bow' }));
+  if(tier==='high'){
+    // at the wide tier the whole ship is ONE hex — a long haul's honest scale
+    ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+here.cx+' '+here.cy+')', class:'region-travel-ark-bow' }));
+  }else{
+    // at the mid tier the Arkborne spans hexes — a bow and a stern, no dot tokens
+    const lastDir=TRAVEL_DIRS.find(d=>d.id===(valid.log.length?valid.log[valid.log.length-1].dir:''))||TRAVEL_DIRS[0];
+    const stern=travelHexCenter(valid.position.q-lastDir.q, valid.position.r-lastDir.r);
+    ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+stern.cx+' '+stern.cy+')', class:'region-travel-ark-stern' }));
+    ark.append(regionSvg('path',{ d:hexPath, transform:'translate('+here.cx+' '+here.cy+')', class:'region-travel-ark-bow' }));
+  }
   ark.append(regionSvg('text',{ x:here.cx, y:regionMapRound(here.cy-0.7), 'text-anchor':'middle', class:'region-travel-label' },'Arkborne'));
   svg.append(ark);
   return svg;
@@ -19607,17 +19731,29 @@ function travelMapSvg(layout, state, viewport){
 async function campTravel(host, name){
   const cfg=ghCfg();
   host.append(h('p',{class:'hint', style:{textAlign:'center'}},'Charting the sea…'));
-  let regions=[], travel=null;
+  let entries=[], regions=[], travel=null, threads={};
   try{
     const result=await loadCampaignRegions(cfg, name);
-    regions=result.regions.filter(entry=>entry.region&&(!entry.errors||!entry.errors.length)).map(entry=>entry.region);
+    entries=result.regions.filter(entry=>entry.region&&(!entry.errors||!entry.errors.length));
+    regions=entries.map(entry=>entry.region);
     travel=await travelLoad(cfg, name);
+    try{
+      const files=await campaignFiles(cfg, name);
+      const th=files.threads?await ghGetText(cfg, files.threads):null;
+      if(th) threads=parseThreads(th.text);
+    }catch(error){ threads={}; }
   }catch(error){ host.replaceChildren(h('p',{class:'hint'},'Travel unavailable: '+String(error&&error.message||error))); return; }
   const layout=travelChartLayout(regions);
+  const index=travelChartIndex(layout);
   const viewport={scale:1, panX:0, panY:0};
   const status=h('span',{class:'hint region-travel-status', role:'status'},'');
   const stage=h('div',{class:'region-travel-stage'});
-  let busy=false;
+  const eventHost=h('div',{class:'region-travel-event-host'});
+  let busy=false, tier='mid';
+  function regionAt(hex){
+    const id=index[travelHexKey(hex.q, hex.r)];
+    return id?entries.find(entry=>entry.region.id===id)||null:null;
+  }
   function clockLine(){
     const due=travelWorldTurnsDue(travel.state);
     const last=travel.state.log[travel.state.log.length-1];
@@ -19626,21 +19762,39 @@ async function campTravel(host, name){
       +(due?' · drift is due':'')
       +(last&&last.stirred?' · the last crossing stirred something':'');
   }
+  function drawEvent(){
+    if(typeof travelEventPanel!=='function'){ eventHost.replaceChildren(); return; }
+    const node=travelEventPanel({ cfg, campaignName:name, travel, layout, entries,
+      regionAt, onChange:()=>{ drawEvent(); draw(); } });
+    eventHost.replaceChildren(...(node?[node]:[]));
+  }
   function draw(){
     stage.replaceChildren(
-      h('div',{class:'region-map region-travel-frame cosmic-middle'}, travelMapSvg(layout, travel.state, viewport)),
+      h('div',{class:'region-map region-travel-frame cosmic-middle'},
+        travelMapSvg(layout, travel.state, viewport, {tier, regions})),
       h('p',{class:'hint region-travel-clock'}, clockLine()));
   }
   async function sail(dirId){
     if(busy) return;
+    if(travel.state.pendingEvent){ status.textContent='An event card waits — choose a door before sailing on.'; return; }
     busy=true; status.textContent='Sailing…';
     try{
       const epoch=travelWorldTurnEpoch(travel.state.ticks);
       const roll=travelTransitRoll(name, travel.state.position, epoch, travel.state.legs+1);
-      const next=travelWithTransit(travel.state, dirId, roll);
+      // the transit check: the leg's destination + its local character set the weight
+      const dir=TRAVEL_DIRS.find(d=>d.id===dirId);
+      const steps=tier==='high'?TRAVEL_HIGH_SCALE:1;
+      const dest=dir?{q:travel.state.position.q+dir.q*steps, r:travel.state.position.r+dir.r*steps}:travel.state.position;
+      const destEntry=regionAt(dest);
+      let event=null;
+      if(typeof travelEventForLeg==='function'){
+        event=travelEventForLeg(roll, destEntry?destEntry.region:null, threads, {layout, dest});
+      }
+      const next=travelWithTransit(travel.state, dirId, roll, tier, event);
       const written=await travelWrite(cfg, name, travel.path, next, travel.text, 'Travel leg '+next.legs);
       travel.state=next; travel.text=written;
-      status.textContent=roll.stirred?'The crossing stirred something — the sea noticed you.':'A quiet crossing.';
+      status.textContent=event?'Something happened on the crossing — the card is on the table.'
+        :(roll.stirred?'The crossing stirred something — the sea noticed you.':'A quiet crossing.');
       const due=travelWorldTurnsDue(travel.state);
       if(due&&regions.length){
         status.textContent='The world drifts as the journey lengthens…';
@@ -19651,26 +19805,276 @@ async function campTravel(host, name){
         const pending=fired.reduce((sum,f)=>sum+f.pending,0);
         status.textContent='The world drifted (minors only'+(pending?'; '+pending+' major'+(pending===1?'':'s')+' wait for review':'')+').';
       }
-      draw();
+      draw(); drawEvent();
     }catch(error){ status.textContent=String(error&&error.message||error); }
     busy=false;
   }
+  const tierRow=h('div',{class:'toolrow region-travel-tiers', role:'group'},
+    h('span',{class:'hint'},'Tier'),
+    ...[['mid','Mid — passage'],['high','High — long haul']].map(([id,label])=>
+      h('button',{class:'navbtn '+(tier===id?'primary':'ghost'), type:'button', 'data-tier':id,
+        'aria-pressed':tier===id?'true':'false', onclick:()=>{ tier=id; drawTierRow(); draw(); }}, label)));
+  function drawTierRow(){
+    // browser HTMLCollections are element-only — read the data attribute, never child text
+    Array.from(tierRow.children||[]).forEach(node=>{
+      if(node.tagName!=='BUTTON'||!node.getAttribute) return;
+      const isOn=node.getAttribute('data-tier')===tier;
+      node.className='navbtn '+(isOn?'primary':'ghost');
+      node.setAttribute('aria-pressed', isOn?'true':'false');
+    });
+  }
   const sailRow=h('div',{class:'toolrow region-travel-sail'}, ...TRAVEL_DIRS.map(dir=>
-    h('button',{class:'navbtn', type:'button', title:'Sail one hex '+dir.label, onclick:()=>sail(dir.id)},'⛵ '+dir.label)));
+    h('button',{class:'navbtn', type:'button', title:'Sail '+dir.label+' (one hex at this tier)', onclick:()=>sail(dir.id)},'⛵ '+dir.label)));
   const panRow=h('div',{class:'toolrow region-travel-pan'},
     h('span',{class:'hint'},'Drift the view'),
     ...[['←',-3,0],['→',3,0],['↑',0,-2.25],['↓',0,2.25]].map(([label,dx,dy])=>
       h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ const v=travelViewportPan(viewport,dx,dy); viewport.panX=v.panX; viewport.panY=v.panY; draw(); }},label)),
     h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ viewport.panX=0; viewport.panY=0; draw(); }},'⌖ Arkborne'));
+  // Forge-on-the-way: sailing toward haze offers charting — the EXISTING Forge
+  // candidate → review → accept flow; the map grows ONLY by forging.
+  const inHaze=!regionAt(travel.state.position);
+  const chartRow=h('div',{class:'toolrow region-travel-chart'},
+    h('button',{class:'navbtn '+(inHaze?'primary':'ghost'), type:'button',
+      onclick:()=>go('regionForge',{camp:name, source:'outer'})},'⚒ Chart what’s ahead'),
+    h('span',{class:'hint'},inHaze
+      ?'You are in unforged sea — what’s ahead becomes real only through the Forge’s candidate → accept review.'
+      :'The chart grows only by forging; accepted regions resolve out of the haze at true scale.'));
   host.replaceChildren(
     h('div',{class:'region-readonly'},
-      h('b',null,'The mid-tier sea · travel'),
-      h('span',null,'Your forged regions at true scale amid honest haze — the chart is always a slice; the sea keeps going past its edge. Sailing ticks the travel clock, and the world quietly drifts (minors only; majors always wait for your review).')),
+      h('b',null,'The travel sea · mid + high tiers'),
+      h('span',null,'Your forged regions at true scale amid honest haze — the chart is always a slice; belts loom at the world’s rim (the only way between bands, never an adjacent hex). Sailing ticks the travel clock; something can happen on any leg, and it is the same something on every reload.')),
     regions.length?null:h('p',{class:'hint'},'No accepted regions yet — the Forge is the only chart-maker. Forge a region and it will appear here at scale.'),
-    stage, sailRow, panRow, h('div',{class:'toolrow'}, status));
-  draw();
+    eventHost, stage, tierRow, sailRow, panRow, chartRow, h('div',{class:'toolrow'}, status));
+  draw(); drawEvent();
 }
-registerCampaignTab(['travel','Travel','Sail the mid-tier sea between your forged regions — the travel clock quietly ages the world.'], (host,name)=>campTravel(host,name), {after:'region'});
+registerCampaignTab(['travel','Travel','Sail the mid and high tiers between your forged regions — events interrupt, the clock quietly ages the world, and the haze forges into map.'], (host,name)=>campTravel(host,name), {after:'region'});
+/* ========================================================================== *
+   TRAVEL EVENT CARDS (Slice 56 / SUBSCALE-001) — the "something happened" drop.
+
+   Per leg, the deterministic Slice-55 roll is checked against a weight built
+   from regionalPressure + worldAttention + hazard + open thread state — and
+   NOTHING else: encounter weight NEVER derives from faction standing (the
+   rejected mechanic; the weight function provably ignores such inputs). On
+   fire, an EVENT CARD pauses the crossing. Two doors, choice-grain law:
+     - "Enter the scene" — the Slice-54 live sub-area mounts at the
+       interruption tile (detailed-immersive);
+     - "Resolve at the table" — the GM narrates it through (broad-immersive);
+       consequences STILL write Slice-52 deltas, and a creature that watched
+       the ship pass may be minted as a denizen who remembers.
+   Heavy events RECOMMEND the ground; the choice is always the player's. On an
+   uncharted hex the sea has no floor to remember with — the card resolves at
+   the table and the honest fix is charting ahead (the Forge). Same leg, same
+   card, every reload.
+ * ========================================================================== */
+const TRAVEL_EVENT_TYPES=[
+  {id:'creature',     label:'Something alive',   line:'a living presence crosses the Arkborne’s path'},
+  {id:'discovery',    label:'Something found',   line:'the sea offers up something worth a closer look'},
+  {id:'weather',      label:'The sky turns',     line:'weather with intent gathers around the crossing'},
+  {id:'pressure',     label:'Pressure',          line:'a live tension of the world leans on the journey'},
+  {id:'civilization', label:'Someone out here',  line:'signs of people, out where people should not be'},
+];
+const TRAVEL_EVENT_HEAVY_RATIO=0.3;   // the deepest slice of a fired roll reads heavy
+const TRAVEL_EVENT_BASE_WEIGHT=0.06;
+const TRAVEL_EVENT_MAX_WEIGHT=0.85;
+
+// The current card the seated GM narrates from (one at a time, like the
+// entered place). The travel tab owns writing it; Play only reads.
+const TRAVEL_EVENT={current:null};
+function travelEventCurrent(){ return TRAVEL_EVENT.current; }
+function travelEventSetCurrent(next){ TRAVEL_EVENT.current=next||null; }
+
+/* ---- the weight: pressure + attention + hazard + threads, NOTHING else ------- */
+// Reads ONLY the four named inputs. Any extra key — however it is spelled —
+// has zero effect, which is what "never faction standing" means in code.
+function travelEventWeight(inputs){
+  const src=regionIsRecord(inputs)?inputs:{};
+  const clamp01=v=>Math.min(1, Math.max(0, Number(v)||0));
+  const weight=TRAVEL_EVENT_BASE_WEIGHT
+    +0.28*clamp01(src.regionalPressure)
+    +0.22*clamp01(src.worldAttention)
+    +0.3*clamp01(src.hazard)
+    +0.04*Math.min(5, Math.max(0, Number(src.openThreads)||0));
+  return regionMapRound(Math.min(TRAVEL_EVENT_MAX_WEIGHT, Math.max(TRAVEL_EVENT_BASE_WEIGHT, weight)),4);
+}
+// Repo reality → the named inputs. Open haze gets the quiet baseline: the
+// unforged sea carries only what the overworld legitimately knows — nothing.
+function travelEventInputs(region, threads){
+  const ambient=region&&regionIsRecord(region.ambientMana)?region.ambientMana:null;
+  const band=String(ambient&&ambient.band||'').toLowerCase();
+  const forgeUi=region&&region.metadata&&region.metadata.visibleInputs&&region.metadata.visibleInputs.forgeUi||{};
+  const dangerTable={low:0.2, moderate:0.5, high:0.85, recommended:0.35};
+  return {
+    regionalPressure:ambient?Math.min(1, Math.max(0, Number(ambient.intensity)||0)):0.1,
+    worldAttention:band==='severe'?1:band==='charged'?0.7:band==='bright'?0.4:band==='steady'?0.2:0.1,
+    hazard:region?(dangerTable[String(forgeUi.danger||'recommended').toLowerCase()]||dangerTable.recommended):0.15,
+    openThreads:(threads&&Array.isArray(threads.LIVE)?threads.LIVE.length:0),
+  };
+}
+function travelEventFires(roll, weight){
+  return !!(roll&&Number.isFinite(roll.value))&&roll.value<Math.max(0, Number(weight)||0);
+}
+/* ---- the card: deterministic from the roll + the local character -------------- */
+function travelEventTypeFor(roll, weight){
+  const ratio=Math.min(0.9999, Math.max(0, (Number(roll&&roll.value)||0)/Math.max(Number(weight)||0.0001, 0.0001)));
+  return TRAVEL_EVENT_TYPES[Math.floor(ratio*TRAVEL_EVENT_TYPES.length)%TRAVEL_EVENT_TYPES.length];
+}
+// The interruption tile: the leg's hex mapped into the region's own grid —
+// deterministic, so the same leg interrupts at the same place forever.
+function travelEventTile(print, region, hex){
+  if(!print||!region) return null;
+  const layer=(Array.isArray(region.localLayers)?region.localLayers:[]).find(l=>l&&regionTerrainGrid(region, l.id));
+  if(!layer) return null;
+  const grid=regionTerrainGrid(region, layer.id);
+  const span=Math.max(1, Math.ceil((print.radius||1)*2));
+  const fx=((Number(hex&&hex.q)||0)-(print.anchor.q-Math.floor(span/2)))/span;
+  const fy=((Number(hex&&hex.r)||0)-(print.anchor.r-Math.floor(span/2)))/span;
+  return {
+    layerId:layer.id,
+    tile:{ x:Math.min(grid.width-1, Math.max(0, Math.round(fx*(grid.width-1)))),
+           y:Math.min(grid.height-1, Math.max(0, Math.round(fy*(grid.height-1)))) },
+  };
+}
+function travelEventForLeg(roll, region, threads, ctx){
+  const weight=travelEventWeight(travelEventInputs(region, threads));
+  if(!travelEventFires(roll, weight)) return null;
+  const type=travelEventTypeFor(roll, weight);
+  const heavy=roll.value<weight*TRAVEL_EVENT_HEAVY_RATIO;
+  const print=ctx&&Array.isArray(ctx.layout)&&region
+    ?ctx.layout.find(p=>p.regionId===region.id)||null:null;
+  const at=region?travelEventTile(print, region, ctx&&ctx.dest):null;
+  return {
+    type:type.id, title:type.label+' — '+type.line, heavy,
+    regionId:region?String(region.id):'',
+    layerId:at?at.layerId:'', tile:at?at.tile:null,
+  };
+}
+/* ---- consequences: BOTH doors write Slice-52 deltas --------------------------- */
+function travelEventResolutionDelta(event, choice){
+  const clean=choice==='enter'?'enter':'table';
+  return {
+    type:event&&event.type==='creature'?'denizen-event':'feature-state',
+    note:'travel event ('+String(event&&event.type||'unknown')+'): '+String(event&&event.title||'')
+      +' — '+(clean==='enter'?'the dreamer went to look':'resolved from the deck, without stopping'),
+    cell:'',
+  };
+}
+/* ---- what the seated GM narrates from ------------------------------------------ */
+function travelEventContextBlock(campaignName){
+  const cur=TRAVEL_EVENT.current;
+  if(!cur||cur.campaignName!==campaignName||!cur.event) return '';
+  const event=cur.event;
+  return [
+    'TRAVEL EVENT (a crossing was interrupted — the card is on the table):',
+    'Event: '+event.title+'.',
+    (cur.regionTitle?'Local character: the crossing skirts '+cur.regionTitle+'.':'Local character: open, unforged sea — only tint and atmosphere are known out here; invent no terrain.'),
+    (event.heavy?'This one is HEAVY — recommend going to the ground to face it, but the choice is always the player’s.':'A light interruption — either door plays well.'),
+    'Two doors: "Enter the scene" (the live sub-area mounts at the interruption tile) or "Resolve at the table" (narrate it through; consequences still land as reviewed place deltas).',
+    'Narrate the moment from the event and the local character. Never decide the player’s door for them; never resolve their response.',
+  ].join('\n');
+}
+function travelEventTableCard(campaignName){
+  const cur=TRAVEL_EVENT.current;
+  if(!cur||cur.campaignName!==campaignName||!cur.event) return null;
+  return {id:'travel-event', label:'Event Card', items:[
+    cur.event.title,
+    cur.event.heavy?'Heavy — the sea recommends the ground; the choice stays yours.':'Light — either door plays well.',
+    cur.regionTitle?('Near: '+cur.regionTitle):'In open, unforged sea.',
+    'Doors: enter the scene · resolve at the table.',
+  ], empty:''};
+}
+/* ---- the card at the travel table ---------------------------------------------- */
+function travelEventPanel(ctx){
+  const travel=ctx&&ctx.travel;
+  const pending=travel&&travel.state&&travel.state.pendingEvent;
+  if(!pending){ travelEventSetCurrent(null); return null; }
+  const entry=pending.regionId?(ctx.entries||[]).find(e=>e.region.id===pending.regionId)||null:null;
+  travelEventSetCurrent({ campaignName:ctx.campaignName, event:pending,
+    regionTitle:entry?String(entry.region.title||entry.region.id):'' });
+  const status=h('span',{class:'hint region-travel-event-status', role:'status'},'');
+  const panel=h('section',{class:'region-travel-event glass'});
+  let busy=false;
+  // the atomic consequence: place delta first (when a place exists to remember),
+  // then the travel state advances past the card — a failed write leaves the card
+  async function resolve(choice){
+    if(busy) return;
+    busy=true; status.textContent=choice==='enter'?'Going to look…':'Resolving from the deck…';
+    try{
+      let scene=null;
+      if(entry&&pending.layerId&&pending.tile){
+        scene=subareaScene(entry.region, pending.layerId, pending.tile);
+        if(scene){
+          const fresh=await placesLoad(ctx.cfg, ctx.campaignName, entry.region.id);
+          const next=placeApplyDelta(fresh.places, scene, travelEventResolutionDelta(pending, choice));
+          await placesWrite(ctx.cfg, ctx.campaignName, fresh.path, next, fresh.text, 'Travel event at '+placeKeyOf(pending.layerId, pending.tile)+' in '+entry.region.id);
+        }
+      }
+      const nextTravel=travelWithEventChoice(travel.state, choice);
+      const written=await travelWrite(ctx.cfg, ctx.campaignName, travel.path, nextTravel, travel.text, 'Travel event — '+choice);
+      travel.state=nextTravel; travel.text=written;
+      travelEventSetCurrent(null);
+      if(choice==='enter'&&entry&&pending.tile){
+        // lift the fog on the interruption tile through the existing guarded
+        // reveal writer, then hand the Slice-54 live mount the request
+        try{
+          const grid=regionTerrainGrid(entry.region, pending.layerId);
+          if(grid) await regionSaveRevealEdit(ctx.cfg, entry, ctx.campaignName,
+            {action:'cell', layerId:pending.layerId, index:pending.tile.y*grid.width+pending.tile.x, revealed:true, view:'gm'});
+        }catch(error){ /* already revealed or hidden layer — the live mount's own fog rule decides */ }
+        if(typeof subareaLiveRequest==='function') subareaLiveRequest(entry.region.id, pending.layerId, pending.tile);
+        toast('The scene waits on the Region tab — the table follows you there.');
+        go('campaign',{camp:ctx.campaignName, tab:'region'});
+        return;
+      }
+      status.textContent='Resolved at the table — the GM has the moment; what happened is remembered as a place delta.';
+      if(ctx.onChange) ctx.onChange();
+    }catch(error){ status.textContent=String(error&&error.message||error); }
+    busy=false;
+  }
+  // "a denizen who remembers the ship that didn't stop" — optional mint on the
+  // table door for a living event, through the Slice-52 instantiation (anchors)
+  function denizenFold(){
+    if(pending.type!=='creature'||!entry||!pending.layerId||!pending.tile) return null;
+    const nameIn=h('input',{placeholder:'what the sea calls them'});
+    const kindIn=h('input',{placeholder:'what they seem to be'});
+    const mintBtn=h('button',{class:'navbtn ghost', type:'button'},'They remember the ship');
+    mintBtn.onclick=async()=>{
+      const dname=nameIn.value.trim();
+      if(!dname){ status.textContent='Give them a name first.'; return; }
+      mintBtn.disabled=true;
+      try{
+        const scene=subareaScene(entry.region, pending.layerId, pending.tile);
+        if(!scene) throw new Error('that tile has nothing to derive');
+        const fresh=await placesLoad(ctx.cfg, ctx.campaignName, entry.region.id);
+        const next=placeDenizenInstantiate(fresh.places, scene, {
+          id:'dz-'+dname.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''),
+          name:dname, kind:kindIn.value.trim(), nicheId:'', homeCell:'',
+          disposition:[{note:'watched the ship pass without stopping', toward:''}],
+        });
+        await placesWrite(ctx.cfg, ctx.campaignName, fresh.path, next, fresh.text, 'Travel event denizen in '+entry.region.id);
+        status.textContent='They live there now — and they remember the ship that didn’t stop.';
+        mintBtn.disabled=true;
+      }catch(error){ status.textContent=String(error&&error.message||error); mintBtn.disabled=false; }
+    };
+    return h('details',{class:'region-travel-event-denizen'},
+      h('summary',null,'Someone was there'),
+      h('p',{class:'hint'},'If the living presence stays unmet, it can still be remembered — a denizen minted where the ship passed by.'),
+      h('div',{class:'toolrow'}, nameIn, kindIn, mintBtn));
+  }
+  panel.append(
+    h('div',{class:'region-readonly'},
+      h('b',null,'⚡ Event card — the crossing pauses'),
+      h('span',null,pending.title+(pending.heavy?' · HEAVY: the sea recommends the ground — the choice is always yours.':''))),
+    h('p',{class:'hint'},entry
+      ?'Near '+String(entry.region.title||entry.region.id)+' — the interruption has a real tile; both doors write what happens into the place records.'
+      :'Open, unforged sea — nothing exists out here to remember with. Resolve at the table, and chart ahead if you want this stretch to become real.'),
+    h('div',{class:'toolrow region-travel-event-doors'},
+      entry&&pending.tile?h('button',{class:'navbtn '+(pending.heavy?'primary':''), type:'button', title:'Detailed-immersive: the Slice-54 live scene mounts at the interruption tile',
+        onclick:()=>resolve('enter')},'▶ Enter the scene'):null,
+      h('button',{class:'navbtn '+(!entry||!pending.tile||!pending.heavy?'':'ghost'), type:'button', title:'Broad-immersive: the GM narrates it through; consequences still write place deltas',
+        onclick:()=>resolve('table')},'✦ Resolve at the table')),
+    denizenFold(), status);
+  return panel;
+}
 /* ========================================================================== *
    REGION REGENERATE - candidate compare, scoped merge, history snapshot.
  * ========================================================================== */
@@ -21033,6 +21437,7 @@ function campPlayBuildSystem(opts){
     sessionBoot?CAMP_PLAY_SESSION_BOOT:'',
     String(opts.dreamContext||''),   // Slice 53: the live dream scene rides the GM context
     String(opts.placeContext||''),   // Slice 54: the entered place — the GM knows what she remembers
+    String(opts.eventContext||''),   // Slice 56: a paused crossing's event card
     (opts.draftResolution||mode.draftResolution)?CAMP_PLAY_DRAFT_3D6_CONTEXT:'',
     'LIVE CAMPAIGN STATE:\n'+campPlayStateBlock(opts.campaignName||'', opts.parsed||{}, opts.threads||{}),
     CAMP_PLAY_TABLE_PROTOCOL,
@@ -21451,6 +21856,7 @@ async function campPlayBuildSession(name, profiles){
     const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges,[
       dream?dreamTableCard(dream.scene, dream.state):null,
       typeof subareaLiveCard==='function'?subareaLiveCard(name):null,   // Slice 54: the entered place
+      typeof travelEventTableCard==='function'?travelEventTableCard(name):null,   // Slice 56: the event card
     ]);
     tablePanel.replaceChildren(...cards.map(card=>{
       const list=(card.items||[]).filter(Boolean);
@@ -21514,7 +21920,8 @@ async function campPlayBuildSession(name, profiles){
       groundingSystem,
       groundingMode:turnGroundingMode,
       dreamContext:dream?dreamContextBlock(dream.scene, dream.state):'',
-      placeContext:typeof subareaLiveContextBlock==='function'?subareaLiveContextBlock(name):''   // Slice 54
+      placeContext:typeof subareaLiveContextBlock==='function'?subareaLiveContextBlock(name):'',   // Slice 54
+      eventContext:typeof travelEventContextBlock==='function'?travelEventContextBlock(name):''   // Slice 56
     });
     const history=messages.slice(0,-1).map(m=>({role:m.role, content:m.content}));
     const chat=Object.assign({ system, messages:history, model:modelSel.value||campPlayModelFor(engine,persona), maxTokens:CAMP_PLAY_MAX_TOKENS }, campPlayChatOptions(engine,persona,mode));
