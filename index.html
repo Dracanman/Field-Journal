@@ -19254,7 +19254,9 @@ function regionWorldHubPanel(entry, cfg, campaignName, refresh){
 
 const REGION_REGENERATE_SCOPES = [
   {id:'terrain', label:'Terrain / local layers', fields:['localLayers','terrain']},
-  {id:'elements', label:'Elements + mana', fields:['ambientMana','elementalInfluence']},
+  // cosmicBlend rides with elements: a re-shaped blend (e.g. leaning a starter toward the
+  // bottom layer) must land in the merged region, not just in the candidate's provenance.
+  {id:'elements', label:'Elements + mana', fields:['ambientMana','elementalInfluence','cosmicBlend']},
   {id:'features', label:'Features', fields:['features']},
   {id:'routes', label:'Routes / connections', fields:['connections']},
 ];
@@ -19374,6 +19376,9 @@ function regionRegenerateMerge(liveRegion, candidateRegion, selectedScopes){
     }else if(scope==='elements'){
       next.ambientMana=regionClone(candidate.ambientMana);
       next.elementalInfluence=regionClone(candidate.elementalInfluence);
+      // take the candidate's blend verbatim (including "no transition" = absent)
+      if(candidate.cosmicBlend===undefined) delete next.cosmicBlend;
+      else next.cosmicBlend=regionClone(candidate.cosmicBlend);
     }else if(scope==='features'){
       next.features=regionRegenerateMergeById(live.features,candidate.features,protection.features,'feature',heldBack);
     }else if(scope==='routes'){
@@ -19480,6 +19485,27 @@ function regionRegenerateWorkspace(host,cfg,campaignName,regionId){
     const held=mergePreview.heldBack;
     const seedInput=regionForgeInput(state.seed,value=>{ state.seed=value; makeCandidate(); draw(); });
     const reroll=()=>{ state.seed=regionForgeRerollSeed(state.seed,++state.rerollStep); makeCandidate(); draw(); };
+    // Forces are editable here so an accepted region can be RE-SHAPED, not just rerolled
+    // (nothing is truly anchored). Changed inputs regenerate the in-memory candidate; the
+    // live region still changes only on a scoped merge, with fog/anchors riding the usual
+    // locks. Size stays fixed on purpose — fog preservation is cell-index-based.
+    const update=(key,value)=>{
+      state[key]=value;
+      // the Forge's adjacency law: a non-adjacent blend clears itself
+      if(state.neighborLayer && !regionCosmicBlendAdjacent(state.cosmicLayer,state.neighborLayer)) state.neighborLayer='';
+      try{ makeCandidate(); status=''; }
+      catch(error){ status='Candidate failed: '+String(error&&error.message||error); }
+      draw();
+    };
+    const forcesStage=regionForgeStage('Forces','re-shape the inputs, then compare',
+      h('div',{class:'region-forge-grid'},
+        regionForgeField('Terrain character',regionForgeInput(state.terrainCharacter,v=>update('terrainCharacter',v)),'Word-forms count: "mountains, lush forests, waterfalls…"'),
+        regionForgeField('Element emphasis',regionForgeInput(state.elementEmphasis,v=>update('elementEmphasis',v))),
+        regionForgeField('Ambient mana',regionForgeSelect(state.ambientMana,[['recommended','Recommended'],['quiet','Quiet'],['steady','Steady'],['bright','Bright'],['charged','Charged'],['severe','Severe']],v=>update('ambientMana',v))),
+        regionForgeField('Danger',regionForgeSelect(state.danger,[['recommended','Recommended'],['low','Low'],['moderate','Moderate'],['high','High']],v=>update('danger',v))),
+        regionForgeField('Blend neighbor',regionForgeSelect(state.neighborLayer,[['','No transition'],['top','Top'],['middle','Middle'],['bottom','Bottom']],v=>update('neighborLayer',v)),'Only adjacent blends validate.'),
+        regionForgeField('Blend strength',regionForgeInput(state.blendStrength,v=>update('blendStrength',Number(v)),{type:'number',min:'0',max:'1',step:'0.05'}))),
+      regionForgeField('Short direction',regionForgeTextarea(state.direction,v=>update('direction',v),{rows:'2'}),'Changed forces regenerate the candidate; the live region changes only on merge.'));
     const merge=async()=>{
       const scopes=checks.filter(item=>item.node.checked).map(item=>item.value);
       if(!scopes.length){ status='Pick at least one scope to merge.'; draw(); return; }
@@ -19500,6 +19526,7 @@ function regionRegenerateWorkspace(host,cfg,campaignName,regionId){
             h('button',{class:'navbtn primary',type:'button',onclick:reroll},'Reroll'),
             h('button',{class:'navbtn ghost',type:'button',onclick:()=>go('campaign',{camp:campaignName,tab:'region',region:live.id})},'Back to region'))),
         h('p',{class:'hint'},'Candidate provenance: '+((candidate.metadata&&candidate.metadata.seed)||'none')+' · '+((candidate.metadata&&candidate.metadata.generatorVersion)||'unknown'))),
+      forcesStage,
       regionForgeStage('Compare','live beside candidate',
         h('div',{class:'region-regenerate-compare'},regionRegenerateMiniMap('Live',live),regionRegenerateMiniMap('Candidate',candidate)),
         errors.length?h('div',{class:'region-invalid'},h('b',null,'Candidate validation'),h('ul',null,...errors.map(e=>h('li',null,e.text||e.message||String(e))))):h('p',{class:'region-valid'},'Valid candidate region.')),
