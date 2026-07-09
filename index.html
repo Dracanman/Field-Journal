@@ -371,6 +371,17 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
   .gal-card .meta small{ display:block; color:var(--hint); font-style:italic; }
   .gal-card .acts{ display:flex; gap:4px; padding:0 8px 10px; flex-wrap:wrap; }
   .gal-card .acts button{ font-size:13px; border:1px solid var(--gold-soft); background:#fff8; border-radius:6px; padding:4px 9px; color:var(--ink-soft); }
+  /* two versions of one card met during a merge — a soft chip, never a blocking screen */
+  .gal-card.conflicted{ border-color:var(--gold-soft); }
+  .gal-card.conflict-copy{ border-style:dashed; opacity:.92; }
+  .conflict-chip{ margin-top:6px; font-size:12px; border:1px solid var(--gold-soft); background:#fff8; border-radius:999px; padding:2px 9px; color:var(--ink-soft); font-style:italic; }
+  .conflict-compare .conflict-cols{ display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-top:10px; }
+  .conflict-side{ background:var(--paper-card); border:1px solid #e6dcc4; border-radius:8px; padding:10px 12px; margin-bottom:8px; }
+  .conflict-side h3{ margin:2px 0 4px; }
+  .conflict-fields{ font-size:14px; color:var(--ink-soft); display:flex; flex-direction:column; gap:3px; }
+  /* restore preview — what a backup file holds, before anything touches the journal */
+  .restore-facts{ background:var(--paper-card); border:1px solid #e6dcc4; border-radius:8px; padding:8px 12px; margin:10px 0; }
+  .restore-row{ display:flex; justify-content:space-between; gap:12px; padding:3px 0; color:var(--ink-soft); font-size:15px; }
   .empty-note{ color:var(--hint); font-style:italic; padding:18px 2px; }
   .spark-row{ display:flex; gap:12px; align-items:flex-start; justify-content:space-between; background:var(--paper-card); border:1px solid #e6dcc4; border-radius:8px; padding:10px 13px; margin-bottom:8px; }
   .spark-text{ white-space:pre-wrap; color:var(--ink-soft); flex:1; }
@@ -4450,6 +4461,29 @@ function saveLocal(opts){
 }
 function save(){ saveLocal(); scheduleSync(); }                    // local + a (debounced, de-duped) repo sync
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+/* ---------- item identity (Slice 57) ---------------------------------------
+   The merge has to answer two questions about any two copies of one card: are they the
+   same, and which is newer. Both answers must come out identical on every device, or the
+   repo copy oscillates forever. */
+// Canonical JSON. Key order differs between a freshly built object and one round-tripped
+// through the repo, so plain JSON.stringify would call two identical cards different.
+function stableStringify(v){
+  if(v===null || typeof v!=='object') return JSON.stringify(v===undefined? null : v);
+  if(Array.isArray(v)) return '['+v.map(stableStringify).join(',')+']';
+  return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stableStringify(v[k])).join(',')+'}';
+}
+// FNV-1a/32 -> base36. Not a security hash: it answers "is this the same content?" cheaply
+// and offline. `updatedAt` is left out on purpose — a re-save that changed nothing must not
+// be able to manufacture a conflict.
+function contentHash(item){
+  const o={}; Object.keys(item||{}).forEach(k=>{ if(k!=='updatedAt') o[k]=item[k]; });
+  const s=stableStringify(o); let x=0x811c9dc5;
+  for(let i=0;i<s.length;i++){ x^=s.charCodeAt(i); x=Math.imul(x,0x01000193)>>>0; }
+  return x.toString(36);
+}
+// Items saved before Slice 57 carry no stamp; they are older than anything stamped, never newest.
+function stampedAt(item){ const n=Number(item && item.updatedAt); return Number.isFinite(n)&&n>0? n : 0; }
+function touchItem(item){ if(item) item.updatedAt=Date.now(); return item; }
 // deletion tombstones (id -> deletedAt). A removed creation/spark is recorded here so the
 // additive merge on the next sync — or another device's copy — can't resurrect it. Undo
 // clears the tombstone so the item is allowed back. See mergeIncoming in sync/github.js.
@@ -4669,6 +4703,7 @@ function moreMenu(){
     item('◐ Theme: '+themeModeLabel(), ()=>cycleThemeMode()),
     item((DB.fxRich?'✦ Atmospherics: on':'✧ Atmospherics: off'), ()=>setAtmospherics(!DB.fxRich)),
     item((document.body.classList.contains('fx-calm')?'❄ Calm visuals: on':'❄ Calm visuals: off'), ()=>setCalmVisuals(!document.body.classList.contains('fx-calm'))),
+    (typeof restoreUndoSlot==='function' && restoreUndoSlot())? item('↺ Undo restore', ()=>undoRestore()) : null,
     item('↻ Replay the welcome', ()=>replayWelcome()),
     item('? How this works', ()=>showIntro(true)),
     item('🐞 Report a problem', ()=>companionOpenReport()),
@@ -5136,7 +5171,7 @@ function elementPicker(state, repaint){
     return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?(e.accent||'var(--gold-soft)'):'var(--gold-soft)', background:on?deriveBg(e.accent||ACCENTS.gold):'#fbf8ef' },
       onclick:()=>{ toggleKey(state,'element',e.key); paintEls(); repaint(); }}, h('span',{class:'dot', style:{background:e.accent||'var(--gold-soft)'}}), e.label); }
   function paintEls(){ erow.replaceChildren(...allElements().map(elChip),
-    h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push({key,label:n.trim(),accent:ACCENTS.gold,custom:true}); save(); toggleKey(state,'element',key); paintEls(); repaint(); } }}, '+ add your own')); }
+    h('button',{class:'chip dash advanced-only', onclick:()=>{ const n=prompt('Name your own element'); if(n&&n.trim()){ const key='c_'+uid(); (DB.elements=DB.elements||[]).push(touchItem({key,label:n.trim(),accent:ACCENTS.gold,custom:true})); save(); toggleKey(state,'element',key); paintEls(); repaint(); } }}, '+ add your own')); }
   paintEls();
   box.append(erow);
 
@@ -5146,7 +5181,7 @@ function elementPicker(state, repaint){
     return h('button',{class:'chip'+(on?' active':''), 'aria-pressed':on?'true':'false', style:{ borderColor:on?'var(--green)':'var(--gold-soft)', background:on?'#eef0e4':'#fbf8ef' },
       onclick:()=>{ toggleKey(state,'expression',e.key); paintX(); repaint(); }}, e.label); }
   function paintX(){ xrow.replaceChildren(...allExpressions().map(xChip),
-    h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push({key,label:n.trim()}); save(); toggleKey(state,'expression',key); paintX(); repaint(); } }}, '+ add a flavor')); }
+    h('button',{class:'chip dash', onclick:()=>{ const n=prompt('Name a flavor (an expression)'); if(n&&n.trim()){ const key='x_'+uid(); (DB.expressions=DB.expressions||[]).push(touchItem({key,label:n.trim()})); save(); toggleKey(state,'expression',key); paintX(); repaint(); } }}, '+ add a flavor')); }
   paintX();
   xwrap.append(xrow);
   box.append(xwrap);
@@ -5363,7 +5398,7 @@ function viewSparks(){
   const body=f.querySelector('.framed-body');
   const ta=h('textarea',{placeholder:'a random idea, a name, a what-if…', rows:2,
     style:{width:'100%',border:'1.5px solid var(--gold-soft)',borderRadius:'8px',padding:'10px',fontFamily:'inherit',fontSize:'17px',background:'#fffdf7',color:'var(--ink-soft)'}});
-  function add(){ const t=ta.value.trim(); if(!t) return; (DB.sparks=DB.sparks||[]).push({id:uid(), text:t, at:Date.now()}); ta.value=''; save(); paint(); ta.focus(); }
+  function add(){ const t=ta.value.trim(); if(!t) return; (DB.sparks=DB.sparks||[]).push(touchItem({id:uid(), text:t, at:Date.now()})); ta.value=''; save(); paint(); ta.focus(); }
   ta.addEventListener('keydown', e=>{ if(e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); add(); } });
   body.append(h('div',{class:'field', style:{maxWidth:'640px',margin:'0 auto 6px'}},
     h('label',null,'A new spark'), ta,
@@ -5422,7 +5457,7 @@ function viewGallery(){
   function paint(){
     host.replaceChildren(); let any=false;
     ['field','world'].forEach(kit=>{
-      const items=DB.creations.filter(c=>c.kit===kit && match(c)).reverse(); if(!items.length) return; any=true;
+      const items=withConflictsBeside(DB.creations.filter(c=>c.kit===kit && match(c)).reverse()); if(!items.length) return; any=true;
       const s=h('div',{class:'shelf'}, h('h3',null, kit==='field'? 'The Field Journal':"The Worldmaker's Pages"));
       const g=h('div',{class:'gal-grid'}); items.forEach(c=> g.append(galCard(c))); s.append(g); host.append(s);
     });
@@ -5460,15 +5495,66 @@ function creationThumb(c){
   if (c.slots){ const s=c.slots.find(x=>x.image); return s?s.image:null; }
   return null;
 }
+/* ---------- two versions of one card met (Slice 57) -------------------------
+   A conflict copy is the older of two edits that were made on two devices at once. The
+   merge kept both rather than pick silently; these are the doors out of that. No blocking
+   screen anywhere — until someone chooses, the newer card simply wears a chip. */
+// the copy rides directly beside the version it lost to, never adrift at the end of the shelf
+function withConflictsBeside(items){
+  const copies={}, out=[];
+  items.forEach(c=>{ if(c && c.conflictOf) (copies[c.conflictOf]=copies[c.conflictOf]||[]).push(c); });
+  items.forEach(c=>{ if(!c || c.conflictOf) return; out.push(c); (copies[c.id]||[]).forEach(x=>out.push(x)); });
+  items.forEach(c=>{ if(c && c.conflictOf && out.indexOf(c)<0) out.push(c); });   // its winner was removed — it stands alone
+  return out;
+}
+function conflictPartner(c){
+  if(c.conflictOf) return (DB.creations||[]).find(x=>x && x.id===c.conflictOf) || null;
+  return (DB.creations||[]).find(x=>x && x.conflictOf===c.id) || null;
+}
+function conflictChip(c){
+  const partner=conflictPartner(c); if(!partner) return null;
+  const older=c.conflictOf? c : partner, newer=c.conflictOf? partner : c;
+  return h('button',{class:'conflict-chip', type:'button', title:'two versions of this met — keep the one you like',
+    onclick:()=>openConflict(newer, older)}, c.conflictOf? '⧉ older version' : '⧉ two versions');
+}
+function conflictSide(c, label){
+  const w=WS[c.worksheetId] || {title:'(unknown page)', fields:[]}, f=c.fields||{};
+  const rows=Object.keys(f).map(k=>{ const v=String(f[k]||'').trim(); return v? h('div',null, h('b',null, k+': '), v) : null; }).filter(Boolean);
+  const when=stampedAt(c)? new Date(stampedAt(c)).toLocaleString() : 'saved before this device kept times';
+  return h('div',{class:'conflict-side'},
+    h('div',{class:'kicker'}, label),
+    h('h3',null, creationTitle(c)),
+    h('p',{class:'hint'}, w.title+' · '+when),
+    rows.length? h('div',{class:'conflict-fields'}, ...rows) : h('p',{class:'hint'},'(nothing written on this one)'));
+}
+// keeping one dismisses the other exactly as "Remove" would — a tombstone, so the choice
+// travels to the other device instead of the loser sailing back in on the next sync.
+function keepVersion(keep, drop){
+  const i=DB.creations.indexOf(drop); if(i>=0) DB.creations.splice(i,1);
+  tombstone(drop.id);
+  if(keep.conflictOf){ delete keep.conflictOf; delete keep.conflictAt; }   // the survivor is just a card again
+  touchItem(keep); save(); render();
+  toast('Kept “'+creationTitle(keep)+'.”');
+}
+function openConflict(newer, older){
+  let close;
+  const body=h('div',{class:'conflict-compare'},
+    h('p',{class:'hint'},'Two versions of this met — they were both kept. Keep the one you like; the other is put away.'),
+    h('div',{class:'conflict-cols'},
+      h('div',null, conflictSide(newer,'the one showing'), h('button',{class:'navbtn primary', onclick:()=>{ if(close) close(); keepVersion(newer, older); }},'Keep this one')),
+      h('div',null, conflictSide(older,'the other one'), h('button',{class:'navbtn', onclick:()=>{ if(close) close(); keepVersion(older, newer); }},'Keep this one'))));
+  close=showModalNode('Two versions of this card', null, body);
+}
 function galCard(c){
   const w=WS[c.worksheetId] || {title:'(unknown page)', fields:[]};
   const thumb=creationThumb(c);
-  const card=h('div',{class:'gal-card'},
+  const chip=conflictChip(c);
+  const card=h('div',{class:'gal-card'+(chip? (c.conflictOf?' conflict-copy':' conflicted') : '')},
     h('div',{class:'thumb'}, thumb? h('img',{src:thumb, alt:''}) : h('span',{class:'none'}, w.title)),
-    h('div',{class:'meta'}, h('b',null, creationTitle(c)), h('small',null, w.title + (c.specimenNo? ` · no. ${c.specimenNo}`:''))),
+    h('div',{class:'meta'}, h('b',null, creationTitle(c)), h('small',null, w.title + (c.specimenNo? ` · no. ${c.specimenNo}`:'')), chip),
     h('div',{class:'acts'},
       h('button',{onclick:()=>openCreation(c)}, 'Open'),
-      h('button',{onclick:()=>{ const copy=JSON.parse(JSON.stringify(c)); copy.id=uid(); copy.createdAt=copy.updatedAt=Date.now(); if(w.specimen) copy.specimenNo=nextSpecimen(w.id); DB.creations.push(copy); save(); render(); }}, 'Duplicate'),
+      h('button',{onclick:()=>{ const copy=JSON.parse(JSON.stringify(c)); copy.id=uid(); copy.createdAt=copy.updatedAt=Date.now(); delete copy.conflictOf; delete copy.conflictAt; if(w.specimen) copy.specimenNo=nextSpecimen(w.id); DB.creations.push(copy); save(); render(); }}, 'Duplicate'),
       (w.card? h('button',{class:'advanced-only', onclick:()=>sendToProcreate(w, c.fields||{}, creationThumb(c), {specimenNo:c.specimenNo})}, 'Save as image'):null),
       (w.card? h('button',{class:'advanced-only', onclick:()=>shareCreation(c)}, 'Weave into the world →'):null),
       h('button',{onclick:()=>{ const idx=DB.creations.indexOf(c); if(idx<0) return; DB.creations.splice(idx,1); tombstone(c.id); save(); render();
@@ -7115,6 +7201,26 @@ function syncPayload(){
   return payload;
 }
 let syncTimer=null, syncing=false, _lastSyncedJSON=null, _lastSyncError=null;
+/* ---------- the merge baseline (Slice 57) -----------------------------------
+   A per-id content fingerprint of the last copy we KNOW the repo held. Fingerprints, not
+   content: a journal carries inline images and a second full copy would double this
+   device's storage. It answers the only question the merge needs — "did THIS side change
+   since the two sides last agreed?" — which `updatedAt` alone cannot, because an untouched
+   device also holds a stamped card.
+   Device-local, under its own IndexedDB key: it is not in DB, so it can never reach the
+   repo payload or a backup file. `_lastSyncedJSON` stays what it always was — the string
+   used to skip a no-op commit. */
+const SYNC_BASELINE_KEY='sync-baseline';
+const SYNC_BASELINE={ map:null };                      // .map = { creations:{id:hash}, sparks:{id:hash} } | null
+function syncBaseline(){ return SYNC_BASELINE.map; }
+function fingerprintList(list){ const m={}; (list||[]).forEach(x=>{ if(x && x.id) m[x.id]=contentHash(x); }); return m; }
+// call whenever local and repo are known to agree: right after we write, or after we read.
+function captureBaseline(known){
+  if(!known || typeof known!=='object') return;
+  SYNC_BASELINE.map={ creations:fingerprintList(known.creations), sparks:fingerprintList(known.sparks) };
+  idbSet(SYNC_BASELINE_KEY, SYNC_BASELINE.map).catch(()=>{});
+}
+async function loadBaseline(){ try{ const b=await idbGet(SYNC_BASELINE_KEY); if(b && typeof b==='object' && b.creations) SYNC_BASELINE.map=b; }catch(e){} }
 function scheduleSync(){ if(!ghReady()) return; clearTimeout(syncTimer); syncTimer=setTimeout(()=>syncToRepo({silent:true}), 20000); }   // 20s debounce — coalesce bursts
 // E-2: background (silent) syncs used to swallow every failure with no trace — a device
 // whose token expired, or that always 429/5xxs, would just quietly never sync again, with
@@ -7132,7 +7238,8 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
     // conflict-safe: if the file moved on the server (another device synced), fold that
     // remote journal into ours before writing, so a second device never erases the first.
     await ghUpdate(cfg, jsonPath, remote=>{ if(remote){ try{ mergeIncoming(JSON.parse(remote)); }catch(_){} } return JSON.stringify(syncPayload(), null, 1); }, `Update ${stem} journal`, {create:true});
-    _lastSyncedJSON = JSON.stringify(syncPayload(), null, 1); saveLocal();   // capture any merged-in remote work
+    const written=syncPayload();
+    _lastSyncedJSON = JSON.stringify(written, null, 1); captureBaseline(written); saveLocal();   // capture any merged-in remote work; the repo now holds exactly this
     // the human-readable .md only re-renders on an explicit save, so background syncs stay one commit
     if(!opts.silent){ const mdPath=`${base}/${stem}.md`; await ghUpdate(cfg, mdPath, ()=>renderJournalMarkdown(), `Update ${stem} journal (readable)`, {create:true}); }
     if(!opts.silent) toast('Saved to your file in the world.');
@@ -7142,13 +7249,15 @@ async function syncToRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent)
 }
 function stripForBackup(db){
   const d=Object.assign({},db);
-  const includePractice=!!d.syncPractice;
   if(d.github){ d.github=Object.assign({},d.github); delete d.github.token; }
   delete d.campaignScratch;
   delete d.usageLedger;
   delete d.syncPractice;
-  if(includePractice) d.practice=practiceSyncSettings(d.practice);
-  else delete d.practice;
+  // A backup file is a WHOLE copy of this device's work, so practice always travels in it
+  // (Slice 58). `syncPractice` governs exactly what its label says — the REPO payload, see
+  // syncPayload — and nothing else: a device swap must not silently lose every chapter,
+  // drill and flashcard because a repo toggle happened to be off.
+  d.practice=practiceSyncSettings(d.practice);
   d.assistant=assistantSyncSettings(d.assistant);
   if(d.engines){
     const engines=d.engines&&typeof d.engines==='object'?d.engines:{};
@@ -7200,21 +7309,76 @@ function mergePracticeState(local,incoming){
     journal:journal.slice(0,30),
   });
 }
-// merge an incoming journal (from the repo or a backup file) into DB. Additive for new
-// work (existing items win, new ones appended by id), but deletions are honored via
-// tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
+// Which of two copies leads? The newer stamp; on a tie (or between two unstamped copies) a
+// stable content ordering, so every device picks the SAME winner and the repo can settle.
+function newerItem(a,b){
+  const ta=stampedAt(a), tb=stampedAt(b);
+  if(ta!==tb) return ta>tb? a : b;
+  return stableStringify(a) > stableStringify(b) ? a : b;
+}
+function isConflictCopy(item){ return !!(item && item.conflictOf); }
+// The loser of a true conflict is never destroyed — it waits beside the winner as a conflict
+// copy. Its id is derived from its own content, so both devices mint the very same copy: a
+// later merge recognises it as one item instead of breeding another.
+function conflictCopy(loser, winner){
+  const copy=JSON.parse(JSON.stringify(loser));
+  copy.id=loser.id+'~c'+contentHash(loser);
+  copy.conflictOf=loser.id;
+  copy.conflictAt=Math.max(stampedAt(winner), stampedAt(loser));
+  return copy;
+}
+/* Merge one id-keyed list. Additive for new work and tombstone-respecting as before, but an
+   id both sides hold is now decided rather than left to flip-flop — and decided without ever
+   dropping an edit:
+     identical content     -> one item; the stamps converge (otherwise the repo would
+                              oscillate on the stamp alone)
+     one side changed      -> that side wins everywhere, quietly. The common case.
+     both sides changed    -> the newer becomes THE item; the older is kept as a conflict copy.
+   "Changed" is measured against the baseline. With no baseline (a device that never synced,
+   or a backup file) an unstamped copy is taken for the ancestor it almost certainly is —
+   only an edit stamps — and two stamped, differing copies are a real conflict: both kept.
+   Conflict copies are content-addressed, so they never re-conflict. */
+function mergeItems(local, incoming, tomb, base){
+  const out=(local||[]).filter(x=>x && x.id && !tomb[x.id]);
+  const byId=Object.create(null); out.forEach(x=>{ byId[x.id]=x; });
+  const adds=[];
+  (incoming||[]).forEach(inc=>{
+    if(!inc || !inc.id || tomb[inc.id]) return;
+    const mine=byId[inc.id];
+    if(!mine){ adds.push(inc); return; }
+    if(isConflictCopy(mine) || isConflictCopy(inc)) return;
+    const hm=contentHash(mine), hi=contentHash(inc);
+    if(hm===hi){ const t=Math.max(stampedAt(mine), stampedAt(inc)); if(t) mine.updatedAt=t; return; }
+    const seen = base? base[inc.id] : undefined;
+    let winner;
+    if(seen!==undefined && hm===seen) winner=inc;                        // only the repo moved
+    else if(seen!==undefined && hi===seen) winner=mine;                  // only we moved
+    else if(!stampedAt(mine) && stampedAt(inc)) winner=inc;              // ours predates stamping
+    else if(stampedAt(mine) && !stampedAt(inc)) winner=mine;
+    else { winner=newerItem(mine,inc); adds.push(conflictCopy(winner===mine? inc : mine, winner)); }
+    if(winner!==mine){ out[out.indexOf(mine)]=winner; byId[inc.id]=winner; }
+  });
+  // appended, never spliced: both devices must end with the same array order or the repo
+  // would keep rewriting itself over nothing. The gallery re-groups copies beside their
+  // winner at render time.
+  adds.forEach(x=>{ if(!byId[x.id] && !tomb[x.id]){ out.push(x); byId[x.id]=x; } });
+  return out;
+}
+// merge an incoming journal (from the repo or a backup file) into DB. Deletions are honored
+// via tombstones: we union both sides' tombstones, drop any tombstoned item locally, and skip
 // re-adding it from the incoming copy. That's what stops a "Remove" from springing back the
-// next time the repo/backup copy is merged in — on this device or another.
+// next time the repo/backup copy is merged in — on this device or another. A tombstoned item
+// is skipped before conflict detection, so it can never come back wearing a conflict copy.
 function mergeIncoming(inc){
   if(!inc || typeof inc!=='object') return;
   const tomb = DB.tombstones = Object.assign({}, inc.tombstones||{}, DB.tombstones||{});
-  DB.creations = DB.creations.filter(c=>!(c && tomb[c.id]));
-  const have=new Set(DB.creations.map(c=>c.id)); (inc.creations||[]).forEach(c=>{ if(c && c.id && !have.has(c.id) && !tomb[c.id]) DB.creations.push(c); });
+  const base = SYNC_BASELINE.map;
+  DB.creations = mergeItems(DB.creations, inc.creations, tomb, base && base.creations);
   DB.roots=Object.assign({}, inc.roots, DB.roots);
   DB.counters=Object.assign({}, inc.counters, DB.counters);
   DB.elements=mergeBy(DB.elements, inc.elements, 'key');
   DB.expressions=mergeBy(DB.expressions, inc.expressions, 'key');
-  DB.sparks=mergeBy(DB.sparks||[], inc.sparks, 'id').filter(s=>!(s && tomb[s.id]));
+  DB.sparks=mergeItems(DB.sparks||[], inc.sparks, tomb, base && base.sparks);
   if('assistant' in inc){
     const localDevice=typeof normalizeAssistantSettings==='function'?normalizeAssistantSettings(DB.assistant):{};
     const local=assistantSyncSettings(DB.assistant), incoming=assistantSyncSettings(inc.assistant);
@@ -7231,7 +7395,9 @@ function mergeIncoming(inc){
 async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silent) toast('Connect to GitHub first.'); return; }
   const cfg=ghCfg(); const base=(cfg.path||'kit/journal/').replace(/\/+$/,''); const stem=stemOf(cfg);
   try{ const r=await ghGetText(cfg, `${base}/${stem}.json`); if(!r){ if(!opts.silent) toast('No saved file found yet.'); return; }
-    mergeIncoming(JSON.parse(r.text));
+    const remote=JSON.parse(r.text);
+    mergeIncoming(remote);
+    captureBaseline(remote);   // whatever we merged, THIS is what the repo holds right now
     saveLocal(); if(!opts.silent) toast('Loaded from your file.'); render();   // don't echo a sync back out
   }catch(e){ if(!opts.silent) toast('Load failed: '+e.message); }
 }
@@ -7482,16 +7648,113 @@ async function ghOauthWhoAmI(token){
 // the journal travels with its images inline; device secrets (GitHub token,
 // engine key, engine endpoint, engine model, usage ledger) are never written
 // into a backup.
+// The spaces a backup file covers, and the only things a Replace ever swaps. Everything
+// absent from this list is DEVICE state and no restore touches it, in either door: the
+// GitHub token, engine profiles, who/PIN roster state, messagesSeen, the usage ledger,
+// unsent campaign scratch, and the look-and-feel toggles.
+const BACKUP_SPACES=['creations','sparks','roots','counters','elements','expressions','tombstones','naming','practice','assistant'];
+function backupFileData(){ const d=stripForBackup(DB); d.backupAt=Date.now(); return d; }   // stamped so a restore can say when it was saved
 function exportBackup(){
-  const data=JSON.stringify(stripForBackup(DB), null, 1);
+  const data=JSON.stringify(backupFileData(), null, 1);
   const b=new Blob([data],{type:'application/json'});
   const a=h('a',{href:URL.createObjectURL(b), download:'vael-journal-backup-'+new Date().toISOString().slice(0,10)+'.json'});
   document.body.append(a); a.click(); a.remove(); toast('Saved a backup file.');
 }
+function parseBackupText(text){
+  const inc=JSON.parse(text);
+  if(!inc || typeof inc!=='object' || !Array.isArray(inc.creations)) throw new Error('not a journal backup');
+  return inc;
+}
+// What the file holds, read WITHOUT touching the database — so a restore can be looked at
+// before it happens. "Buds" are the Naming Tree's unassigned roots.
+function backupPreview(inc){
+  const practice=practiceSyncSettings(inc && inc.practice);
+  let chapters=0, flashcards=0;
+  Object.keys(practice.tracks||{}).forEach(id=>{
+    const tr=practice.tracks[id]||{};
+    chapters+=Object.keys(tr.chapterDone||{}).filter(k=>tr.chapterDone[k]).length;
+    flashcards+=Object.keys(tr.flashKnown||{}).filter(k=>tr.flashKnown[k]).length;
+  });
+  return {
+    name:(inc.github&&inc.github.displayName)||'',
+    savedAt:Number(inc.backupAt)||0,
+    creations:(inc.creations||[]).length,
+    sparks:(inc.sparks||[]).length,
+    namingBuds:((inc.naming&&inc.naming.openRoots)||[]).length,
+    practiceChapters:chapters,
+    practiceFlashcards:flashcards,
+  };
+}
+// Normalize one space out of the file. Throws on a malformed file BEFORE anything is
+// assigned, which is what keeps a failed restore from leaving the database half-swapped.
+function restoreSpaceValue(key, value){
+  if(key==='practice') return practiceSyncSettings(value);
+  if(key==='assistant'){
+    const device=normalizeAssistantSettings(DB.assistant);
+    return normalizeAssistantSettings(Object.assign({}, assistantSyncSettings(value), {autoEscalateLocalToApi:device.autoEscalateLocalToApi===true}));
+  }
+  if(key==='naming') return Object.assign(namingDefault(), value||{});
+  if(key==='creations'||key==='sparks'||key==='elements'||key==='expressions') return Array.isArray(value)? value.slice() : [];
+  return (value && typeof value==='object' && !Array.isArray(value))? Object.assign({}, value) : {};
+}
+function backupReplaceValues(inc){
+  const next={};
+  BACKUP_SPACES.forEach(k=>{ if(k in inc) next[k]=restoreSpaceValue(k, inc[k]); });
+  return next;
+}
+function backupApplyReplace(inc){ Object.assign(DB, backupReplaceValues(inc)); }   // wholesale, but only the covered spaces
+function backupApplyFoldIn(inc){ mergeIncoming(inc); }                             // conflict-aware since Slice 57
+/* ---------- the way back (Slice 58) -----------------------------------------
+   A restore is never a one-way door: this device's copy is put aside first, so the whole
+   thing can be walked back with one tap. The slot is device-local, under its own IndexedDB
+   key, and is replaced by the next restore. */
+const RESTORE_UNDO_KEY='restore-undo';
+const RESTORE_UNDO={ slot:null };                  // { at, data } | null
+function restoreUndoSlot(){ return RESTORE_UNDO.slot; }
+async function loadRestoreUndo(){ try{ const s=await idbGet(RESTORE_UNDO_KEY); if(s && s.data) RESTORE_UNDO.slot=s; }catch(e){} }
+async function keepRestoreUndo(){
+  RESTORE_UNDO.slot={ at:Date.now(), data:stripForBackup(DB) };
+  try{ await idbSet(RESTORE_UNDO_KEY, RESTORE_UNDO.slot); }catch(e){}   // no IndexedDB: the slot still stands for this session
+}
+function undoRestore(){
+  const slot=restoreUndoSlot();
+  if(!slot || !slot.data){ toast('There’s nothing to undo.'); return; }
+  backupApplyReplace(slot.data);
+  RESTORE_UNDO.slot=null; idbSet(RESTORE_UNDO_KEY, null).catch(()=>{});
+  save(); render(); toast('Restore undone — your copy is back.');
+}
+async function restoreFromBackup(inc, mode){
+  await keepRestoreUndo();                        // kept BEFORE anything moves
+  try{ if(mode==='replace') backupApplyReplace(inc); else backupApplyFoldIn(inc); }
+  catch(e){ toast('That restore could not be finished — nothing was changed.'); return; }
+  save(); render();
+  undoToast(mode==='replace'? 'Replaced this device’s copy.' : 'Folded the backup in.', ()=>undoRestore());
+}
+function restoreFact(label, value){ return h('div',{class:'restore-row'}, h('span',null,label), h('b',null,String(value))); }
+function openRestorePreview(inc){
+  const p=backupPreview(inc); let close;
+  const body=h('div',{class:'restore-preview'},
+    h('p',{class:'hint'},'Here’s what this file holds. Nothing has changed yet.'),
+    h('div',{class:'restore-facts'},
+      p.name? restoreFact('Whose journal', p.name) : null,
+      restoreFact('Saved', p.savedAt? new Date(p.savedAt).toLocaleString() : 'no date in this file'),
+      restoreFact('Journal pages', p.creations),
+      restoreFact('Sparks', p.sparks),
+      restoreFact('Naming buds', p.namingBuds),
+      restoreFact('Practice chapters done', p.practiceChapters),
+      restoreFact('Flashcards known', p.practiceFlashcards)),
+    h('p',{class:'hint'},'“Fold in” keeps everything already here and adds what the file has. “Replace” swaps this device’s copy for the file’s. Either way, one tap puts it back.'),
+    h('div',{class:'toolrow', style:{marginTop:'12px'}},
+      h('button',{class:'navbtn primary', onclick:()=>{ if(close) close(); restoreFromBackup(inc,'fold'); }}, 'Fold in'),
+      h('button',{class:'navbtn', onclick:()=>{ if(close) close(); restoreFromBackup(inc,'replace'); }}, 'Replace this device’s copy'),
+      h('button',{class:'navbtn ghost', onclick:()=>close&&close()}, 'Cancel')));
+  close=showModalNode('Restore from a backup', null, body);
+}
 function importBackupFile(file){
   const rd=new FileReader();
-  rd.onload=()=>{ try{ const inc=JSON.parse(rd.result); if(!inc || !('creations' in inc)) throw 0; mergeIncoming(inc); save(); toast('Restored from your backup.'); render(); }
-    catch(e){ toast('That file could not be read as a journal backup.'); } };
+  const fail=()=>toast('That file could not be read as a journal backup.');
+  rd.onload=()=>{ let inc; try{ inc=parseBackupText(rd.result); }catch(e){ fail(); return; } openRestorePreview(inc); };
+  rd.onerror=fail;
   rd.readAsText(file);
 }
 function pickBackupFile(){
@@ -7577,8 +7840,8 @@ function openGitHubPanel(){
     h('div',{class:'twocol'}, h('div',null,h('label',null,'Branch'),branchIn), h('div',null,h('label',null,'Folder'),pathIn)),
     h('div',{class:'world-only'}, h('label',null,'Her journal file name (for the Inbox)'), makerIn),
     h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'12px'}}, syncChk, 'Load my file automatically when I open the app'),
-    h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'8px'}}, practiceChk, 'Include Code Practice progress in backup/sync'),
-    h('p',{class:'hint', style:{margin:'4px 0 0'}}, 'When on, chapters, typed drills, flashcards, and the practice log can travel to another device. Engine keys and usage stay device-only.'),
+    h('label',{style:{display:'flex',alignItems:'center',gap:'8px',textTransform:'none',letterSpacing:'0',color:'var(--ink-soft)',fontSize:'15px',marginTop:'8px'}}, practiceChk, 'Include Code Practice progress in my file in the world'),
+    h('p',{class:'hint', style:{margin:'4px 0 0'}}, 'When on, chapters, typed drills, flashcards, and the practice log travel to the repo too. A backup file always carries them, whatever this says. Engine keys and usage stay device-only.'),
     h('div',{class:'warn'},'Your token is a key. Use a fine-grained token limited to just this one repo (Contents: read & write). It’s kept only on this device, never written into the repo, and you can revoke it on GitHub any time.'),
     status,
     h('div',{class:'toolrow', style:{marginTop:'14px'}},
@@ -22012,6 +22275,8 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible') liveRefreshTick(); });   // returning to view: pull what other devices did meanwhile
 (async function init(){
   try{ DB = await loadState(); }catch(e){ DB = defaults(); }
+  await loadBaseline();   // what the repo last held, per id — the merge needs it before any sync runs
+  await loadRestoreUndo();   // a restore from a previous session can still be walked back
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
   if(DB.who) applyPersonContext(activePerson());   // returning person: their file, favorites & space (Phase B)
   applyMode();
