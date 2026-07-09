@@ -2317,6 +2317,127 @@ function elementLabelsOf(v){ return keyList(v).map(elementLabelOf).join(' · ');
 function expressionLabelsOf(v){ return keyList(v).map(expressionLabelOf).join(' · '); }
 function primaryElementKey(v){ const k=keyList(v); return k.length ? k[0] : ''; }
 
+/* ========================================================================== *
+   POOLS (Slice 59 / FABLE-001 prep) — the authored-content schema the Fable
+   library is written against. A pool entry is a card or component fragment
+   that may fire ONLY where its `fit` is true of the crossing/place it would
+   appear in — an index-only selector can't tell a cloud-cave from two hundred
+   metres underground; a fit contract can.
+
+   `fit` axes are 'any' (wildcard) or a real value from the vocabulary that
+   already exists elsewhere in the app (derive-or-omit: carried, never
+   invented) — REGION_LOCAL_LAYER_TYPES, REGION_OCCUPANCY_VALUES, the travel
+   tiers, ELEMENTS. `heavy` splits the authored-whole / component seam the
+   travel-event code already cut (TRAVEL_EVENT_HEAVY_RATIO).
+
+   `tone` is a vector, not a label — the six DREAM_VERBS axes (derive-or-omit:
+   carried from campaign-dream.js) plus the DREAM_DOOR_GRAINS scalar. Tone on
+   an event/place card is affordance only — magnitude, never valence: a card
+   may say a choice is heavy, never which way is wrong (00_CANON_HOME.md §
+   Moral Physics — the universe itself stays neutral). This module carries the
+   vector; nothing in this Slice reads or thresholds it yet.
+ * ========================================================================== */
+const POOL_TIERS=['high','mid','subarea'];
+const POOL_TONE_GRAIN_AXIS='grain';
+function poolToneAxes(){ return DREAM_VERBS.map(v=>v.id); }   // {move,reach,call,rest,attend,spend}
+function poolFitAxisOk(value, allowed){ return value==='any'||allowed.includes(value); }
+function poolValidateFit(fit){
+  const f=fit||{};
+  const errors=[];
+  if(!poolFitAxisOk(f.layer, REGION_LOCAL_LAYER_TYPES)) errors.push('fit.layer must be "any" or one of: '+REGION_LOCAL_LAYER_TYPES.join(', '));
+  if(!poolFitAxisOk(f.occupancy, REGION_OCCUPANCY_VALUES)) errors.push('fit.occupancy must be "any" or one of: '+REGION_OCCUPANCY_VALUES.join(', '));
+  if(!poolFitAxisOk(f.tier, POOL_TIERS)) errors.push('fit.tier must be "any" or one of: '+POOL_TIERS.join(', '));
+  if(!poolFitAxisOk(f.element, ELEMENTS.map(e=>e.key))) errors.push('fit.element must be "any" or a known element key');
+  if(!(f.heavy==='any'||f.heavy===true||f.heavy===false)) errors.push('fit.heavy must be "any", true, or false');
+  return errors;
+}
+function poolValidateTone(tone){
+  const t=tone||{};
+  const errors=[];
+  poolToneAxes().concat([POOL_TONE_GRAIN_AXIS]).forEach(axis=>{
+    const v=Number(t[axis]);
+    if(!(v>=0&&v<=1)) errors.push('tone.'+axis+' must be a number 0..1');
+  });
+  return errors;
+}
+// Structural conformance only — never judges prose, never enforces voice.
+function poolEntryErrors(entry){
+  if(!entry||typeof entry!=='object') return ['a pool entry must be an object'];
+  const errors=[];
+  if(!entry.id||typeof entry.id!=='string') errors.push('id is required and must be a stable string');
+  if(!entry.prose||typeof entry.prose!=='string') errors.push('prose is required');
+  if(!entry.source||typeof entry.source!=='string') errors.push('source is required (provenance)');
+  errors.push(...poolValidateFit(entry.fit));
+  errors.push(...poolValidateTone(entry.tone));
+  return errors;
+}
+
+/* ---- the travel-event pool: five migrated exemplars ------------------------
+   These become the calibration exemplars a Fable batch is scored against —
+   scores are Del's, proposed by the agent, approved before the Slice ships.
+   Their fit is 'anywhere': the old vague lines were vague on purpose, and
+   that vagueness is exactly what a universal fallback tier needs. */
+const POOL_FIT_ANYWHERE={layer:'any', occupancy:'any', tier:'any', element:'any', heavy:'any'};
+const POOL_SOURCE_EXEMPLAR='hand-authored — calibration exemplar (migrated Slice 56)';
+const POOL_TRAVEL_EVENTS=[
+  { id:'creature', label:'Something alive', prose:'a living presence crosses your path',
+    fit:{...POOL_FIT_ANYWHERE}, source:POOL_SOURCE_EXEMPLAR,
+    tone:{move:0.3, reach:0.2, call:0.6, rest:0.1, attend:0.7, spend:0.3, grain:0.5} },
+  { id:'discovery', label:'Something found', prose:'the sea offers up something worth a closer look',
+    fit:{...POOL_FIT_ANYWHERE}, source:POOL_SOURCE_EXEMPLAR,
+    tone:{move:0.2, reach:0.8, call:0.1, rest:0.2, attend:0.6, spend:0.5, grain:0.6} },
+  { id:'weather', label:'The sky turns', prose:'weather with intent gathers around the crossing',
+    fit:{...POOL_FIT_ANYWHERE}, source:POOL_SOURCE_EXEMPLAR,
+    tone:{move:0.6, reach:0.1, call:0.1, rest:0.1, attend:0.7, spend:0.4, grain:0.3} },
+  { id:'pressure', label:'Pressure', prose:'a live tension of the world leans on the journey',
+    fit:{...POOL_FIT_ANYWHERE}, source:POOL_SOURCE_EXEMPLAR,
+    tone:{move:0.3, reach:0.1, call:0.2, rest:0.1, attend:0.5, spend:0.7, grain:0.4} },
+  { id:'civilization', label:'Someone out here', prose:'signs of people, out where people should not be',
+    fit:{...POOL_FIT_ANYWHERE}, source:POOL_SOURCE_EXEMPLAR,
+    tone:{move:0.2, reach:0.1, call:0.7, rest:0.2, attend:0.6, spend:0.4, grain:0.6} },
+];
+
+/* ---- fit matching + the empty-bucket fallback ------------------------------
+   A card fires only where its fit is true. Relax in a fixed, deterministic
+   order — element → tier → occupancy — until a crossing draws SOME card;
+   `layer` and `heavy` are never relaxed (an 'any' fit still matches them
+   trivially, which is what makes the fallback terminate). */
+const POOL_FIT_AXES=['layer','occupancy','tier','element'];
+const POOL_RELAX_STAGES=[[], ['element'], ['element','tier'], ['element','tier','occupancy']];
+function poolFitMatches(fit, crossing, axes){
+  const f=fit||{};
+  const heavyOk=f.heavy==null||f.heavy==='any'||f.heavy===crossing.heavy;
+  if(!heavyOk) return false;
+  return (axes||POOL_FIT_AXES).every(axis=>{
+    const want=f[axis];
+    return want==null||want==='any'||want===crossing[axis];
+  });
+}
+function poolBucketFor(pool, crossing){
+  const list=Array.isArray(pool)?pool:[];
+  for(const drop of POOL_RELAX_STAGES){
+    const axes=POOL_FIT_AXES.filter(a=>!drop.includes(a));
+    const hit=list.filter(entry=>poolFitMatches(entry&&entry.fit, crossing, axes));
+    if(hit.length) return hit;
+  }
+  // The last stage above already checks layer+heavy only, and an 'any' fit
+  // passes every axis at every stage — so an anywhere, heavy-matched card is
+  // never reached only here; nothing further to relax without inventing fit.
+  return [];
+}
+// Stable-id selection (rendezvous / HRW hashing): the highest-scoring id for
+// this roll key wins. Appending one candidate only ever steals the roll keys
+// where the newcomer's own score is highest — ~1/(N+1) of them — instead of
+// reshuffling every prior assignment.
+function poolPick(bucket, rollKey){
+  let best=null, bestScore=-1;
+  (Array.isArray(bucket)?bucket:[]).forEach(entry=>{
+    if(!entry||!entry.id) return;
+    const score=travelValue(rollKey,'pool-pick|'+entry.id);
+    if(score>bestScore){ bestScore=score; best=entry; }
+  });
+  return best;
+}
 /* ---------- worksheet definitions (faithful to the printed pages) ---------- */
 /* field types: short | long | element | word                                  */
 const WORKSHEETS = [
@@ -20056,7 +20177,7 @@ async function campTravel(host, name){
       const destEntry=regionAt(dest);
       let event=null;
       if(typeof travelEventForLeg==='function'){
-        event=travelEventForLeg(roll, destEntry?destEntry.region:null, threads, {layout, dest});
+        event=travelEventForLeg(roll, destEntry?destEntry.region:null, threads, {layout, dest, tier});
       }
       const next=travelWithTransit(travel.state, dirId, roll, tier, event);
       const written=await travelWrite(cfg, name, travel.path, next, travel.text, 'Travel leg '+next.legs);
@@ -20117,7 +20238,8 @@ async function campTravel(host, name){
 }
 registerCampaignTab(['travel','Travel','Sail the mid and high tiers between your forged regions — events interrupt, the clock quietly ages the world, and the haze forges into map.'], (host,name)=>campTravel(host,name), {after:'region'});
 /* ========================================================================== *
-   TRAVEL EVENT CARDS (Slice 56 / SUBSCALE-001) — the "something happened" drop.
+   TRAVEL EVENT CARDS (Slice 56 / SUBSCALE-001, fit contract Slice 59 /
+   FABLE-001) — the "something happened" drop.
 
    Per leg, the deterministic Slice-55 roll is checked against a weight built
    from regionalPressure + worldAttention + hazard + open thread state — and
@@ -20133,17 +20255,18 @@ registerCampaignTab(['travel','Travel','Sail the mid and high tiers between your
    uncharted hex the sea has no floor to remember with — the card resolves at
    the table and the honest fix is charting ahead (the Forge). Same leg, same
    card, every reload.
- * ========================================================================== */
-const TRAVEL_EVENT_TYPES=[
-  {id:'creature',     label:'Something alive',   line:'a living presence crosses the Arkborne’s path'},
-  {id:'discovery',    label:'Something found',   line:'the sea offers up something worth a closer look'},
-  {id:'weather',      label:'The sky turns',     line:'weather with intent gathers around the crossing'},
-  {id:'pressure',     label:'Pressure',          line:'a live tension of the world leans on the journey'},
-  {id:'civilization', label:'Someone out here',  line:'signs of people, out where people should not be'},
-];
+
+   WHICH card is a Slice-59 bucketed pick against `kit/src/data/pools.js`'s
+   POOL_TRAVEL_EVENTS: a card fires only where its fit is true of the
+   crossing (layer/occupancy/tier/element/heavy). travelEventWeight() decides
+   WHETHER the world interrupts you; this decides WHAT it is — different
+   questions, and the weight function is never touched by this. */
 const TRAVEL_EVENT_HEAVY_RATIO=0.3;   // the deepest slice of a fired roll reads heavy
 const TRAVEL_EVENT_BASE_WEIGHT=0.06;
 const TRAVEL_EVENT_MAX_WEIGHT=0.85;
+// Backward-compatible view over the pool — nothing that reads the old
+// {id,label,line} shape breaks.
+const TRAVEL_EVENT_TYPES=POOL_TRAVEL_EVENTS.map(e=>({id:e.id, label:e.label, line:e.prose}));
 
 // The current card the seated GM narrates from (one at a time, like the
 // entered place). The travel tab owns writing it; Play only reads.
@@ -20181,10 +20304,28 @@ function travelEventInputs(region, threads){
 function travelEventFires(roll, weight){
   return !!(roll&&Number.isFinite(roll.value))&&roll.value<Math.max(0, Number(weight)||0);
 }
-/* ---- the card: deterministic from the roll + the local character -------------- */
-function travelEventTypeFor(roll, weight){
-  const ratio=Math.min(0.9999, Math.max(0, (Number(roll&&roll.value)||0)/Math.max(Number(weight)||0.0001, 0.0001)));
-  return TRAVEL_EVENT_TYPES[Math.floor(ratio*TRAVEL_EVENT_TYPES.length)%TRAVEL_EVENT_TYPES.length];
+/* ---- the card: a bucketed pick against the crossing's own fit ---------------- */
+// What the crossing IS, in the pool's fit vocabulary — derived from the SAME
+// placement tile travelEventTile picks (no extra roll, no extra derivation):
+// the local layer's type, that tile's occupancy, and the layer's strongest
+// elemental leaning (carried from the Slice-50 subarea helpers, never invented).
+function travelEventCrossing(region, at, ctx){
+  const tier=ctx&&ctx.tier==='high'?'high':(ctx&&ctx.tier==='subarea'?'subarea':'mid');
+  if(!region||!at) return {layer:null, occupancy:null, element:null, tier};
+  const grid=regionTerrainGrid(region, at.layerId);
+  const cell=grid?regionGridCell(grid, at.tile.x, at.tile.y):null;
+  const weights=subareaLayerWeights(region, at.layerId);
+  const topElement=Object.keys(weights).sort((a,b)=>weights[b]-weights[a]||(a<b?-1:1))[0]||null;
+  return {
+    layer:subareaLayerType(region, at.layerId)||null,
+    occupancy:cell?regionCellOccupancy(cell):null,
+    element:topElement,
+    tier,
+  };
+}
+function travelEventTypeFor(roll, crossing, heavy){
+  const bucket=poolBucketFor(POOL_TRAVEL_EVENTS, {...crossing, heavy});
+  return poolPick(bucket, roll&&roll.value) || POOL_TRAVEL_EVENTS[0];
 }
 // The interruption tile: the leg's hex mapped into the region's own grid —
 // deterministic, so the same leg interrupts at the same place forever.
@@ -20205,13 +20346,14 @@ function travelEventTile(print, region, hex){
 function travelEventForLeg(roll, region, threads, ctx){
   const weight=travelEventWeight(travelEventInputs(region, threads));
   if(!travelEventFires(roll, weight)) return null;
-  const type=travelEventTypeFor(roll, weight);
   const heavy=roll.value<weight*TRAVEL_EVENT_HEAVY_RATIO;
   const print=ctx&&Array.isArray(ctx.layout)&&region
     ?ctx.layout.find(p=>p.regionId===region.id)||null:null;
   const at=region?travelEventTile(print, region, ctx&&ctx.dest):null;
+  const crossing=travelEventCrossing(region, at, ctx);
+  const entry=travelEventTypeFor(roll, crossing, heavy);
   return {
-    type:type.id, title:type.label+' — '+type.line, heavy,
+    type:entry.id, title:entry.label?entry.label+' — '+entry.prose:entry.prose, heavy,
     regionId:region?String(region.id):'',
     layerId:at?at.layerId:'', tile:at?at.tile:null,
   };
@@ -20927,12 +21069,22 @@ campResume=async function(host,name){
 const DREAM_SCHEMA_VERSION=1;
 const DREAM_ENGINE_VERSION='1.0.0';
 // The core verbs of play. Each unfurls its own pocket on FIRST use only.
+// `attend` and `spend` (Slice 59 / FABLE-001 prep) are carried the same way —
+// unfurl-once state applies generically — but their pockets already exist
+// elsewhere (placeContext, dreamDenizenRemember) and open no NEW door in the
+// dream scene itself; they exist here so the Fable tone vector's six axes
+// {move,reach,call,rest,attend,spend} have a single, carried source of truth.
 const DREAM_VERBS=[
-  {id:'move',  label:'move / look',   pocket:'paths',        unfurl:'first movement opens paths'},
-  {id:'reach', label:'reach / shape', pocket:'making-space', unfurl:'first reaching opens a making-space'},
-  {id:'call',  label:'call / speak',  pocket:'encounter',    unfurl:'first calling opens an encounter — someone may answer'},
-  {id:'rest',  label:'rest',          pocket:'still-place',  unfurl:'first rest opens a still place'},
+  {id:'move',   label:'move / look',   pocket:'paths',         unfurl:'first movement opens paths'},
+  {id:'reach',  label:'reach / shape', pocket:'making-space',  unfurl:'first reaching opens a making-space'},
+  {id:'call',   label:'call / speak',  pocket:'encounter',     unfurl:'first calling opens an encounter — someone may answer'},
+  {id:'rest',   label:'rest',          pocket:'still-place',   unfurl:'first rest opens a still place'},
+  {id:'attend', label:'attend / read', pocket:'what-remains',  unfurl:'first attending opens what the place remembers'},
+  {id:'spend',  label:'spend / take',  pocket:'what-it-costs', unfurl:'first spending opens what it costs'},
 ];
+// Pockets the dream scene itself knows how to draw as an interactable — attend
+// and spend deliberately have no door here (see note above).
+const DREAM_VISUAL_POCKETS=['paths','making-space','encounter','still-place'];
 // Choice grains (the standing principle): two immersive doors now; a third
 // NON-immersive grain (direct picks) is added later as one more entry here and
 // one more key in each interactable's doors — consumers iterate this list.
@@ -21139,8 +21291,10 @@ function dreamScene(campaignName, essence, growth){
   const interactables=[];
   const niches=[];
   // growth pockets first, in canonical verb order; the starting pocket lands
-  // last so its heart is never overwritten (paths may still lap its rim)
-  DREAM_VERBS.filter(v=>verbs.includes(v.id)).forEach(def=>{
+  // last so its heart is never overwritten (paths may still lap its rim).
+  // Only verbs with a visual pocket draw one — attend/spend unfurl state but
+  // open no door in the dream scene.
+  DREAM_VERBS.filter(v=>verbs.includes(v.id)&&DREAM_VISUAL_POCKETS.includes(v.pocket)).forEach(def=>{
     dreamApplyPocket(def, core, pool, top, put, interactables, niches);
   });
   const startCells=dreamCluster(DREAM_START, core, 'start', true);
@@ -21169,7 +21323,9 @@ function dreamScene(campaignName, essence, growth){
     landmarks:all.map(it=>({id:it.id, type:it.type, label:it.label, at:it.at, adjacent:false})),
     interactables:all,
     rim:SUBAREA_EDGES.map(edge=>({edge, blend:'edge-of-chart', toward:''})),
-    growth:{verbs:verbs.slice(), remaining:DREAM_VERBS.filter(v=>!verbs.includes(v.id)).map(v=>v.id)},
+    // "fully unfurled" is scoped to the dream's OWN visual pockets — attend/spend
+    // carry state generically but open no door here, so they never block it.
+    growth:{verbs:verbs.slice(), remaining:DREAM_VERBS.filter(v=>DREAM_VISUAL_POCKETS.includes(v.pocket)&&!verbs.includes(v.id)).map(v=>v.id)},
     sourceHash:regionForgeHash({base, verbs:DREAM_VERBS.filter(v=>verbs.includes(v.id)).map(v=>v.id)}),
   };
 }
@@ -21311,7 +21467,8 @@ function dreamContextBlock(scene, state){
     'THE DREAM (Session Zero scene — mechanism, not canon):',
     'The character is between death and arrival, inside their own dream. What the dream IS in-world is deliberately unclaimed — never state what it is; keep it felt.',
     'Dreamscape now: '+scene.interactables.map(i=>i.label).join('; ')+'.',
-    'Growth law: the FIRST use of each core verb of play grows the dream by one pocket — '+DREAM_VERBS.map(v=>v.unfurl).join('; ')+'.',
+    'Growth law: the FIRST use of each core verb of play grows the dream by one pocket — '
+      +DREAM_VERBS.filter(v=>DREAM_VISUAL_POCKETS.includes(v.pocket)).map(v=>v.unfurl).join('; ')+'.',
     'Verbs already answered: '+(tried.length?tried.join(', '):'none yet')+'. Still waiting: '+(remaining.length?remaining.join(', '):'none — the dream is fully unfurled')+'.',
     (state&&state.denizens.length?'Beings met here (they may remember the dreamer): '+state.denizens.map(d=>(d.name||d.id)+(d.kind?' ('+d.kind+')':'')).join(', ')+'.':''),
     'The dream ends ONLY when the dreamer chooses to leave — never end it for them, never rush them. Leaving is arriving.',
