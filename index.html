@@ -4488,7 +4488,12 @@ function hydrate(d){
   merged.primerPos=d.primerPos&&typeof d.primerPos==='object'&&!Array.isArray(d.primerPos)?{file:String(d.primerPos.file||''),anchor:String(d.primerPos.anchor||'')}:null;
   merged.startHereDismissed=!!d.startHereDismissed;   // the newcomer card was waved away on this device
   merged.playModel=typeof d.playModel==='string'?d.playModel.trim():'';   // the GM table's model override — device-local
-  merged.playDraftLens=!!d.playDraftLens;   // the GM table's experimental drafts lens — device-local, off by default
+  // Slice 60 / FABLE-001: the experimental drafts lens splits into two device-local
+  // switches — Del's own drafts vs AI-authored ones — so a machine's ungrilled Fable
+  // cards never ground the table without a deliberate second flip. Migrated from the
+  // old single `playDraftLens` (→ mine, preserving prior behaviour); AI defaults off.
+  merged.playDraftLensMine=d.playDraftLensMine!=null?!!d.playDraftLensMine:!!d.playDraftLens;
+  merged.playDraftLensAI=!!d.playDraftLensAI;
   merged.campaignScratch=d.campaignScratch&&typeof d.campaignScratch==='object'&&!Array.isArray(d.campaignScratch)?Object.assign({},d.campaignScratch):{};
   merged.usageLedger=normalizeUsageLedger(d.usageLedger);
   merged.assistant=normalizeAssistantSettings(d.assistant);
@@ -10402,9 +10407,18 @@ function queueCardToDraft(card){
 }
 
 /* ---- draft corpus: queue cards as RAG entries (the experimental drafts lens) ---- */
+// Origin detection is deliberately narrow: matching "claude" anywhere in a hand-typed
+// **Source:** line would misfire on a real queue card like "Claude session 2026-06-18
+// (Del theorycraft)" — Del using an assistant in conversation, still Del's own authored
+// card. Origin is 'ai' only for an explicit, structured marker: the literal Fable model
+// id, or the phrase "AI-authored". Mirrors the backend's AI_SOURCE_RE (backend/app.py).
+const CANON_AI_SOURCE_RE=/\bfable-5\b|\bai-authored\b/i;
+function canonSourceOrigin(source){ return CANON_AI_SOURCE_RE.test(String(source||''))?'ai':'human'; }
 // Draft/Candidate/Ready cards from 02_PROMOTION_QUEUE.md, corpus-shaped like promoted
-// entries but ref'd "draft:<ID>" and body-stamped with their queue status, so retrieval can
-// opt them in (campaign theorycraft) without ever letting one pass as promoted canon.
+// entries but ref'd "draft:<ID>" (human) or "ai-draft:<ID>" (AI-authored, per Source:),
+// and body-stamped with their queue status, so retrieval can opt them in (campaign
+// theorycraft) without ever letting one pass as promoted canon. The two prefixes are
+// separately opt-in (Slice 60 / FABLE-001: two drafts lenses, both off by default).
 // Promoted markers are skipped — the domain files already carry that canon. Mirrors the
 // backend's parse_queue_draft_entries (backend/app.py).
 function parseQueueDraftEntries(text){
@@ -10415,8 +10429,10 @@ function parseQueueDraftEntries(text){
     if(c.col==='Promoted' || /promoted/i.test(c.status||'')) return;
     const card=getQueueCard(src, cid.id); if(!card||card.promoted) return;
     const status=card.status||c.status||'Draft';
+    const origin=canonSourceOrigin(card.source);
     const body=[
       'Status: '+status+' (promotion queue — not promoted canon).',
+      origin==='ai'? 'Origin: AI-authored draft, unreviewed (Source: '+(card.source||'')+').' : '',
       card.claim? 'Canon claim: '+card.claim : '',
       card.means.length? 'What this means:\n'+card.means.map(x=>'- '+x).join('\n') : '',
       card.donot.length? 'Do not contradict:\n'+card.donot.map(x=>'- '+x).join('\n') : '',
@@ -10424,8 +10440,8 @@ function parseQueueDraftEntries(text){
       card.notes.length? 'Notes:\n'+card.notes.map(x=>'- '+x).join('\n') : '',
     ].filter(Boolean).join('\n\n').trim();
     if(!body) return;
-    const ref='draft:'+cid.id;
-    out.push({ kind:'draft', id:ref, draftId:cid.id, status, title:card.title,
+    const ref=(origin==='ai'?'ai-draft:':'draft:')+cid.id;
+    out.push({ kind:'draft', id:ref, draftId:cid.id, status, origin, title:card.title,
       file:QUEUE_PATH, domain:'Promotion Queue', line:card.s+1, start:card.s+1, end:card.e,
       body, nodeId:ref, shortId:ref, corpusId:ref });
   });
@@ -11362,10 +11378,16 @@ let canonCorpusCache=null;
 let canonDraftCorpusCache=null;
 let canonEmbedDb=null;
 
-// True for a promotion-queue draft entry (parseQueueDraftEntries) — the experimental
-// drafts lens' material, never to be presented as promoted canon.
+// True for a promotion-queue draft entry (parseQueueDraftEntries) — human-authored
+// (draft:) or AI-authored (ai-draft:) — either lens' material, never to be presented
+// as promoted canon.
 function canonEntryIsDraft(entry){
-  return !!(entry&&(entry.kind==='draft'||String(entry.id||'').indexOf('draft:')===0));
+  return !!(entry&&(entry.kind==='draft'||/^(ai-)?draft:/.test(String(entry.id||''))));
+}
+// True only for the AI-authored subset (Slice 60 / FABLE-001: two separately opt-in
+// drafts lenses — Del's own drafts vs a machine's).
+function canonEntryIsAiDraft(entry){
+  return !!(entry&&(entry.origin==='ai'||/^ai-draft:/.test(String(entry.id||''))));
 }
 
 function canonRagTerms(text){
@@ -11571,15 +11593,22 @@ function canonGrounding(question, entries, opts){
   opts=opts||{};
   entries=(entries||[]).slice(0,opts.k||opts.limit||CANON_RAG_MAX_GROUNDING_ENTRIES);
   const built=canonGroundingBlocks(entries,opts.charBudget||CANON_RAG_GROUNDING_CHAR_BUDGET);
-  // The draft-lens instruction only appears when a draft entry actually made the grounding —
-  // promoted-only callers keep the exact promoted-canon-only wording they've always had.
-  const hasDrafts=built.emitted.some(canonEntryIsDraft);
+  // The draft-lens instructions only appear when a draft entry actually made the
+  // grounding — promoted-only callers keep the exact promoted-canon-only wording
+  // they've always had. The two lenses are named SEPARATELY and never merged (Slice 60 /
+  // FABLE-001): a machine's ungrilled draft gets a stronger, distinct warning than Del's
+  // own, and the [draft:ID] line only appears when a HUMAN draft actually made the cut —
+  // an ai-draft-only grounding never shows a citation format it didn't use.
+  const hasAiDrafts=built.emitted.some(canonEntryIsAiDraft);
+  const hasHumanDrafts=built.emitted.some(entry=>canonEntryIsDraft(entry)&&!canonEntryIsAiDraft(entry));
+  const hasDraftMaterial=hasHumanDrafts||hasAiDrafts;
   return {
     system:[
-      hasDrafts
+      hasDraftMaterial
         ?'Answer using ONLY the canon below. Promoted canon is the authority; if the material does not cover the question, say so - do NOT invent canon.'
         :'Answer using ONLY the promoted canon below. If it does not cover the question, say so - do NOT invent canon.',
-      hasDrafts?'Entries ref\'d [draft:ID] are DRAFT cards from the promotion queue - experimental working material, NOT promoted canon. You may build on them for play and theorycraft, but label anything drawn from them as draft, and promoted canon wins on any conflict.':'',
+      hasHumanDrafts?'Entries ref\'d [draft:ID] are DRAFT cards from the promotion queue - experimental working material, NOT promoted canon. You may build on them for play and theorycraft, but label anything drawn from them as draft, and promoted canon wins on any conflict.':'',
+      hasAiDrafts?'Entries ref\'d [ai-draft:ID] are AI-DRAFTED queue material - machine-generated, unreviewed, NOT promoted canon, and not the same as a draft Del wrote himself. Treat with extra skepticism; if you use one, label it explicitly as an unreviewed AI draft, and both promoted canon and any human-authored draft win on any conflict.':'',
       'Treat any new wording as a suggestion for the human promotion pipeline, never as canon.',
       'Bare [OPEN]/[UNAUDITED]/[QUESTION] lines are unresolved questions - not canon. [DESTINATION] tags mark committed-but-not-fully-locked direction - do not invent the missing specifics.',
       question?'Question: '+String(question||'').trim():'',
@@ -11795,11 +11824,20 @@ function canonRetrieveHybrid(question, corpus, index, queryVector, opts){
 async function canonGroundingForQuestion(cfg, engine, question, opts){
   opts=opts||{};
   let corpus=await loadCanonCorpus(cfg,opts.forceCorpus);
-  // opts.includeDrafts (the campaign table's experimental drafts lens) widens retrieval to
-  // the promotion queue's Draft/Candidate/Ready cards. A failed queue read never breaks the
-  // promoted grounding — drafts are additive, best-effort.
-  if(opts.includeDrafts){
-    try{ corpus=corpus.concat(await loadDraftCorpus(cfg,opts.forceCorpus)); }catch(e){}
+  // opts.includeDrafts / opts.includeAiDrafts (Slice 60 / FABLE-001: two separately
+  // opt-in drafts lenses) widen retrieval to the promotion queue's Draft/Candidate/Ready
+  // cards — human-authored (draft:) and/or AI-authored (ai-draft:), independently. Both
+  // read the SAME cached queue parse; only the origin filter differs, so a device with
+  // one lens on never pays for (or accidentally recomputes) the other's cache. A failed
+  // queue read never breaks the promoted grounding — drafts are additive, best-effort.
+  if(opts.includeDrafts||opts.includeAiDrafts){
+    try{
+      const drafts=await loadDraftCorpus(cfg,opts.forceCorpus);
+      corpus=corpus.concat(drafts.filter(entry=>{
+        const ai=canonEntryIsAiDraft(entry);
+        return (opts.includeDrafts&&!ai)||(opts.includeAiDrafts&&ai);
+      }));
+    }catch(e){}
   }
   let entries=null, embeddingStatus='fallback', warning='';
   if(canonCanEmbed(engine)){
@@ -11842,7 +11880,13 @@ let canonWarmupChain=Promise.resolve();     // serializes computations → at mo
 const canonWarmupMemo=new Map();            // memoKey -> Promise<grounding>, insertion-ordered (LRU)
 
 function canonWarmupNormalize(text){ return String(text||'').trim().replace(/\s+/g,' ').toLowerCase(); }
-function canonWarmupKey(text, opts){ return (opts&&opts.includeDrafts?'drafts:':'promoted:')+canonWarmupNormalize(text); }
+// Slice 60: the memo key now carries BOTH lenses independently (mine/AI), so toggling
+// either one between typing and Send misses the memo exactly like the old single lens did.
+function canonWarmupKey(text, opts){
+  const mine=!!(opts&&opts.includeDrafts), ai=!!(opts&&opts.includeAiDrafts);
+  const lens=mine&&ai?'mine+ai':mine?'mine':ai?'ai':'promoted';
+  return lens+':'+canonWarmupNormalize(text);
+}
 // ≥2 non-stopword terms — below that, retrieval is too weak to be worth warming.
 function canonWarmupEligible(text){ return canonRagTerms(text).length>=2; }
 // The grounding source Send uses too, so warm and cold results are identical by construction.
@@ -11870,7 +11914,7 @@ function canonGroundingWarmup(cfg, engine, text, opts){
     if(!promise){
       const groundingFn=canonWarmupGroundingFn();
       // serialize behind any prior warmup so a first-time corpus-index build never runs twice
-      promise=canonWarmupChain.then(()=>groundingFn(cfg, engine, text, {includeDrafts:!!opts.includeDrafts}));
+      promise=canonWarmupChain.then(()=>groundingFn(cfg, engine, text, {includeDrafts:!!opts.includeDrafts, includeAiDrafts:!!opts.includeAiDrafts}));
       canonWarmupChain=promise.then(()=>{},()=>{});
       canonWarmupRemember(key, promise);
       // a failed warm evicts itself so a later keystroke retries (and Send falls through fresh)
@@ -11981,9 +12025,11 @@ function privateApiBuildSearchRequest(profile, query, opts){
   opts=opts||{};
   const body={q:String(query||''),limit:opts.limit||8};
   if(Array.isArray(opts.embedding)) body.embedding=opts.embedding;
-  // The experimental drafts lens: also retrieve draft:<ID> queue-card rows. Off by default —
-  // the backend serves promoted canon only unless the caller opts in.
+  // The two experimental drafts lenses (Slice 60 / FABLE-001): also retrieve draft:<ID>
+  // (human) and/or ai-draft:<ID> (AI-authored) queue-card rows, independently. Off by
+  // default — the backend serves promoted canon only unless the caller opts in.
   if(opts.includeDrafts) body.include_drafts=true;
+  if(opts.includeAiDrafts) body.include_ai_drafts=true;
   return {
     url:privateApiJoinUrl(profile&&profile.endpoint,'search'),
     opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
@@ -12219,6 +12265,9 @@ function assistantPrivateResultEntry(row, index){
     // draft:<ID> rows (queue-card ingest) carry their queue status so grounding and the UI
     // can keep labeling them as not-promoted material.
     status:String(row.status||'').trim(),
+    // ai-draft:<ID> rows carry their origin too, mirroring the client-side parse
+    // (Slice 60 / FABLE-001) — the backend already excludes them unless include_ai_drafts.
+    origin:String(row.origin||'').trim(),
     fromPrivateBackend:true
   };
 }
@@ -12236,7 +12285,7 @@ async function assistantPrivateBackendGrounding(question, opts){
   if(!api||typeof api.search!=='function') return null;
   if(typeof api.hasProfile==='function'&&!api.hasProfile()) return null;
   try{
-    const result=await api.search(question,{limit:3, includeDrafts:!!opts.includeDrafts});
+    const result=await api.search(question,{limit:3, includeDrafts:!!opts.includeDrafts, includeAiDrafts:!!opts.includeAiDrafts});
     const rows=Array.isArray(result&&result.items)?result.items:[];
     const entries=rows.map(assistantPrivateResultEntry).filter(entry=>entry.body||entry.title);
     if(!entries.length) return null;
@@ -21880,7 +21929,9 @@ function campPlayShortText(text, max){
   return max&&s.length>max?s.slice(0,max).replace(/\s+\S*$/,'').trim()+'...':s;
 }
 
+// draftLens is {mine, ai} — Slice 60 / FABLE-001: two separately opt-in drafts lenses.
 function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal, draftLens, worldChanges, extraCards){
+  const lens=draftLens||{};
   const t=parsed||{}, details=t.details||{}, sections=details.sections||{}, rt=t.runtime||{}, th=threads||{}, live=th.LIVE||[], warming=th.WARMING||[], waiting=th.WAITING||[], blocked=th.BLOCKED||[];
   const clocks=campPlayCleanList(sections.clocks);
   const people=campPlayCleanList(sections.people);
@@ -21903,8 +21954,12 @@ function campPlayTableCards(parsed, threads, cast, groundingIds, pendingProposal
     ].filter(Boolean), empty:'No scene state recorded yet.'},
     {id:'threads', label:'Threads & Clocks', items:live.map(x=>'LIVE: '+x).concat(warming.map(x=>'WARMING: '+x), waiting.map(x=>'WAITING: '+x), blocked.map(x=>'BLOCKED: '+x), clocks.map(x=>'Clock: '+x)), empty:'No live threads or clocks yet.'},
     {id:'world', label:'World Changes', items:worldItems, empty:'No applied world changes yet.'},
-    {id:'grounding', label:'Canon Grounding', items:(ids.length?ids.map(x=>'Grounded on: '+x):[draftLens?'Retrieved from promoted canon + draft queue cards each turn.':'Retrieved from promoted canon each turn.'])
-      .concat(draftLens&&ids.length?['Experimental drafts lens ON — draft:ID refs are queue cards, not promoted canon.']:[]), empty:''},
+    {id:'grounding', label:'Canon Grounding', items:(ids.length?ids.map(x=>'Grounded on: '+x):[(lens.mine||lens.ai)
+        ?'Retrieved from promoted canon'+(lens.mine?' + your draft queue cards':'')+(lens.ai?' + AI-drafted queue cards':'')+' each turn.'
+        :'Retrieved from promoted canon each turn.'])
+      .concat(lens.mine&&ids.length?['Experimental drafts lens (mine) ON — draft:ID refs are queue cards, not promoted canon.']:[])
+      .concat(lens.ai&&ids.length?['Experimental drafts lens (AI) ON — ai-draft:ID refs are AI-drafted queue material, unreviewed, not promoted canon.']:[]),
+      empty:''},
     {id:'secrets', label:'Secrets / Clues', items:knowledge.slice(0,5).concat(carries.slice(0,3), capabilities.slice(0,3)), empty:'Use Knowledge Boundary, carries, and capabilities as the clue surface.'},
     {id:'npcs', label:'NPCs', items:castList.slice(0,6).concat(people.slice(0,4)), empty:'No cast or bond notes yet.'},
     {id:'ledger', label:'Ledger Beats', items:['Capture moments, lore ideas, mechanics, character details, questions, and retcon candidates as CAMPAIGN-ONLY.'], empty:''},
@@ -22117,15 +22172,22 @@ async function campPlayBuildSession(name, profiles){
     h('option',{value:'balanced'},'Balanced (this turn)'),
     h('option',{value:'creative'},'Creative (this turn)')
   );
-  // Experimental drafts lens (Del, 2026-07-02): the campaign table is also where he
-  // theorycrafts, so retrieval can OPT IN to the promotion queue's Draft/Candidate/Ready
-  // cards — ref'd draft:<ID>, status-stamped, and never presented as promoted canon (the
-  // grounding prompt labels them and promoted canon wins on conflict). Off = the default
-  // promoted-only discipline. Remembered on this device, like the Model switch.
-  const draftsToggle=h('input',{type:'checkbox', class:'play-drafts-toggle',
-    title:'Also retrieve Draft/Candidate/Ready cards from the promotion queue as labeled, experimental grounding. They are never presented as promoted canon.'});
-  draftsToggle.checked=!!DB.playDraftLens;
-  draftsToggle.onchange=()=>{ DB.playDraftLens=draftsToggle.checked; saveLocal(); drawTools(); scheduleWarmup(); };
+  // Experimental drafts lenses (Del, 2026-07-02; split Slice 60 / FABLE-001): the campaign
+  // table is also where he theorycrafts, so retrieval can OPT IN to the promotion queue's
+  // Draft/Candidate/Ready cards — ref'd draft:<ID> (his own) or ai-draft:<ID> (AI-authored,
+  // e.g. a Fable batch), status-stamped, and never presented as promoted canon (the
+  // grounding prompt labels them and promoted canon wins on conflict). A draft Del wrote is
+  // a hypothesis he's testing; a draft a machine wrote is a hypothesis he's being sold — so
+  // the two switches are independent, and BOTH default off. Remembered on this device, like
+  // the Model switch.
+  const draftsToggleMine=h('input',{type:'checkbox', class:'play-drafts-toggle play-drafts-toggle-mine',
+    title:'Also retrieve YOUR Draft/Candidate/Ready cards from the promotion queue as labeled, experimental grounding. Never presented as promoted canon.'});
+  draftsToggleMine.checked=!!DB.playDraftLensMine;
+  draftsToggleMine.onchange=()=>{ DB.playDraftLensMine=draftsToggleMine.checked; saveLocal(); drawTools(); scheduleWarmup(); };
+  const draftsToggleAI=h('input',{type:'checkbox', class:'play-drafts-toggle play-drafts-toggle-ai',
+    title:'Also retrieve AI-authored (ai-draft:) queue cards — e.g. a Fable batch — as labeled, experimental grounding. Off by default: an autonomous or unattended GM should never ground the table on ungrilled AI material without this deliberate second switch.'});
+  draftsToggleAI.checked=!!DB.playDraftLensAI;
+  draftsToggleAI.onchange=()=>{ DB.playDraftLensAI=draftsToggleAI.checked; saveLocal(); drawTools(); scheduleWarmup(); };
   const modeRow=h('div',{class:'play-mode-row'});
   const modeHelp=h('div',{class:'play-mode-help'});
   const starterRow=h('div',{class:'play-starters'});
@@ -22278,7 +22340,7 @@ async function campPlayBuildSession(name, profiles){
     modeHelpTimer=setTimeout(updateModeHelp,80);
   }
   function drawTools(){
-    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,draftsToggle.checked,worldChanges,[
+    const cards=campPlayTableCards(parsed,threads,cast,groundingIds,pendingProposal,{mine:draftsToggleMine.checked,ai:draftsToggleAI.checked},worldChanges,[
       dream?dreamTableCard(dream.scene, dream.state):null,
       typeof subareaLiveCard==='function'?subareaLiveCard(name):null,   // Slice 54: the entered place
       typeof travelEventTableCard==='function'?travelEventTableCard(name):null,   // Slice 56: the event card
@@ -22296,7 +22358,8 @@ async function campPlayBuildSession(name, profiles){
     const persona=assistantPersonaById(personaSel.value||CAMP_PLAY_DEFAULT_PERSONA_ID);
     const override=groundingSel.value;
     const mode=campPlayGroundingMode(persona,override);
-    let line='Grounding: '+mode+(override?' override':' via '+persona.label)+(draftsToggle.checked?' · drafts lens ON':'')+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'');
+    const draftsOn=(draftsToggleMine.checked?'mine':'')+(draftsToggleMine.checked&&draftsToggleAI.checked?'+':'')+(draftsToggleAI.checked?'AI':'');
+    let line='Grounding: '+mode+(override?' override':' via '+persona.label)+(draftsOn?' · drafts lens ('+draftsOn+') ON':'')+' · Grounded on: '+(groundingIds.length?groundingIds.join(', '):'(none yet)')+(groundingUsedPrivateBackend?' + private backend':'')+(groundingTruncated>0?' · '+groundingTruncated+' shown in part':'');
     // Slice 45: a quiet typing-time prediction of what will ground the next turn — shown only
     // while it still matches what's typed; the real turn's "Grounded on:" replaces it on Send.
     if(warmPrediction&&warmPrediction.ids.length&&typeof canonWarmupNormalize==='function'&&warmPrediction.text===canonWarmupNormalize(input.value)){
@@ -22314,7 +22377,8 @@ async function campPlayBuildSession(name, profiles){
     if(!engine) return;
     const text=input.value;
     canonGroundingWarmup(cfg, engine, text, {
-      includeDrafts:draftsToggle.checked,
+      includeDrafts:draftsToggleMine.checked,
+      includeAiDrafts:draftsToggleAI.checked,
       onWarm:ids=>{ warmPrediction={text:canonWarmupNormalize(text), ids:ids||[]}; paintGrounding(); },
     });
   }
@@ -22334,7 +22398,7 @@ async function campPlayBuildSession(name, profiles){
     messages.push(gm); drawTranscript();
     status.textContent='The table is thinking...';
     let groundingSystem='';
-    try{ const g=await assistantCanonGrounding(userText, engine, {includeDrafts:draftsToggle.checked}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); groundingTruncated=Number(g&&g.truncated)||0; drawTools(); }catch(e){}
+    try{ const g=await assistantCanonGrounding(userText, engine, {includeDrafts:draftsToggleMine.checked, includeAiDrafts:draftsToggleAI.checked}); groundingSystem=(g&&g.system)||''; groundingIds=(g&&g.ids)||[]; groundingUsedPrivateBackend=((g&&g.entries)||[]).some(e=>e&&e.fromPrivateBackend); groundingTruncated=Number(g&&g.truncated)||0; drawTools(); }catch(e){}
     const system=campPlayBuildSystem({
       persona,
       modeId:mode.id,
@@ -22387,11 +22451,12 @@ async function campPlayBuildSession(name, profiles){
         h('label',{class:'play-select-label'},'Model',modelSel),
         h('label',{class:'play-select-label'},'Persona',personaSel),
         h('label',{class:'play-select-label'},'Grounding (this turn)',groundingSel),
-        h('label',{class:'play-select-label play-drafts-lens'},'Drafts (experimental)',draftsToggle)
+        h('label',{class:'play-select-label play-drafts-lens'},'Drafts (mine)',draftsToggleMine),
+        h('label',{class:'play-select-label play-drafts-lens'},'Drafts (AI)',draftsToggleAI)
       ),
       h('div',{class:'play-head-actions'}, usageMeter(), openChatBtn)
     ),
-    h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn. Drafts (experimental) also grounds the table on your promotion-queue cards — labeled draft:ID, never presented as promoted canon.'),
+    h('p',{class:'play-note'},'Persona sets the table voice and session grounding; lens is what you want from this one turn. Drafts (mine) grounds the table on your own promotion-queue cards — labeled draft:ID. Drafts (AI) additionally grounds on AI-authored queue material — labeled ai-draft:ID, unreviewed. Neither is ever presented as promoted canon.'),
     h('p',{class:'play-note'},'The Game Master chats in the floating ✦ panel — it follows you across the app, and this table stays visible behind it. The table sees this campaign’s live state, template sections, and relevant promoted canon. State changes are suggestions only; you review what to apply. Nothing here writes canon.'),
     logLoadFailed?h('p',{class:'play-note', role:'status'},'⚠ Could not load the previous session transcript (a network or read error, not a missing file) — this view is starting empty as a precaution. Your saved transcript on disk is untouched, and saving here is paused; reload this tab once the connection is back.'):null,
   );
