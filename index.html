@@ -2438,6 +2438,50 @@ function poolPick(bucket, rollKey){
   });
   return best;
 }
+
+/* ---- denizen baselines (Slice 61 / FABLE-001 prep 3): library, not instance -
+   A baseline is per NICHE TYPE (SUBAREA_NICHE_TYPES), never per met individual —
+   "the library must stay immutable, or it stops being a shippable static asset."
+   `standing` is a position on the uplift ladder (beast -> uplifted -> people,
+   region-subarea-state.js's DENIZEN_STANDING_THRESHOLD decides who answers a
+   call); `horizon` is which SUBAREA_DELTA_TYPES a being of this niche could
+   plausibly have noticed (inherited memory is filtered through it, never
+   invented); `stance` is affordance-only and stays '' below the threshold —
+   the universe stays neutral, and only PEOPLE carry moral pushback. */
+const POOL_DENIZEN_SOURCE='hand-authored — calibration baseline (Slice 61)';
+const POOL_DENIZEN_NICHES=[
+  { id:'guardian-brood', standing:0.7, horizon:['denizen-event','feature-state'],
+    stance:'answers warily, and remembers who helped or harmed its brood',
+    tells:'a low chittering that answers a call, if the caller is patient', source:POOL_DENIZEN_SOURCE },
+  { id:'rooted-grove', standing:0.65, horizon:['terrain-change','feature-state'],
+    stance:'answers slowly, in the language of growth and season',
+    tells:'a rustle that means yes, a stillness that means not yet', source:POOL_DENIZEN_SOURCE },
+  { id:'current-nest', standing:0.55, horizon:[], stance:'',
+    tells:'a shift in the air-current — skittish, and not yet a someone', source:POOL_DENIZEN_SOURCE },
+  { id:'grazer-drift', standing:0.3, horizon:[], stance:'',
+    tells:'placid and many — a herd, not a someone, not yet', source:POOL_DENIZEN_SOURCE },
+  { id:'seep-pool', standing:0.45, horizon:[], stance:'',
+    tells:'watchful and still — nothing here answers a stranger’s call', source:POOL_DENIZEN_SOURCE },
+  { id:'shade-warren', standing:0.25, horizon:[], stance:'',
+    tells:'too many, too quick, to be a someone yet', source:POOL_DENIZEN_SOURCE },
+];
+function poolDenizenBaselineFor(nicheType){
+  return POOL_DENIZEN_NICHES.find(entry=>entry.id===String(nicheType||''))||null;
+}
+// Structural conformance for a denizen baseline — a different shape than an
+// event/place card (no fit/tone/prose; standing+horizon+stance+tells instead).
+function poolDenizenBaselineErrors(entry){
+  if(!entry||typeof entry!=='object') return ['a denizen baseline must be an object'];
+  const errors=[];
+  if(!entry.id||typeof entry.id!=='string') errors.push('id is required and must be a stable niche id');
+  const standing=Number(entry.standing);
+  if(!(standing>=0&&standing<=1)) errors.push('standing must be a number 0..1');
+  if(!Array.isArray(entry.horizon)||!entry.horizon.every(tag=>SUBAREA_DELTA_TYPES.includes(tag))) errors.push('horizon must be an array of known SUBAREA_DELTA_TYPES');
+  if(typeof entry.stance!=='string') errors.push('stance must be a string ("" below the standing threshold)');
+  if(denizenCanAnswerCall(entry)===false&&entry.stance) errors.push('a below-threshold baseline must not carry a stance — the universe stays neutral until standing crosses it');
+  if(!entry.source||typeof entry.source!=='string') errors.push('source is required (provenance)');
+  return errors;
+}
 /* ---------- worksheet definitions (faithful to the printed pages) ---------- */
 /* field types: short | long | element | word                                  */
 const WORKSHEETS = [
@@ -15262,6 +15306,14 @@ function placesNormalizeDenizen(denizen){
     homeCell:String(denizen.homeCell||''),
     disposition:(Array.isArray(denizen.disposition)?denizen.disposition:[]).map(placesNormalizeMemory),
     instantiatedAt:String(denizen.instantiatedAt||''),
+    // Slice 61 / FABLE-001: standing = position on the uplift ladder, copied
+    // ONCE from the library baseline at the moment of meeting (copy-on-meet) —
+    // it never re-derives, so a library rebuild can never alter a met NPC.
+    // stance only ever arrives non-empty from a baseline that already cleared
+    // DENIZEN_STANDING_THRESHOLD; ordinary derived denizens (no baseline) stay
+    // at 0/'' — behaviour only, exactly like before this Slice.
+    standing:Math.min(1, Math.max(0, Number(denizen.standing)||0)),
+    stance:String(denizen.stance||''),
   };
 }
 function placesNormalizeMove(move){
@@ -15393,6 +15445,59 @@ function placeDenizenRemember(places, key, denizenId, memory, opts){
   if(!place.denizens.some(denizen=>denizen.id===String(denizenId))) throw new Error('no denizen '+denizenId+' at '+key);
   return placesWith(places, key, {...place, denizens});
 }
+
+/* ---- copy-on-meet (Slice 61 / FABLE-001 prep 3) -----------------------------
+   The library baseline (kit/src/data/pools.js POOL_DENIZEN_NICHES) is per NICHE
+   TYPE and immutable from here on out — this file only ever COPIES from it,
+   never derives from it live, so a library rebuild can never alter a met NPC
+   and two campaigns lifting the same baseline can never converge (each copy
+   lands in its OWN campaign's place file; nothing here is shared state).
+   `call / speak already carries the trigger: "first calling opens an encounter
+   — someone may answer."` — lift-on-call is that answer, gated by standing. */
+// game-phase, deferred — see drafts/PEO-000: below this, disposition reads only
+// as BEHAVIOUR (the wolf remembers and avoids); at/above, it also reads as
+// STANCE — moral pushback. Same array, different reading. Not canon itself.
+const DENIZEN_STANDING_THRESHOLD=0.6;
+function denizenCanAnswerCall(baseline){
+  return Number(baseline&&baseline.standing)>=DENIZEN_STANDING_THRESHOLD;
+}
+// Inherited memory: the ROOM keeps a neutral record (place.deltas); the person
+// forms the opinion — but only of what a being of this niche, standing where
+// she stood, could plausibly have known. Never a fact outside her horizon.
+function denizenInheritedDisposition(place, horizon, opts){
+  const tags=Array.isArray(horizon)?horizon:[];
+  if(!tags.length||!place||!Array.isArray(place.deltas)) return [];
+  return place.deltas.filter(delta=>tags.includes(delta&&delta.type))
+    .map(delta=>placesNormalizeMemory({ note:'Inherited: '+(delta.note||delta.type), toward:'', at:delta.at||placesNow(opts) }));
+}
+// The snapshot itself: baseline (niche, tells, horizon, stance, standing) +
+// the accepted proposal (name/kind/temperament — same shape propose-accept
+// already uses) + inherited memory, seeded once. Ordinary derived denizens
+// (no baseline) keep deriving through the existing subareaDenizenFromProposal
+// path unchanged — this is additive, not a replacement.
+function denizenLiftFromBaseline(niche, proposal, baseline, place, opts){
+  if(!proposal||!String(proposal.name||'').trim()) throw new Error('no proposal, no denizen — the review comes first');
+  const name=String(proposal.name).trim();
+  const standing=Math.min(1, Math.max(0, Number(baseline&&baseline.standing)||0));
+  const stance=denizenCanAnswerCall(baseline)?String(baseline&&baseline.stance||''):'';
+  const inherited=denizenInheritedDisposition(place, baseline&&baseline.horizon, opts);
+  return {
+    id:'dz-'+name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,''),
+    name, kind:String(proposal.kind||'').trim(),
+    nicheId:String(niche&&niche.id||''),
+    homeCell:String(niche&&niche.cells&&niche.cells[0]||''),
+    standing, stance,
+    disposition:inherited.concat([{ note:'first met — '+(String(proposal.temperament||'').trim()||'temperament unreadable'), toward:'', at:(opts&&opts.now)||placesNow(opts) }]),
+  };
+}
+// The gate: a storm-creature does not answer; the verb was already asking the
+// question. A non-answering standing is a no-op — null, never a thrown error
+// (calling out is always allowed; an answer is not always owed).
+function denizenLiftOnCall(niche, proposal, baseline, place, opts){
+  if(!denizenCanAnswerCall(baseline)) return null;
+  return denizenLiftFromBaseline(niche, proposal, baseline, place, opts);
+}
+
 /* The ONLY move primitive — identity, not coordinates. Callable solely by
    living-world machinery under the minor/major law: slight drift is minor;
    relocation as a MAJOR change must have come through the Slice-42 review
