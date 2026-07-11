@@ -1372,6 +1372,19 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 .rune-note-new{ border-color:var(--glow); }
 .rune-note-complaint{ border-style:dashed; }
 .rune-note-complaint .rune-note-head b::before{ content:'📮 '; }
+/* The list — TASKS.md remote control (Slice 65) */
+.rune-tasks{ margin:14px 0 6px; }
+.rune-tasks-list{ display:grid; gap:4px; margin-top:8px; }
+.rune-tasks-heading{ margin:10px 0 2px; }
+.rune-task-row{ display:flex; gap:8px; align-items:center; }
+.rune-task-row input[type=checkbox]{ flex:none; }
+.rune-task-text{ flex:1; }
+.rune-task-text.done{ opacity:.55; text-decoration:line-through; }
+.rune-task-edit{ padding:1px 7px; }
+.rune-task-addrow{ display:flex; gap:8px; margin-top:10px; align-items:center; }
+.rune-task-section{ max-width:38%; border:1.5px solid var(--glass-border); border-radius:10px; padding:4px 8px; background:var(--glass-bg); color:var(--ink); font:inherit; font-size:12.5px; }
+.rune-notes-heading{ margin:16px 0 4px; }
+.rune-tasks-status{ min-height:16px; margin:2px 0 0; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
 .companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
 /* the GM deserves a wider seat by default — there's room at the sides on desktop */
@@ -4890,6 +4903,7 @@ function moreMenu(){
     advanced?item('⚙ Engine', ()=>openEngineSettings()):null,
     item('⌂ On open', ()=>openOpenToSettings()),
     item((DB.liveRefresh!==false?'⟳ Live refresh: on':'⟳ Live refresh: off'), ()=>setLiveRefresh(DB.liveRefresh===false)),
+    advanced?item('⟳ Pull now', ()=>loadFromRepo()):null,
     item('◐ Theme: '+themeModeLabel(), ()=>cycleThemeMode()),
     item('◇ Motion: '+motionLabel(), ()=>cycleMotion()),
     (typeof restoreUndoSlot==='function' && restoreUndoSlot())? item('↺ Undo restore', ()=>undoRestore()) : null,
@@ -9510,6 +9524,147 @@ function runeBody(){
     h('div',{class:'companion-footrow'}, modelSel, deepBtn, deskBtn, back));
 }
 /* ========================================================================== *
+   THE TASKS REMOTE CONTROL — TASKS.md from any device (Slice 65).
+
+   TASKS.md stays Del's plain-text master exactly as it is; this section of
+   Rune's desk renders its headings + checkbox tasks and posts edits through
+   the backend (/tasks, /tasks/toggle, /tasks/add, /tasks/edit). Every write
+   names the exact line it expects — a 409 means the file changed underneath
+   (another device, an editor, Claude) and the view refetches instead of
+   clobbering. Prose lines stay in the file, untouched and unrendered: the
+   remote control is a lens, not a migration. This retires the Notion mirror's
+   whole job.
+ * ========================================================================== */
+
+const RUNE_TASKS={lines:[], newline:'lf', loaded:'', host:null, statusHost:null, fetchSeq:0};
+const RUNE_TASK_BOX_RE=/^(\s*- \[)([ xX])(\] ?)(.*)$/;
+
+function runeTasksProfile(){
+  return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
+}
+function runeTasksBuildGetRequest(profile){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'tasks'),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+function runeTasksBuildPostRequest(profile, path, body){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'tasks/'+path),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body||{})},
+  };
+}
+async function runeTasksFetch(){
+  const profile=runeTasksProfile();
+  if(!profile) return null;
+  const seq=++RUNE_TASKS.fetchSeq;
+  const raw=await privateApiJson(profile, runeTasksBuildGetRequest(profile));
+  if(RUNE_TASKS.fetchSeq!==seq) return raw;
+  RUNE_TASKS.lines=String(raw&&raw.text||'').split(/\r\n|\n/);
+  RUNE_TASKS.newline=String(raw&&raw.newline||'lf');
+  RUNE_TASKS.loaded='ok';
+  return raw;
+}
+// The remote view shows headings + checkbox tasks; everything else stays
+// file-only. line_no indexes the RAW file lines so writes anchor exactly.
+function runeTasksRows(){
+  const rows=[];
+  RUNE_TASKS.lines.forEach((line, i)=>{
+    if(line.startsWith('## ')) rows.push({kind:'heading', line_no:i, text:line.slice(3).trim()});
+    else{
+      const m=RUNE_TASK_BOX_RE.exec(line);
+      if(m) rows.push({kind:'task', line_no:i, raw:line, done:m[2]!==' ', prefix:m[1]+m[2]+m[3], text:m[4]});
+    }
+  });
+  return rows;
+}
+function runeTasksSections(){
+  return runeTasksRows().filter(r=>r.kind==='heading').map(r=>r.text);
+}
+async function runeTasksPost(path, body){
+  const profile=runeTasksProfile();
+  if(!profile) throw new Error('The list rides your private backend — add its engine profile first.');
+  return privateApiJson(profile, runeTasksBuildPostRequest(profile, path, body));
+}
+function runeTasksSection(){
+  const status=h('p',{class:'hint rune-tasks-status'},'');
+  const list=h('div',{class:'rune-tasks-list'});
+  RUNE_TASKS.host=list; RUNE_TASKS.statusHost=status;
+  async function refresh(message){
+    try{ await runeTasksFetch(); }catch(e){ RUNE_TASKS.loaded=RUNE_TASKS.loaded==='ok'?'ok':'error'; }
+    paint();
+    if(message) status.textContent=message;
+  }
+  async function act(path, body, conflictMessage){
+    status.textContent='';
+    try{
+      await runeTasksPost(path, body);
+      await refresh();
+    }catch(e){
+      const msg=String(e&&e.message||e);
+      // a 409 means someone else edited the file — never clobber, just re-read
+      await refresh(/changed underneath|409/.test(msg)?(conflictMessage||'The list changed under you — refreshed; try again.'):msg);
+    }
+  }
+  function taskRow(row){
+    const box=h('input',{type:'checkbox'});
+    box.checked=row.done;
+    box.onchange=()=>{ box.disabled=true; act('toggle', {line_no:row.line_no, expect:row.raw}); };
+    const label=h('span',{class:'rune-task-text'+(row.done?' done':'')}, row.text);
+    const editBtn=h('button',{class:'navbtn ghost rune-task-edit', type:'button', title:'Edit this task'},'✎');
+    const rowEl=h('div',{class:'rune-task-row'}, box, label, editBtn);
+    editBtn.onclick=()=>{
+      const input=h('input',{class:'companion-input', value:row.text});
+      const save=h('button',{class:'navbtn primary', type:'button'},'Save');
+      save.onclick=()=>{
+        const text=String(input.value||'').trim();
+        if(!text) return;
+        save.disabled=true;
+        act('edit', {line_no:row.line_no, expect:row.raw, text:row.prefix+text});
+      };
+      rowEl.replaceChildren(box, input, save);
+    };
+    return rowEl;
+  }
+  function paint(){
+    const rows=runeTasksRows();
+    const nodes=[];
+    rows.forEach(row=>{
+      if(row.kind==='heading') nodes.push(h('h4',{class:'rune-tasks-heading'}, row.text));
+      else nodes.push(taskRow(row));
+    });
+    if(!nodes.length){
+      nodes.push(h('p',{class:'hint'}, RUNE_TASKS.loaded==='ok'
+        ?'TASKS.md has no checkbox tasks yet.'
+        :RUNE_TASKS.loaded==='error'
+        ?'The list is unreachable — check the backend, then reopen.'
+        :'Opening the list…'));
+    }else{
+      const sections=runeTasksSections();
+      const sectionSel=h('select',{class:'rune-task-section', 'aria-label':'Section'});
+      sections.forEach(s=>sectionSel.append(h('option',{value:s},s)));
+      const addIn=h('input',{class:'companion-input', placeholder:'Add a task…', onkeydown:e=>{ if(e.key==='Enter') addNow(); }});
+      const addBtn=h('button',{class:'navbtn ghost', type:'button', onclick:()=>addNow()},'＋ Add');
+      function addNow(){
+        const text=String(addIn.value||'').trim();
+        if(!text) return;
+        addIn.value='';
+        act('add', {section:sectionSel.value, text});
+      }
+      nodes.push(h('div',{class:'rune-task-addrow'}, sectionSel, addIn, addBtn));
+    }
+    list.replaceChildren(...nodes);
+  }
+  paint();
+  refresh();
+  return h('div',{class:'rune-tasks'},
+    h('div',{class:'rune-desk-head'},
+      h('h3',null,'☑ The list'),
+      h('p',{class:'hint'},'TASKS.md, live — the file stays the master; this is its remote control.')),
+    status,
+    list);
+}
+/* ========================================================================== *
    RUNE'S DESK — the notebook view for Rune's autonomous thoughts (Slice 64).
 
    The backend heartbeat (RUNE-002, grilled 2026-07-11) thinks on a schedule
@@ -9612,6 +9767,10 @@ function runeDeskNoteCard(note, rerender){
 // Buzz state is SERVER truth (review fix: a localStorage-only marker could
 // silently disagree with the row that actually gates the buzz).
 async function runeDeskBuzzStatus(){
+  // Guard FIRST: on a page without an active service worker (file:// copy),
+  // navigator.serviceWorker.ready never settles — awaiting it hung the buzz
+  // button at "🔔 …" forever (Del hit this on the desktop).
+  if(typeof messagesPushSupported!=='function'||!messagesPushSupported()) return {known:false, rune:false, msgs:false, unsupported:true};
   const profile=runeDeskProfile();
   const sub=typeof messagesPushSubscription==='function'?await messagesPushSubscription():null;
   if(!profile||!sub) return {known:false, rune:false, msgs:false};
@@ -9671,8 +9830,11 @@ function viewRuneDesk(){
       h('p',{class:'hint'},'The desk rides your private backend — add the Private tailnet backend profile under ⚙ Engine on this device, then come back.'));
   }
   const buzzBtn=h('button',{class:'navbtn ghost', type:'button'},'🔔 …');
-  (async()=>{ try{ const s=await runeDeskBuzzStatus(); buzzBtn.textContent=s.rune?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off'; }
-    catch(e){ buzzBtn.textContent='🔔 Rune may buzz this device: off'; } })();
+  (async()=>{ try{
+    const s=await runeDeskBuzzStatus();
+    if(s.unsupported){ buzzBtn.disabled=true; buzzBtn.textContent='🔔 Buzz needs the installed journal'; buzzBtn.setAttribute('title','Push works from the Home-Screen/installed HTTPS app — this copy shows the badge instead.'); return; }
+    buzzBtn.textContent=s.rune?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off';
+  }catch(e){ buzzBtn.textContent='🔔 Rune may buzz this device: off'; } })();
   buzzBtn.onclick=async()=>{
     buzzBtn.disabled=true; status.textContent='';
     try{
@@ -9692,6 +9854,8 @@ function viewRuneDesk(){
       h('p',{class:'hint'},'Rune’s own thoughts land here — tagged, reviewable, yours to keep or dismiss. Keeping one tells Rune it mattered.')),
     h('div',{class:'toolrow'}, buzzBtn),
     status,
+    (typeof runeTasksSection==='function'?runeTasksSection():null),
+    h('h3',{class:'rune-notes-heading'},'📝 The notes'),
     list);
 }
 if(typeof registerView==='function') registerView('rune-desk', ()=>viewRuneDesk());
