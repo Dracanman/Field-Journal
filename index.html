@@ -1356,6 +1356,14 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 .companion-msg-btn{ padding:2px 8px; }
 .messages-meta{ font-size:11px; margin:0 0 2px; opacity:.72; }
 .companion-messages .companion-msg{ max-width:92%; }
+/* Rune room (Slice 62): the model select shares the foot row with "Back" */
+.companion-rune .companion-footrow{ justify-content:space-between; gap:8px; align-items:center; }
+.companion-rune .rune-model{
+  max-width:52%; border:1.5px solid var(--glass-border); border-radius:10px;
+  padding:4px 8px; background:var(--glass-bg); color:var(--ink); font:inherit; font-size:12.5px;
+}
+.companion-rune .rune-banner{ margin:2px 0 0; }
+.companion-rune .companion-msg{ max-width:92%; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
 .companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
 /* the GM deserves a wider seat by default — there's room at the sides on desktop */
@@ -7423,6 +7431,9 @@ function stripForBackup(db){
   delete d.campaignScratch;
   delete d.usageLedger;
   delete d.syncPractice;
+  // Rune-room render cache: personal conversation, and only a cache — the
+  // backend's chats table is the real corpus (Slice 62). Never in a backup.
+  delete d.runeChat;
   // A backup file is a WHOLE copy of this device's work, so practice always travels in it
   // (Slice 58). `syncPractice` governs exactly what its label says — the REPO payload, see
   // syncPayload — and nothing else: a device swap must not silently lose every chapter,
@@ -9181,6 +9192,192 @@ function messagesBody(){
     (!messagesPushSupported()&&typeof Notification==='undefined')?h('p',{class:'hint', style:{margin:'0'}},'For alerts when the journal is closed, open the installed Home-Screen journal and tap 🔔 there — this copy can only show notes while it’s open.'):null);
 }
 /* ========================================================================== *
+   RUNE ROOM — ᚱ Rune, Del's personal AI partner, as a companion-panel mode.
+
+   Rune is served as the Ollama model `rune` (a baked persona — rune/Modelfile)
+   through the ACTIVE engine profile like every other helper, but unlike the
+   other seats it injects NO view context. Instead every send carries LIVE
+   CONTEXT fetched from the private backend (/rune/context: real clock +
+   TASKS.md), because a persona hungry for specifics fabricates them when
+   starved (rune/PROFILE.md — the invented-dog incident, 2026-07-10). Every
+   exchange is logged server-side (/chats/append, source 'rune') from day one:
+   the log IS the future fine-tune voice corpus (two-corpus law). Backend
+   down → the room chats without logging behind a soft banner; engine down →
+   the usual friendly setup pointer. DB.runeChat is only a device-local render
+   cache (never in syncPayload; stripped from backups — the backend holds the
+   real corpus).
+ * ========================================================================== */
+
+const RUNE_ROOM={items:[], busy:false, banner:'', listHost:null, statusHost:null, model:'rune', hydrated:false};
+const RUNE_CONTEXT_LABEL='LIVE CONTEXT (real, not remembered)';
+const RUNE_LOG_LIMIT=200;
+const RUNE_CACHE_LIMIT=40;
+
+function runeBackendProfile(){
+  return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
+}
+function runeEngine(){
+  let engine=null;
+  try{ engine=typeof getActiveEngine==='function'?getActiveEngine():null; }catch(e){ engine=null; }
+  if(!engine) return null;
+  if(typeof engineIsPrivateBackendType==='function'&&engineIsPrivateBackendType(engine.type)) return null;
+  try{ aiProvider(engine); }catch(e){ return null; }
+  return engine;
+}
+function runeBuildContextRequest(profile){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'rune/context'),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+function runeBuildAppendRequest(profile, messages){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'chats/append'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({source:'rune',messages:messages||[]})},
+  };
+}
+function runeBuildRecentRequest(profile, limit){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'chats/recent')+'?source=rune&limit='+(Number(limit)||50),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+async function runeFetchContext(){
+  const profile=runeBackendProfile();
+  if(!profile) return null;
+  try{ return await privateApiJson(profile, runeBuildContextRequest(profile)); }
+  catch(e){ return null; }
+}
+// The block rides INSIDE the user turn — a request-level system message would
+// REPLACE the Modelfile persona on the Ollama path, which is the one thing the
+// room must never do.
+function runeContextBlock(ctx){
+  if(!ctx) return '';
+  const lines=[RUNE_CONTEXT_LABEL+':', 'Now: '+(ctx.weekday?ctx.weekday+', ':'')+String(ctx.now||'')];
+  const tasks=String(ctx.tasks||'').trim();
+  lines.push(tasks?('TASKS.md (the real list):\n'+tasks):'TASKS.md: unavailable right now — say so instead of inventing tasks.');
+  return lines.join('\n');
+}
+function runeChatMessages(question, ctx){
+  const history=RUNE_ROOM.items.slice(-12).map(m=>({role:m.role==='you'?'user':'assistant', content:m.text}));
+  const block=runeContextBlock(ctx);
+  history.push({role:'user', content:(block?block+'\n---\n':'')+question});
+  return history;
+}
+async function runeAppend(turns){
+  const profile=runeBackendProfile();
+  if(!profile){ RUNE_ROOM.banner='no-backend'; return false; }
+  try{
+    await privateApiJson(profile, runeBuildAppendRequest(profile, turns));
+    RUNE_ROOM.banner='';
+    return true;
+  }catch(e){ RUNE_ROOM.banner='no-backend'; return false; }
+}
+function runeCacheSave(){
+  DB.runeChat=RUNE_ROOM.items.slice(-RUNE_CACHE_LIMIT);
+  if(typeof save==='function') save();
+}
+async function runeHydrate(){
+  if(RUNE_ROOM.hydrated) return;
+  RUNE_ROOM.hydrated=true;
+  if(!RUNE_ROOM.items.length&&Array.isArray(DB.runeChat)&&DB.runeChat.length){
+    RUNE_ROOM.items=DB.runeChat.map(m=>({role:m.role==='you'?'you':'rune', text:String(m.text||'')}));
+  }
+  const profile=runeBackendProfile();
+  if(!profile){ RUNE_ROOM.banner='no-backend'; runeRenderList(); return; }
+  try{
+    const raw=await privateApiJson(profile, runeBuildRecentRequest(profile, 50));
+    const items=Array.isArray(raw&&raw.items)?raw.items:[];
+    if(items.length) RUNE_ROOM.items=items.map(m=>({role:m.role==='user'?'you':'rune', text:String(m.content||'')}));
+    RUNE_ROOM.banner='';
+    runeCacheSave();
+  }catch(e){ RUNE_ROOM.banner='no-backend'; }
+  runeRenderList();
+}
+function runeBannerText(){
+  return RUNE_ROOM.banner==='no-backend'?'Rune’s memory is unreachable — chatting without logging.':'';
+}
+function runeRenderList(){
+  const host=RUNE_ROOM.listHost;
+  if(!host) return;
+  const items=RUNE_ROOM.items.slice(-100).map(m=>h('div',{class:'companion-msg '+(m.role==='you'?'you':'guide')}, h('p',null,m.text)));
+  if(!items.length) items.push(h('p',{class:'hint companion-hello'},'ᚱ Rune is here — the partner who knows what time it actually is. Say hello.'));
+  if(RUNE_ROOM.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,'…')));
+  host.replaceChildren(...items);
+  try{ host.scrollTop=host.scrollHeight||0; }catch(e){}
+  const status=RUNE_ROOM.statusHost;
+  if(status) status.textContent=runeBannerText();
+}
+function runeModelChoices(engine){
+  const out=['rune'];
+  const push=m=>{ m=String(m||'').trim(); if(m&&out.indexOf(m)<0) out.push(m); };
+  if(typeof assistantAdvertisedModels==='function') assistantAdvertisedModels(engine).forEach(push);
+  if(engine&&engine.model) push(engine.model);
+  return out;
+}
+async function runeSend(inputEl){
+  const question=String(inputEl.value||'').trim();
+  if(!question||RUNE_ROOM.busy) return;
+  const engine=runeEngine();
+  if(!engine){
+    RUNE_ROOM.items.push({role:'rune', text:'No engine is awake — pick one under ⋯ More → ⚙ Engine (Rune rides the model named "rune" on your Ollama).'});
+    runeRenderList();
+    return;
+  }
+  inputEl.value='';
+  RUNE_ROOM.items.push({role:'you', text:question});
+  RUNE_ROOM.busy=true; runeRenderList();
+  const ctx=await runeFetchContext();
+  if(!ctx) RUNE_ROOM.banner='no-backend';
+  const live={role:'rune', text:''};
+  let streamed=false;
+  const streamFn=(typeof globalThis!=='undefined'&&globalThis.__runeAiStream)||aiStream;
+  try{
+    const result=await companionTimeout(
+      streamFn(engine, {model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx), maxTokens:700},
+        (piece, info)=>{
+          if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
+          live.text=info&&info.text?info.text:(live.text+String(piece||''));
+          runeRenderList();
+        }),
+      120000, 'Rune');
+    const text=String(result&&result.text||live.text||'').trim();
+    if(!streamed) RUNE_ROOM.items.push(live);
+    live.text=text||'…';
+    // Log the CLEAN user turn (the context block is transport, not corpus) +
+    // Rune's reply. meta records that live context rode along.
+    await runeAppend([
+      {role:'user', content:question, model:'', meta:{context:!!ctx}},
+      {role:'assistant', content:live.text, model:String(result&&result.model||RUNE_ROOM.model||'rune'), meta:{}},
+    ]);
+  }catch(e){
+    RUNE_ROOM.items.push({role:'rune', text:'(Rune hiccuped: '+String(e&&e.message||e)+')'});
+  }finally{
+    RUNE_ROOM.busy=false;
+  }
+  if(RUNE_ROOM.items.length>RUNE_LOG_LIMIT) RUNE_ROOM.items=RUNE_ROOM.items.slice(-RUNE_LOG_LIMIT);
+  runeRenderList(); runeCacheSave();
+}
+function runeBody(){
+  const list=h('div',{class:'companion-log rune-log'});
+  RUNE_ROOM.listHost=list;
+  const status=h('p',{class:'hint companion-report-status rune-banner'}, runeBannerText());
+  RUNE_ROOM.statusHost=status;
+  const input=h('input',{class:'companion-input', placeholder:'Talk to Rune…', onkeydown:e=>{ if(e.key==='Enter') runeSend(input); }});
+  const send=h('button',{class:'navbtn primary', type:'button', onclick:()=>runeSend(input)},'Send');
+  const modelSel=h('select',{class:'rune-model', 'aria-label':'Rune model', onchange:function(){ RUNE_ROOM.model=this.value||'rune'; }});
+  runeModelChoices(runeEngine()).forEach(m=>modelSel.append(h('option',{value:m},m)));
+  modelSel.value=RUNE_ROOM.model||'rune';
+  const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')},'Back to chat');
+  runeRenderList();
+  runeHydrate();
+  return h('div',{class:'companion-body companion-rune'},
+    list,
+    status,
+    h('div',{class:'companion-inputrow'}, input, send),
+    h('div',{class:'companion-footrow'}, modelSel, back));
+}
+/* ========================================================================== *
    COMPANION — the floating guide chat + bug-report mode.
 
    A small pop-up chat that follows every space (render() mounts its bubble like
@@ -9411,6 +9608,10 @@ function companionRefreshContext(){
     chip.textContent=s&&s.chapter?('✶ Ch '+s.chapter.n+' · '+s.chapter.title):'✶ not seated';
     return;
   }
+  if(COMPANION.mode==='rune'){
+    chip.textContent='ᚱ '+((typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.model)||'rune')+' · live context';
+    return;
+  }
   chip.textContent=companionContext().line;
 }
 
@@ -9448,12 +9649,12 @@ function companionChatBody(){
   return h('div',{class:'companion-body'}, log, h('div',{class:'companion-inputrow'}, input, send), h('div',{class:'companion-footrow'}, report));
 }
 
-const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master', studio:'✒ Canon assistant', coach:'✶ Coach'};
+const COMPANION_TITLES={chat:'✦ Guide', report:'🐞 Report', messages:'💬 Notes home', gm:'♟ Game Master', studio:'✒ Canon assistant', coach:'✶ Coach', rune:'ᚱ Rune'};
 function companionSetMode(mode){
   COMPANION.mode=mode;
   const body=COMPANION.panel&&COMPANION.panel._body;
   if(!body) return;
-  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():mode==='coach'?practiceCoachCompanionBody():companionChatBody());
+  body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='rune'?runeBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():mode==='coach'?practiceCoachCompanionBody():companionChatBody());
   const title=COMPANION.panel._title;
   if(title) title.textContent=COMPANION_TITLES[mode]||COMPANION_TITLES.chat;
   companionRefreshContext();
@@ -9620,12 +9821,14 @@ function companionEnsurePanel(){
     onclick:()=>companionSetMode(COMPANION.mode==='coach'?'chat':'coach')}, '✶');
   const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
     onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
+  const runeBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Rune', title:'Rune — your partner',
+    onclick:()=>companionSetMode(COMPANION.mode==='rune'?'chat':'rune')}, 'ᚱ');
   const readBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
     title:'Hide the writing area to read', onclick:()=>companionSetReading()}, '📖');
   const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
-  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, coachBtn, msgBtn, readBtn, sizeBtn, closeBtn);
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, coachBtn, msgBtn, runeBtn, readBtn, sizeBtn, closeBtn);
   // Safari (iPad included) never renders the native CSS resize corner, so the
   // panel carries its own touch grip: the top-left corner resizes toward/away
   // from the bottom-right, which stays visually put.
