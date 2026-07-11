@@ -1364,6 +1364,14 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 }
 .companion-rune .rune-banner{ margin:2px 0 0; }
 .companion-rune .companion-msg{ max-width:92%; }
+/* Rune's desk (Slice 64): the notebook view */
+.rune-desk-list{ display:grid; gap:10px; margin-top:12px; }
+.rune-note{ padding:12px 14px; }
+.rune-note-head{ display:flex; justify-content:space-between; gap:10px; align-items:baseline; }
+.rune-note-meta{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:6px 0 4px; }
+.rune-note-new{ border-color:var(--glow); }
+.rune-note-complaint{ border-style:dashed; }
+.rune-note-complaint .rune-note-head b::before{ content:'📮 '; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
 .companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
 /* the GM deserves a wider seat by default — there's room at the sides on desktop */
@@ -9105,6 +9113,8 @@ function messagesMerge(result){
 async function messagesPoll(){
   if(MESSAGES.busy) return;
   MESSAGES.busy=true;
+  // The desk badge rides this same tick — no second timer (Slice 64).
+  if(typeof runeDeskPollCount==='function') runeDeskPollCount();
   try{
     const result=await messagesFetch(MESSAGES.latestId);
     if(result){
@@ -9486,6 +9496,8 @@ function runeBody(){
   // The think flag only exists on the Ollama native path — on a cloud engine
   // the toggle would be a lying no-op, so it hides instead.
   if(!(engine&&engine.type==='OpenAI-compatible local endpoint')) deepBtn.style.display='none';
+  const deskBtn=h('button',{class:'navbtn ghost', type:'button', title:'Rune’s notebook — autonomous thoughts land there',
+    onclick:()=>{ if(typeof go==='function') go('rune-desk'); companionToggle(false); }},'🗒 Desk');
   runeRenderList();
   runeHydrate();
   return h('div',{class:'companion-body companion-rune'},
@@ -9493,8 +9505,148 @@ function runeBody(){
     status,
     engineHint,
     h('div',{class:'companion-inputrow'}, input, send),
-    h('div',{class:'companion-footrow'}, modelSel, deepBtn, back));
+    h('div',{class:'companion-footrow'}, modelSel, deepBtn, deskBtn, back));
 }
+/* ========================================================================== *
+   RUNE'S DESK — the notebook view for Rune's autonomous thoughts (Slice 64).
+
+   The backend heartbeat (RUNE-002, grilled 2026-07-11) thinks on a schedule
+   and leaves tagged notes; this view is where Del reviews them. Keep/Dismiss
+   is corpus signal, never deletion. `complaint` notes are Rune disagreeing
+   with the push law — they render distinctly, and Del's rulings are how the
+   protected-category list earns amendments. The "Rune may buzz this device"
+   toggle writes the per-device opt-in (the iPad rule: shared devices stay
+   badge-only). The ᚱ room stays the conversation; this is the notebook.
+ * ========================================================================== */
+
+const RUNE_DESK={items:[], newCount:0, busy:false, listHost:null, statusHost:null};
+
+function runeDeskProfile(){
+  return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
+}
+function runeDeskBuildListRequest(profile, limit){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'notes')+'?limit='+(Number(limit)||100),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+function runeDeskBuildStatusRequest(profile, id, status){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'notes/'+Number(id)+'/status'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({status:String(status||'')})},
+  };
+}
+async function runeDeskFetch(){
+  const profile=runeDeskProfile();
+  if(!profile) return null;
+  const raw=await privateApiJson(profile, runeDeskBuildListRequest(profile, 100));
+  RUNE_DESK.items=Array.isArray(raw&&raw.items)?raw.items:[];
+  RUNE_DESK.newCount=Number(raw&&raw.new_count)||0;
+  if(typeof companionRefreshContext==='function') companionRefreshContext();
+  return raw;
+}
+// The ᚱ header button carries the new-notes count; the messages poll calls
+// this so the badge stays current without its own timer.
+async function runeDeskPollCount(){
+  try{ await runeDeskFetch(); }catch(e){ /* quiet — badge just goes stale */ }
+}
+async function runeDeskSetStatus(id, status){
+  const profile=runeDeskProfile();
+  if(!profile) throw new Error('The desk rides your private backend — add its engine profile first.');
+  await privateApiJson(profile, runeDeskBuildStatusRequest(profile, id, status));
+  const item=RUNE_DESK.items.find(n=>n.id===id);
+  if(item){ if(item.status==='new') RUNE_DESK.newCount=Math.max(0,RUNE_DESK.newCount-1); item.status=status; }
+  if(typeof companionRefreshContext==='function') companionRefreshContext();
+}
+function runeDeskTimeLabel(iso){
+  const d=new Date(iso);
+  return isNaN(d.getTime())?'':d.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
+}
+function runeDeskNoteCard(note, rerender){
+  const chips=(note.tags||[]).map(t=>h('span',{class:'chip dash'},t));
+  if(note.category) chips.push(h('span',{class:'chip'},note.category));
+  const marker=note.complaint?'📮 complaint — wanted to buzz, the rules said no'
+    : note.pushed?(note.important?'🔔 pushed (important)':'🔔 pushed')
+    : '🤐 waited on the desk';
+  const open=note.status==='new'||note.status==='seen';
+  const keep=open?h('button',{class:'navbtn ghost', type:'button'},'Keep'):null;
+  const dismiss=open?h('button',{class:'navbtn ghost', type:'button'},'Dismiss'):null;
+  const status=h('span',{class:'hint'},note.status+(open?'':' ✓'));
+  const wire=(btn,value)=>{ if(!btn) return; btn.onclick=async()=>{ btn.disabled=true;
+    try{ await runeDeskSetStatus(note.id, value); }catch(e){ btn.disabled=false; return; }
+    rerender(); }; };
+  wire(keep,'kept'); wire(dismiss,'dismissed');
+  return h('div',{class:'panel rune-note'+(note.complaint?' rune-note-complaint':'')+(note.status==='new'?' rune-note-new':'')},
+    h('div',{class:'rune-note-head'},
+      h('b',null,note.title),
+      h('span',{class:'hint'},runeDeskTimeLabel(note.created_at))),
+    h('p',null,note.body),
+    h('div',{class:'rune-note-meta'},...chips, h('span',{class:'hint'},marker)),
+    h('div',{class:'toolrow'}, keep, dismiss, status));
+}
+async function runeDeskBuzzEnabled(){
+  const sub=typeof messagesPushSubscription==='function'?await messagesPushSubscription():null;
+  return !!sub&&localStorage&&localStorage.getItem('rune-buzz')==='on';
+}
+// Buzz opt-in re-subscribes THIS device with the rune flag; turning it off
+// re-subscribes with rune:false — the messages board's own alerts survive.
+async function runeDeskSetBuzz(on){
+  const profile=runeDeskProfile();
+  if(!profile) throw new Error('The desk rides your private backend — add its engine profile first.');
+  if(typeof messagesPushSupported!=='function'||!messagesPushSupported()) throw new Error('Push needs the installed HTTPS journal (Home-Screen app).');
+  if(typeof Notification!=='undefined'&&Notification.permission==='default'){
+    try{ await Notification.requestPermission(); }catch(e){}
+  }
+  const keyReply=await privateApiJson(profile, messagesBuildPushRequest(profile,'push/key'));
+  const reg=await navigator.serviceWorker.ready;
+  const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:messagesPushKeyBytes(String(keyReply&&keyReply.key||''))});
+  await privateApiJson(profile, {
+    url:privateApiJoinUrl(profile.endpoint,'push/subscribe'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),
+      body:JSON.stringify({subscription:sub.toJSON?sub.toJSON():sub, label:(typeof messagesSenderName==='function'?messagesSenderName():''), rune:!!on})},
+  });
+  try{ localStorage.setItem('rune-buzz', on?'on':'off'); }catch(e){}
+  return true;
+}
+function viewRuneDesk(){
+  const status=h('p',{class:'hint'},'');
+  const list=h('div',{class:'rune-desk-list'});
+  RUNE_DESK.listHost=list; RUNE_DESK.statusHost=status;
+  function paint(){
+    const items=RUNE_DESK.items.map(n=>runeDeskNoteCard(n, paint));
+    list.replaceChildren(...(items.length?items:[
+      h('p',{class:'hint'},'No notes yet — the heartbeat thinks every few hours (quiet during work and the night). Silence is allowed; a partner only speaks when there’s something to say.')]));
+  }
+  const profile=runeDeskProfile();
+  if(!profile){
+    return h('div',{class:'panel rune-desk'},
+      h('h2',null,'ᚱ Rune’s desk'),
+      h('p',{class:'hint'},'The desk rides your private backend — add the Private tailnet backend profile under ⚙ Engine on this device, then come back.'));
+  }
+  const buzzBtn=h('button',{class:'navbtn ghost', type:'button'},'🔔 …');
+  (async()=>{ try{ buzzBtn.textContent=(await runeDeskBuzzEnabled())?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off'; }
+    catch(e){ buzzBtn.textContent='🔔 Rune may buzz this device: off'; } })();
+  buzzBtn.onclick=async()=>{
+    buzzBtn.disabled=true; status.textContent='';
+    try{
+      const on=!(await runeDeskBuzzEnabled());
+      await runeDeskSetBuzz(on);
+      buzzBtn.textContent=on?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off';
+      status.textContent=on?'This device buzzes for Rune (important always; ordinary under the daily cap).':'Badge-only on this device — notes still land here quietly.';
+    }catch(e){ status.textContent=String(e&&e.message||e); }
+    finally{ buzzBtn.disabled=false; }
+  };
+  paint();
+  runeDeskFetch().then(paint).catch(()=>{ status.textContent='Rune’s desk is unreachable — check the backend.'; });
+  return h('div',{class:'panel rune-desk'},
+    h('div',{class:'rune-desk-head'},
+      h('h2',null,'ᚱ Rune’s desk'),
+      h('p',{class:'hint'},'Rune’s own thoughts land here — tagged, reviewable, yours to keep or dismiss. Keeping one tells Rune it mattered.')),
+    h('div',{class:'toolrow'}, buzzBtn),
+    status,
+    list);
+}
+if(typeof registerView==='function') registerView('rune-desk', ()=>viewRuneDesk());
 /* ========================================================================== *
    COMPANION — the floating guide chat + bug-report mode.
 
@@ -9725,6 +9877,14 @@ function companionRefreshContext(){
     const s=typeof practiceCoachSession==='function'?practiceCoachSession():null;
     chip.textContent=s&&s.chapter?('✶ Ch '+s.chapter.n+' · '+s.chapter.title):'✶ not seated';
     return;
+  }
+  // The ᚱ button doubles as the desk badge: a dot + count when unreviewed
+  // notes wait (fed by runeDeskPollCount piggybacking the messages poll).
+  const runeBtn=COMPANION.panel&&COMPANION.panel._runeBtn;
+  if(runeBtn){
+    const n=(typeof RUNE_DESK!=='undefined'&&RUNE_DESK.newCount)||0;
+    runeBtn.textContent=n>0?('ᚱ·'+n):'ᚱ';
+    runeBtn.setAttribute('title', n>0?('Rune — '+n+' new note'+(n===1?'':'s')+' on the desk'):'Rune — your partner');
   }
   if(COMPANION.mode==='rune'){
     const deep=typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.deep;
@@ -9957,7 +10117,7 @@ function companionEnsurePanel(){
     body,
     grip);
   panel.style.display='none';
-  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn; panel._coachBtn=coachBtn;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn; panel._coachBtn=coachBtn; panel._runeBtn=runeBtn;
   COMPANION.panel=panel;
   companionWireDrag(panel, head);
   companionWireResize(panel);
