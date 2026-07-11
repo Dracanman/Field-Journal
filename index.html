@@ -7360,7 +7360,10 @@ async function ghFetch(url, opts, tries){
   tries=tries||3; let last;
   for(let i=0;i<tries;i++){
     if(i) await ghSleep(400*Math.pow(2,i-1) + Math.floor(Math.random()*200));
-    let r; try{ r=await fetch(url, opts); }catch(e){ last=ghErr(0); continue; }
+    // cache:'no-cache' — the API replies with max-age=60, so a plain fetch can hand back
+    // a minute-stale browser copy (an edit + immediate Pull now showed the OLD file).
+    // Revalidating by ETag keeps every read current; a 304 still reuses the cached body.
+    let r; try{ r=await fetch(url, Object.assign({cache:'no-cache'}, opts)); }catch(e){ last=ghErr(0); continue; }
     if(r.status===429 || r.status>=500){ last=ghErr(r.status); continue; }
     return r;
   }
@@ -9341,7 +9344,7 @@ async function runeHydrate(){
   if(RUNE_ROOM.hydrated) return;
   RUNE_ROOM.hydrated=true;
   if(!RUNE_ROOM.items.length&&Array.isArray(DB.runeChat)&&DB.runeChat.length){
-    RUNE_ROOM.items=DB.runeChat.map(m=>({role:m.role==='you'?'you':'rune', text:String(m.text||'')}));
+    RUNE_ROOM.items=DB.runeChat.map(m=>({role:m.role==='you'?'you':'rune', text:String(m.text||''), unlogged:!!m.unlogged}));
   }
   const profile=runeBackendProfile();
   if(!profile){ RUNE_ROOM.banner='no-backend'; runeRenderList(); return; }
@@ -9353,7 +9356,14 @@ async function runeHydrate(){
     // a send racing a slow hydrate must never have its in-flight turns (or the
     // streaming reply bubble) orphaned by a wholesale replacement.
     if(items.length&&!RUNE_ROOM.busy&&RUNE_ROOM.items.length===before){
-      RUNE_ROOM.items=items.map(m=>({role:m.role==='user'?'you':'rune', text:String(m.content||'')}));
+      const server=items.map(m=>({role:m.role==='user'?'you':'rune', text:String(m.content||'')}));
+      // Merge, never clobber: turns the backend hasn't confirmed (a refresh
+      // landed mid-reply, or the log write failed on a no-backend day) stay
+      // in the room. The tail check only guards the append-landed-but-the-
+      // flag-never-cleared edge from duplicating a turn.
+      const tail=server.slice(-20).map(m=>m.role+'\n'+m.text);
+      const keep=RUNE_ROOM.items.filter(m=>m.unlogged&&tail.indexOf(m.role+'\n'+m.text)<0);
+      RUNE_ROOM.items=server.concat(keep);
       runeCacheSave();
     }
     RUNE_ROOM.banner='';
@@ -9420,8 +9430,11 @@ async function runeSend(inputEl){
   // History snapshot BEFORE the question lands in items (see runeChatMessages).
   const priorTurns=RUNE_ROOM.items.map(m=>({role:m.role==='you'?'user':'assistant', content:m.text}));
   inputEl.value='';
-  RUNE_ROOM.items.push({role:'you', text:question});
-  RUNE_ROOM.busy=true; runeRenderList();
+  // unlogged until the backend append confirms — and cached NOW, not after the
+  // reply: a refresh mid-generation used to erase the question entirely.
+  const userTurn={role:'you', text:question, unlogged:true};
+  RUNE_ROOM.items.push(userTurn);
+  RUNE_ROOM.busy=true; runeRenderList(); runeCacheSave();
   const ctx=await runeFetchContext();
   if(!ctx) RUNE_ROOM.banner='no-backend';
   const live={role:'rune', text:''};
@@ -9460,10 +9473,15 @@ async function runeSend(inputEl){
     // (cloud engine day, a swapped local model) logs as 'rune-offvoice'.
     const usedModel=String(result&&result.model||chat.model||'rune');
     const person=(typeof activePerson==='function'&&activePerson())||null;
-    await runeAppend([
+    live.unlogged=true;
+    const logged=await runeAppend([
       {role:'user', content:question, model:'', meta:{context:!!ctx, person:(person&&person.name)||''}},
       {role:'assistant', content:live.text, model:usedModel, meta:{}},
     ], /^rune(\b|[:@-])/.test(usedModel)?'rune':'rune-offvoice');
+    // Confirmed in the corpus → the hydrate merge no longer needs to protect
+    // these turns; a failed append leaves them flagged so no later hydrate
+    // can erase what the backend never saw.
+    if(logged){ delete userTurn.unlogged; delete live.unlogged; }
   }catch(e){
     RUNE_ROOM.sendSeq++;   // orphan the failed stream — its late chunks must not keep painting
     RUNE_ROOM.items.push({role:'rune', text:'(Rune hiccuped: '+String(e&&e.message||e)+')'});
