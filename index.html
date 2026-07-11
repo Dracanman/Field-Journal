@@ -7405,7 +7405,9 @@ async function ghUpdate(cfg, path, transform, message, opts){
 async function ghGetText(cfg, path){ const meta=await ghMeta(cfg, path); if(!meta) return null;
   let text;
   if(meta.encoding==='base64' && typeof meta.content==='string'){ text=ub64(meta.content); }
-  else if(meta.download_url){ text=await (await fetch(meta.download_url)).text(); }
+  // the >1MB fallback rides ghFetch too: retry, an .ok check (an error body
+  // must never become "the file"), and the same no-stale-cache revalidation
+  else if(meta.download_url){ const r=await ghFetch(meta.download_url, {}); if(!r.ok) throw ghErr(r.status); text=await r.text(); }
   else throw new Error('could not read '+path);
   text=text.replace(/^﻿/,'');   // strip a UTF-8 BOM if present
   return { text, sha:meta.sha }; }
@@ -9340,15 +9342,43 @@ function runeCacheSave(){
   DB.runeChat=RUNE_ROOM.items.slice(-RUNE_CACHE_LIMIT);
   if(typeof save==='function') save();
 }
+// Turns a failed /chats/append left flagged get re-sent, oldest first, one
+// batch per source. Two-corpus law holds on retry: a turn whose model was
+// never recorded goes off-voice — the voice corpus is never fed by guess.
+async function runeFlushStranded(){
+  const stranded=RUNE_ROOM.items.filter(m=>m.unlogged);
+  if(!stranded.length) return;
+  const batches=[];
+  stranded.forEach(m=>{
+    const source=/^rune(\b|[:@-])/.test(String(m.model||''))?'rune':'rune-offvoice';
+    const turn={role:m.role==='you'?'user':'assistant', content:String(m.text||''), model:String(m.model||''), meta:{recovered:true}};
+    const last=batches[batches.length-1];
+    if(last&&last.source===source){ last.items.push(m); last.turns.push(turn); }
+    else batches.push({source, items:[m], turns:[turn]});
+  });
+  for(const b of batches){
+    if(!(await runeAppend(b.turns, b.source))) return;   // still down — flags stay for next open
+    b.items.forEach(m=>{ delete m.unlogged; });
+  }
+  runeCacheSave();
+}
 async function runeHydrate(){
   if(RUNE_ROOM.hydrated) return;
   RUNE_ROOM.hydrated=true;
   if(!RUNE_ROOM.items.length&&Array.isArray(DB.runeChat)&&DB.runeChat.length){
-    RUNE_ROOM.items=DB.runeChat.map(m=>({role:m.role==='you'?'you':'rune', text:String(m.text||''), unlogged:!!m.unlogged}));
+    RUNE_ROOM.items=DB.runeChat.map(m=>({role:m.role==='you'?'you':'rune', text:String(m.text||''), unlogged:!!m.unlogged, model:String(m.model||'')}));
   }
   const profile=runeBackendProfile();
   if(!profile){ RUNE_ROOM.banner='no-backend'; runeRenderList(); return; }
+  // The race-guard snapshot comes FIRST — before any await — so a send
+  // landing during the flush still reads as "something happened locally".
+  // (The flush only mutates flags, never the item count.)
   const before=RUNE_ROOM.items.length;
+  // Retry stranded log writes BEFORE adopting the server history: a flushed
+  // turn lands at the corpus tail, so the recent fetch below returns it in
+  // order and the merge fallback has nothing left to pin out of place. This
+  // is also the only path that ever delivers a failed exchange to the corpus.
+  await runeFlushStranded();
   try{
     const raw=await privateApiJson(profile, runeBuildRecentRequest(profile, 50));
     const items=Array.isArray(raw&&raw.items)?raw.items:[];
@@ -9473,6 +9503,9 @@ async function runeSend(inputEl){
     // (cloud engine day, a swapped local model) logs as 'rune-offvoice'.
     const usedModel=String(result&&result.model||chat.model||'rune');
     const person=(typeof activePerson==='function'&&activePerson())||null;
+    // Recorded on the items so a stranded exchange keeps its voice/off-voice
+    // ruling when runeFlushStranded retries it in a later session.
+    userTurn.model=usedModel; live.model=usedModel;
     live.unlogged=true;
     const logged=await runeAppend([
       {role:'user', content:question, model:'', meta:{context:!!ctx, person:(person&&person.name)||''}},
