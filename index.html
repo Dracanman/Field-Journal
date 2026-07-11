@@ -8495,19 +8495,24 @@ function aiOllamaNativeEndpoint(endpoint){
   const base=aiCleanEndpoint(endpoint).replace(/\/v1$/i,'');
   return base+'/api/chat';
 }
+// think:false rides only the native endpoint (the OpenAI-compat path has no
+// field for it), so asking to disable thinking also selects the native route.
 function aiShouldUseOllamaNative(engine,chat){
-  return String(engine&&engine.type||'')==='OpenAI-compatible local endpoint'&&aiChatNumCtx(chat)>0;
+  return String(engine&&engine.type||'')==='OpenAI-compatible local endpoint'&&(aiChatNumCtx(chat)>0||(chat&&chat.think===false));
 }
 function aiBuildOllamaNativeChatRequest(engine,chat){
   chat=chat||{};
   const model=aiModelFor(engine,chat.model);
   const messages=aiNormalizeMessages(chat.messages,true);
   if(chat.system) messages.unshift({role:'system',content:String(chat.system)});
-  const options={num_ctx:aiChatNumCtx(chat)};
+  const options={};
+  const numCtx=aiChatNumCtx(chat);
+  if(numCtx>0) options.num_ctx=numCtx;
   const temperature=aiChatTemperature(chat), topP=aiChatTopP(chat);
   if(temperature!==null) options.temperature=temperature;
   if(topP!==null) options.top_p=topP;
   const body={model,messages,stream:false,options};
+  if(chat.think===false) body.think=false;
   return {
     provider:'ollama',
     url:aiOllamaNativeEndpoint(engine&&engine.endpoint),
@@ -9208,7 +9213,7 @@ function messagesBody(){
    real corpus).
  * ========================================================================== */
 
-const RUNE_ROOM={items:[], busy:false, banner:'', listHost:null, statusHost:null, model:'rune', hydrated:false};
+const RUNE_ROOM={items:[], busy:false, banner:'', listHost:null, statusHost:null, model:'rune', deep:false, hydrated:false};
 const RUNE_CONTEXT_LABEL='LIVE CONTEXT (real, not remembered)';
 const RUNE_LOG_LIMIT=200;
 const RUNE_CACHE_LIMIT=40;
@@ -9302,7 +9307,7 @@ function runeRenderList(){
   if(!host) return;
   const items=RUNE_ROOM.items.slice(-100).map(m=>h('div',{class:'companion-msg '+(m.role==='you'?'you':'guide')}, h('p',null,m.text)));
   if(!items.length) items.push(h('p',{class:'hint companion-hello'},'ᚱ Rune is here — the partner who knows what time it actually is. Say hello.'));
-  if(RUNE_ROOM.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,'…')));
+  if(RUNE_ROOM.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,RUNE_ROOM.deep?'thinking…':'…')));
   host.replaceChildren(...items);
   try{ host.scrollTop=host.scrollHeight||0; }catch(e){}
   const status=RUNE_ROOM.statusHost;
@@ -9333,8 +9338,19 @@ async function runeSend(inputEl){
   let streamed=false;
   const streamFn=(typeof globalThis!=='undefined'&&globalThis.__runeAiStream)||aiStream;
   try{
+    // Fast by default, deep on demand. Gemma 4 thinks by default and a hidden
+    // reasoning phase ate the entire token budget on day one (corpus rows
+    // #3/#5 are literally '…'). Measured 2026-07-11: default 49.3s/746 tok
+    // (2,500 chars of thinking starved the answer) vs think:false 7.7s/136
+    // tok, fully in character. The 🧠 toggle re-enables thinking. Rune is
+    // UNCAPPED locally — the native path sends no token limit; maxTokens here
+    // is only the cloud-engine seatbelt (Anthropic requires a number, and
+    // unmetered cloud generation is real money). numCtx 8192: persona + LIVE
+    // CONTEXT already run ~2.5k tokens.
+    const chat={model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx), maxTokens:4000, numCtx:8192};
+    if(!RUNE_ROOM.deep) chat.think=false;
     const result=await companionTimeout(
-      streamFn(engine, {model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx), maxTokens:700},
+      streamFn(engine, chat,
         (piece, info)=>{
           if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
           live.text=info&&info.text?info.text:(live.text+String(piece||''));
@@ -9368,6 +9384,14 @@ function runeBody(){
   const modelSel=h('select',{class:'rune-model', 'aria-label':'Rune model', onchange:function(){ RUNE_ROOM.model=this.value||'rune'; }});
   runeModelChoices(runeEngine()).forEach(m=>modelSel.append(h('option',{value:m},m)));
   modelSel.value=RUNE_ROOM.model||'rune';
+  const deepBtn=h('button',{class:'navbtn ghost rune-deep', type:'button', 'aria-pressed':RUNE_ROOM.deep?'true':'false',
+    title:'Slower, fuller reasoning for hard questions'},'🧠 Deep thought: '+(RUNE_ROOM.deep?'on':'off'));
+  deepBtn.onclick=()=>{
+    RUNE_ROOM.deep=!RUNE_ROOM.deep;
+    deepBtn.textContent='🧠 Deep thought: '+(RUNE_ROOM.deep?'on':'off');
+    deepBtn.setAttribute('aria-pressed',RUNE_ROOM.deep?'true':'false');
+    if(typeof companionRefreshContext==='function') companionRefreshContext();
+  };
   const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')},'Back to chat');
   runeRenderList();
   runeHydrate();
@@ -9375,7 +9399,7 @@ function runeBody(){
     list,
     status,
     h('div',{class:'companion-inputrow'}, input, send),
-    h('div',{class:'companion-footrow'}, modelSel, back));
+    h('div',{class:'companion-footrow'}, modelSel, deepBtn, back));
 }
 /* ========================================================================== *
    COMPANION — the floating guide chat + bug-report mode.
@@ -9609,7 +9633,8 @@ function companionRefreshContext(){
     return;
   }
   if(COMPANION.mode==='rune'){
-    chip.textContent='ᚱ '+((typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.model)||'rune')+' · live context';
+    const deep=typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.deep;
+    chip.textContent='ᚱ '+((typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.model)||'rune')+' · live context'+(deep?' · 🧠':'');
     return;
   }
   chip.textContent=companionContext().line;
