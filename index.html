@@ -9081,7 +9081,9 @@ async function messagesPushEnable(){
   const keyReply=await privateApiJson(profile, messagesBuildPushRequest(profile,'push/key'));
   const reg=await navigator.serviceWorker.ready;
   const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:messagesPushKeyBytes(String(keyReply&&keyReply.key||''))});
-  await privateApiJson(profile, messagesBuildPushRequest(profile,'push/subscribe',{subscription:sub.toJSON?sub.toJSON():sub, label:messagesSenderName()}));
+  // msgs:true is this button's meaning; rune is deliberately ABSENT so the
+  // server preserves the desk's opt-in (review fix: this call used to wipe it).
+  await privateApiJson(profile, messagesBuildPushRequest(profile,'push/subscribe',{subscription:sub.toJSON?sub.toJSON():sub, label:messagesSenderName(), msgs:true}));
   return true;
 }
 async function messagesPushDisable(){
@@ -9519,7 +9521,7 @@ function runeBody(){
    badge-only). The ᚱ room stays the conversation; this is the notebook.
  * ========================================================================== */
 
-const RUNE_DESK={items:[], newCount:0, busy:false, listHost:null, statusHost:null};
+const RUNE_DESK={items:[], newCount:0, busy:false, listHost:null, statusHost:null, loaded:'', fetchSeq:0};
 
 function runeDeskProfile(){
   return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
@@ -9539,9 +9541,15 @@ function runeDeskBuildStatusRequest(profile, id, status){
 async function runeDeskFetch(){
   const profile=runeDeskProfile();
   if(!profile) return null;
+  // A poll GET that straddles a Keep/Dismiss POST must never overwrite the
+  // newer local truth with its pre-click snapshot (review-confirmed race) —
+  // any local mutation bumps fetchSeq and orphans in-flight fetches.
+  const seq=++RUNE_DESK.fetchSeq;
   const raw=await privateApiJson(profile, runeDeskBuildListRequest(profile, 100));
+  if(RUNE_DESK.fetchSeq!==seq) return raw;
   RUNE_DESK.items=Array.isArray(raw&&raw.items)?raw.items:[];
   RUNE_DESK.newCount=Number(raw&&raw.new_count)||0;
+  RUNE_DESK.loaded='ok';
   if(typeof companionRefreshContext==='function') companionRefreshContext();
   return raw;
 }
@@ -9554,9 +9562,20 @@ async function runeDeskSetStatus(id, status){
   const profile=runeDeskProfile();
   if(!profile) throw new Error('The desk rides your private backend — add its engine profile first.');
   await privateApiJson(profile, runeDeskBuildStatusRequest(profile, id, status));
+  RUNE_DESK.fetchSeq++;   // orphan any in-flight pre-click snapshot
   const item=RUNE_DESK.items.find(n=>n.id===id);
   if(item){ if(item.status==='new') RUNE_DESK.newCount=Math.max(0,RUNE_DESK.newCount-1); item.status=status; }
   if(typeof companionRefreshContext==='function') companionRefreshContext();
+}
+// Reading the desk clears the badge: new notes become 'seen' (still open —
+// Keep/Dismiss stays available; a ruling is never forced just to quiet the ᚱ).
+async function runeDeskMarkSeen(){
+  const profile=runeDeskProfile();
+  if(!profile) return;
+  const fresh=RUNE_DESK.items.filter(n=>n.status==='new');
+  for(const note of fresh){
+    try{ await runeDeskSetStatus(note.id, 'seen'); }catch(e){ break; }
+  }
 }
 function runeDeskTimeLabel(iso){
   const d=new Date(iso);
@@ -9573,7 +9592,13 @@ function runeDeskNoteCard(note, rerender){
   const dismiss=open?h('button',{class:'navbtn ghost', type:'button'},'Dismiss'):null;
   const status=h('span',{class:'hint'},note.status+(open?'':' ✓'));
   const wire=(btn,value)=>{ if(!btn) return; btn.onclick=async()=>{ btn.disabled=true;
-    try{ await runeDeskSetStatus(note.id, value); }catch(e){ btn.disabled=false; return; }
+    try{ await runeDeskSetStatus(note.id, value); }
+    catch(e){
+      btn.disabled=false;
+      // A ruling that didn't stick must SAY so (review fix: it was silent).
+      if(RUNE_DESK.statusHost) RUNE_DESK.statusHost.textContent='That ruling didn’t save — check the backend and try again.';
+      return;
+    }
     rerender(); }; };
   wire(keep,'kept'); wire(dismiss,'dismissed');
   return h('div',{class:'panel rune-note'+(note.complaint?' rune-note-complaint':'')+(note.status==='new'?' rune-note-new':'')},
@@ -9584,12 +9609,20 @@ function runeDeskNoteCard(note, rerender){
     h('div',{class:'rune-note-meta'},...chips, h('span',{class:'hint'},marker)),
     h('div',{class:'toolrow'}, keep, dismiss, status));
 }
-async function runeDeskBuzzEnabled(){
+// Buzz state is SERVER truth (review fix: a localStorage-only marker could
+// silently disagree with the row that actually gates the buzz).
+async function runeDeskBuzzStatus(){
+  const profile=runeDeskProfile();
   const sub=typeof messagesPushSubscription==='function'?await messagesPushSubscription():null;
-  return !!sub&&localStorage&&localStorage.getItem('rune-buzz')==='on';
+  if(!profile||!sub) return {known:false, rune:false, msgs:false};
+  return privateApiJson(profile, {
+    url:privateApiJoinUrl(profile.endpoint,'push/status'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({endpoint:sub.endpoint})},
+  });
 }
-// Buzz opt-in re-subscribes THIS device with the rune flag; turning it off
-// re-subscribes with rune:false — the messages board's own alerts survive.
+// Buzz opt-in subscribes THIS device with the rune flag. A device enrolled
+// ONLY for Rune (msgs=0) fully unsubscribes on the way out — enabling Rune
+// buzz never side-enrolls a device in family message pushes (review fix).
 async function runeDeskSetBuzz(on){
   const profile=runeDeskProfile();
   if(!profile) throw new Error('The desk rides your private backend — add its engine profile first.');
@@ -9597,15 +9630,23 @@ async function runeDeskSetBuzz(on){
   if(typeof Notification!=='undefined'&&Notification.permission==='default'){
     try{ await Notification.requestPermission(); }catch(e){}
   }
+  const before=await runeDeskBuzzStatus();
+  if(!on&&before.known&&!before.msgs){
+    // rune-only device: restore its prior no-subscription state entirely
+    const sub=await messagesPushSubscription();
+    if(sub){ const endpoint=sub.endpoint; try{ await sub.unsubscribe(); }catch(e){}
+      await privateApiJson(profile, messagesBuildPushRequest(profile,'push/unsubscribe',{endpoint})); }
+    return true;
+  }
   const keyReply=await privateApiJson(profile, messagesBuildPushRequest(profile,'push/key'));
   const reg=await navigator.serviceWorker.ready;
   const sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:messagesPushKeyBytes(String(keyReply&&keyReply.key||''))});
+  const body={subscription:sub.toJSON?sub.toJSON():sub, label:(typeof messagesSenderName==='function'?messagesSenderName():''), rune:!!on};
+  if(!before.known) body.msgs=false;   // fresh rune-only enrollment: no family messages
   await privateApiJson(profile, {
     url:privateApiJoinUrl(profile.endpoint,'push/subscribe'),
-    opts:{method:'POST',headers:privateApiHeaders(profile,true),
-      body:JSON.stringify({subscription:sub.toJSON?sub.toJSON():sub, label:(typeof messagesSenderName==='function'?messagesSenderName():''), rune:!!on})},
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify(body)},
   });
-  try{ localStorage.setItem('rune-buzz', on?'on':'off'); }catch(e){}
   return true;
 }
 function viewRuneDesk(){
@@ -9614,8 +9655,14 @@ function viewRuneDesk(){
   RUNE_DESK.listHost=list; RUNE_DESK.statusHost=status;
   function paint(){
     const items=RUNE_DESK.items.map(n=>runeDeskNoteCard(n, paint));
-    list.replaceChildren(...(items.length?items:[
-      h('p',{class:'hint'},'No notes yet — the heartbeat thinks every few hours (quiet during work and the night). Silence is allowed; a partner only speaks when there’s something to say.')]));
+    // Honest empty states (review fix: 'No notes yet' used to paint before the
+    // first fetch resolved AND kept painting under an unreachable banner).
+    const empty=RUNE_DESK.loaded==='ok'
+      ?h('p',{class:'hint'},'No notes yet — the heartbeat thinks every few hours (quiet during work and the night). Silence is allowed; a partner only speaks when there’s something to say.')
+      :RUNE_DESK.loaded==='error'
+      ?h('p',{class:'hint'},'The desk is unreachable — check the backend, then reopen.')
+      :h('p',{class:'hint'},'Opening the desk…');
+    list.replaceChildren(...(items.length?items:[empty]));
   }
   const profile=runeDeskProfile();
   if(!profile){
@@ -9624,12 +9671,12 @@ function viewRuneDesk(){
       h('p',{class:'hint'},'The desk rides your private backend — add the Private tailnet backend profile under ⚙ Engine on this device, then come back.'));
   }
   const buzzBtn=h('button',{class:'navbtn ghost', type:'button'},'🔔 …');
-  (async()=>{ try{ buzzBtn.textContent=(await runeDeskBuzzEnabled())?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off'; }
+  (async()=>{ try{ const s=await runeDeskBuzzStatus(); buzzBtn.textContent=s.rune?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off'; }
     catch(e){ buzzBtn.textContent='🔔 Rune may buzz this device: off'; } })();
   buzzBtn.onclick=async()=>{
     buzzBtn.disabled=true; status.textContent='';
     try{
-      const on=!(await runeDeskBuzzEnabled());
+      const on=!((await runeDeskBuzzStatus()).rune);
       await runeDeskSetBuzz(on);
       buzzBtn.textContent=on?'🔕 Rune may buzz this device: on':'🔔 Rune may buzz this device: off';
       status.textContent=on?'This device buzzes for Rune (important always; ordinary under the daily cap).':'Badge-only on this device — notes still land here quietly.';
@@ -9637,7 +9684,8 @@ function viewRuneDesk(){
     finally{ buzzBtn.disabled=false; }
   };
   paint();
-  runeDeskFetch().then(paint).catch(()=>{ status.textContent='Rune’s desk is unreachable — check the backend.'; });
+  runeDeskFetch().then(async()=>{ paint(); await runeDeskMarkSeen(); paint(); })
+    .catch(()=>{ RUNE_DESK.loaded=RUNE_DESK.loaded==='ok'?'ok':'error'; paint(); status.textContent='Rune’s desk is unreachable — check the backend.'; });
   return h('div',{class:'panel rune-desk'},
     h('div',{class:'rune-desk-head'},
       h('h2',null,'ᚱ Rune’s desk'),
@@ -9860,6 +9908,14 @@ function companionRefreshContext(){
   if(studioBtn) studioBtn.style.display=(typeof assistantSession==='function'&&assistantSession())?'':'none';
   const coachBtn=COMPANION.panel&&COMPANION.panel._coachBtn;
   if(coachBtn) coachBtn.style.display=(typeof practiceCoachSession==='function'&&practiceCoachSession())?'':'none';
+  // The ᚱ badge repaints on EVERY refresh, before the per-mode early returns —
+  // the review caught it freezing whenever the panel sat in gm/studio/coach.
+  const runeBtn=COMPANION.panel&&COMPANION.panel._runeBtn;
+  if(runeBtn){
+    const n=(typeof RUNE_DESK!=='undefined'&&RUNE_DESK.newCount)||0;
+    runeBtn.textContent=n>0?('ᚱ·'+n):'ᚱ';
+    runeBtn.setAttribute('title', n>0?('Rune — '+n+' new note'+(n===1?'':'s')+' on the desk'):'Rune — your partner');
+  }
   const chip=COMPANION.panel&&COMPANION.panel._context;
   if(!chip) return;
   if(COMPANION.mode==='gm'){
@@ -9877,14 +9933,6 @@ function companionRefreshContext(){
     const s=typeof practiceCoachSession==='function'?practiceCoachSession():null;
     chip.textContent=s&&s.chapter?('✶ Ch '+s.chapter.n+' · '+s.chapter.title):'✶ not seated';
     return;
-  }
-  // The ᚱ button doubles as the desk badge: a dot + count when unreviewed
-  // notes wait (fed by runeDeskPollCount piggybacking the messages poll).
-  const runeBtn=COMPANION.panel&&COMPANION.panel._runeBtn;
-  if(runeBtn){
-    const n=(typeof RUNE_DESK!=='undefined'&&RUNE_DESK.newCount)||0;
-    runeBtn.textContent=n>0?('ᚱ·'+n):'ᚱ';
-    runeBtn.setAttribute('title', n>0?('Rune — '+n+' new note'+(n===1?'':'s')+' on the desk'):'Rune — your partner');
   }
   if(COMPANION.mode==='rune'){
     const deep=typeof RUNE_ROOM!=='undefined'&&RUNE_ROOM.deep;
