@@ -9360,6 +9360,28 @@ function runeModelChoices(engine){
   if(engine&&engine.model) push(engine.model);
   return out;
 }
+// Stall watchdog, not a stopwatch: rune-max at ~4 tok/s legitimately talks for
+// minutes, and the old fixed 120s deadline fired "(Rune hiccuped…)" MID-
+// SENTENCE while the orphaned stream kept talking underneath. Rune only
+// times out on SILENCE — no chunks at all for stallMs (generous enough for
+// model load + prompt eval + a deep-thought pass on the slow brain).
+const RUNE_STALL_MS=300000;
+function runeStreamWithWatchdog(streamFn, engine, chat, onChunk, stallMs){
+  let last=Date.now(), done=false;
+  const wrapped=(piece, info)=>{ last=Date.now(); onChunk(piece, info); };
+  return new Promise((resolve, reject)=>{
+    const timer=setInterval(()=>{
+      if(done) return;
+      if(Date.now()-last>stallMs){
+        done=true; clearInterval(timer);
+        reject(new Error('Rune went quiet for '+Math.round(stallMs/60000)+' minutes — check the engine and try again.'));
+      }
+    }, 5000);
+    streamFn(engine, chat, wrapped).then(
+      r=>{ if(!done){ done=true; clearInterval(timer); resolve(r); } },
+      e=>{ if(!done){ done=true; clearInterval(timer); reject(e); } });
+  });
+}
 async function runeSend(inputEl){
   const question=String(inputEl.value||'').trim();
   if(!question||RUNE_ROOM.busy) return;
@@ -9378,6 +9400,9 @@ async function runeSend(inputEl){
   if(!ctx) RUNE_ROOM.banner='no-backend';
   const live={role:'rune', text:''};
   let streamed=false;
+  // A cancelled/stale stream must never keep painting into the room: each send
+  // gets a generation id and late chunks from an older send are ignored.
+  const sendId=(RUNE_ROOM.sendSeq=(RUNE_ROOM.sendSeq||0)+1);
   const streamFn=(typeof globalThis!=='undefined'&&globalThis.__runeAiStream)||aiStream;
   try{
     // Fast by default, deep on demand. Gemma 4 thinks by default and a hidden
@@ -9391,14 +9416,14 @@ async function runeSend(inputEl){
     // CONTEXT already run ~2.5k tokens.
     const chat={model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx, priorTurns), maxTokens:4000, numCtx:8192};
     if(!RUNE_ROOM.deep) chat.think=false;
-    const result=await companionTimeout(
-      streamFn(engine, chat,
-        (piece, info)=>{
-          if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
-          live.text=info&&info.text?info.text:(live.text+String(piece||''));
-          runeRenderList();
-        }),
-      120000, 'Rune');
+    const result=await runeStreamWithWatchdog(streamFn, engine, chat,
+      (piece, info)=>{
+        if(RUNE_ROOM.sendSeq!==sendId) return;   // stale stream — stop painting
+        if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
+        live.text=info&&info.text?info.text:(live.text+String(piece||''));
+        runeRenderList();
+      },
+      RUNE_STALL_MS);
     const text=String(result&&result.text||live.text||'').trim();
     if(!streamed) RUNE_ROOM.items.push(live);
     live.text=text||'…';
@@ -9414,6 +9439,7 @@ async function runeSend(inputEl){
       {role:'assistant', content:live.text, model:usedModel, meta:{}},
     ], /^rune(\b|[:@-])/.test(usedModel)?'rune':'rune-offvoice');
   }catch(e){
+    RUNE_ROOM.sendSeq++;   // orphan the failed stream — its late chunks must not keep painting
     RUNE_ROOM.items.push({role:'rune', text:'(Rune hiccuped: '+String(e&&e.message||e)+')'});
   }finally{
     RUNE_ROOM.busy=false;
