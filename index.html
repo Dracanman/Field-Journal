@@ -5945,10 +5945,15 @@ if(PHONE_MQ.addEventListener) PHONE_MQ.addEventListener('change', ()=>applyMode(
 function motionValue(){
   const m=DB.motion;
   if(m==='calm'||m==='rich'||m==='standard') return m;
-  if(DB.fxRich===true) return 'rich';
+  // Legacy order matters and mirrors the OLD effective rendering: the CSS gave
+  // calm absolute precedence over rich (body.fx-calm.fx-rich::after{content:
+  // none}), and the 'auto' default was calm on phones even with Atmospherics
+  // on — so calm signals migrate first, and fxRich only wins where it actually
+  // rendered rich before.
   if(DB.fxCalm===true) return 'calm';
-  if(DB.fxCalm===false) return 'standard';   // an explicit old "full sky" pick
-  return PHONE_MQ.matches?'calm':'standard';
+  if(DB.fxCalm===false) return DB.fxRich===true?'rich':'standard';
+  if(PHONE_MQ.matches) return 'calm';               // legacy auto: phones were calm
+  return DB.fxRich===true?'rich':'standard';
 }
 function motionLabel(){ const m=motionValue(); return m==='calm'?'Calm' : m==='rich'?'Rich' : 'Standard'; }
 function setMotion(value){
@@ -7597,7 +7602,12 @@ async function loadFromRepo(opts){ opts=opts||{}; if(!ghReady()){ if(!opts.silen
     const remote=JSON.parse(r.text);
     mergeIncoming(remote);
     captureBaseline(remote);   // whatever we merged, THIS is what the repo holds right now
-    saveLocal(); if(!opts.silent) toast('Loaded from your file.'); render();   // don't echo a sync back out
+    saveLocal(); if(!opts.silent) toast('Loaded from your file.');
+    // A gentle (background) load never repaints over mid-edit typing — same
+    // law as liveRefreshTick: unsaved field text lives only in the DOM, and a
+    // full render() eats it. The merged data is saved regardless and paints on
+    // the next navigation. Manual loads keep the immediate repaint.
+    if(!opts.gentle||typeof liveRefreshSafeToRender!=='function'||liveRefreshSafeToRender()) render();   // don't echo a sync back out
   }catch(e){ if(!opts.silent) toast('Load failed: '+e.message); }
 }
 function mergeBy(a,b,k){ a=a||[]; const seen=new Set(a.map(x=>x[k])); (b||[]).forEach(x=>{ if(!seen.has(x[k])) a.push(x); }); return a; }
@@ -9251,10 +9261,10 @@ function runeBuildContextRequest(profile){
     opts:{method:'GET',headers:privateApiHeaders(profile,false)},
   };
 }
-function runeBuildAppendRequest(profile, messages){
+function runeBuildAppendRequest(profile, messages, source){
   return {
     url:privateApiJoinUrl(profile&&profile.endpoint,'chats/append'),
-    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({source:'rune',messages:messages||[]})},
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({source:source||'rune',messages:messages||[]})},
   };
 }
 function runeBuildRecentRequest(profile, limit){
@@ -9279,17 +9289,20 @@ function runeContextBlock(ctx){
   lines.push(tasks?('TASKS.md (the real list):\n'+tasks):'TASKS.md: unavailable right now — say so instead of inventing tasks.');
   return lines.join('\n');
 }
-function runeChatMessages(question, ctx){
-  const history=RUNE_ROOM.items.slice(-12).map(m=>({role:m.role==='you'?'user':'assistant', content:m.text}));
+// priorTurns must be snapshotted BEFORE the question lands in RUNE_ROOM.items,
+// or the model receives the question twice (once bare in history, once inside
+// the context turn) — the review-confirmed day-two bug.
+function runeChatMessages(question, ctx, priorTurns){
+  const history=(Array.isArray(priorTurns)?priorTurns:RUNE_ROOM.items.map(m=>({role:m.role==='you'?'user':'assistant', content:m.text}))).slice(-12);
   const block=runeContextBlock(ctx);
   history.push({role:'user', content:(block?block+'\n---\n':'')+question});
   return history;
 }
-async function runeAppend(turns){
+async function runeAppend(turns, source){
   const profile=runeBackendProfile();
   if(!profile){ RUNE_ROOM.banner='no-backend'; return false; }
   try{
-    await privateApiJson(profile, runeBuildAppendRequest(profile, turns));
+    await privateApiJson(profile, runeBuildAppendRequest(profile, turns, source));
     RUNE_ROOM.banner='';
     return true;
   }catch(e){ RUNE_ROOM.banner='no-backend'; return false; }
@@ -9306,12 +9319,18 @@ async function runeHydrate(){
   }
   const profile=runeBackendProfile();
   if(!profile){ RUNE_ROOM.banner='no-backend'; runeRenderList(); return; }
+  const before=RUNE_ROOM.items.length;
   try{
     const raw=await privateApiJson(profile, runeBuildRecentRequest(profile, 50));
     const items=Array.isArray(raw&&raw.items)?raw.items:[];
-    if(items.length) RUNE_ROOM.items=items.map(m=>({role:m.role==='user'?'you':'rune', text:String(m.content||'')}));
+    // Replace only if nothing happened locally while the fetch was in flight —
+    // a send racing a slow hydrate must never have its in-flight turns (or the
+    // streaming reply bubble) orphaned by a wholesale replacement.
+    if(items.length&&!RUNE_ROOM.busy&&RUNE_ROOM.items.length===before){
+      RUNE_ROOM.items=items.map(m=>({role:m.role==='user'?'you':'rune', text:String(m.content||'')}));
+      runeCacheSave();
+    }
     RUNE_ROOM.banner='';
-    runeCacheSave();
   }catch(e){ RUNE_ROOM.banner='no-backend'; }
   runeRenderList();
 }
@@ -9341,10 +9360,12 @@ async function runeSend(inputEl){
   if(!question||RUNE_ROOM.busy) return;
   const engine=runeEngine();
   if(!engine){
-    RUNE_ROOM.items.push({role:'rune', text:'No engine is awake — pick one under ⋯ More → ⚙ Engine (Rune rides the model named "rune" on your Ollama).'});
+    RUNE_ROOM.items.push({role:'rune', text:'No engine is awake — tap ⚙ Engine settings in this room to pick one (Rune rides the model named "rune" on your Ollama).'});
     runeRenderList();
     return;
   }
+  // History snapshot BEFORE the question lands in items (see runeChatMessages).
+  const priorTurns=RUNE_ROOM.items.map(m=>({role:m.role==='you'?'user':'assistant', content:m.text}));
   inputEl.value='';
   RUNE_ROOM.items.push({role:'you', text:question});
   RUNE_ROOM.busy=true; runeRenderList();
@@ -9363,7 +9384,7 @@ async function runeSend(inputEl){
     // is only the cloud-engine seatbelt (Anthropic requires a number, and
     // unmetered cloud generation is real money). numCtx 8192: persona + LIVE
     // CONTEXT already run ~2.5k tokens.
-    const chat={model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx), maxTokens:4000, numCtx:8192};
+    const chat={model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx, priorTurns), maxTokens:4000, numCtx:8192};
     if(!RUNE_ROOM.deep) chat.think=false;
     const result=await companionTimeout(
       streamFn(engine, chat,
@@ -9377,11 +9398,16 @@ async function runeSend(inputEl){
     if(!streamed) RUNE_ROOM.items.push(live);
     live.text=text||'…';
     // Log the CLEAN user turn (the context block is transport, not corpus) +
-    // Rune's reply. meta records that live context rode along.
+    // Rune's reply. meta records live context + WHO was talking (shared
+    // device: another person's words must be attributable). Two-corpus law:
+    // only a rune-voiced reply joins the voice corpus — an off-model stand-in
+    // (cloud engine day, a swapped local model) logs as 'rune-offvoice'.
+    const usedModel=String(result&&result.model||chat.model||'rune');
+    const person=(typeof activePerson==='function'&&activePerson())||null;
     await runeAppend([
-      {role:'user', content:question, model:'', meta:{context:!!ctx}},
-      {role:'assistant', content:live.text, model:String(result&&result.model||RUNE_ROOM.model||'rune'), meta:{}},
-    ]);
+      {role:'user', content:question, model:'', meta:{context:!!ctx, person:(person&&person.name)||''}},
+      {role:'assistant', content:live.text, model:usedModel, meta:{}},
+    ], /^rune(\b|[:@-])/.test(usedModel)?'rune':'rune-offvoice');
   }catch(e){
     RUNE_ROOM.items.push({role:'rune', text:'(Rune hiccuped: '+String(e&&e.message||e)+')'});
   }finally{
@@ -9391,14 +9417,32 @@ async function runeSend(inputEl){
   runeRenderList(); runeCacheSave();
 }
 function runeBody(){
+  const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')},'Back to chat');
+  // A personal partner on a shared device: guests can't read the corpus or
+  // speak into it. (Full-access people share every device power — house law.)
+  const person=typeof activePerson==='function'?activePerson():null;
+  if(person&&person.role==='guest'){
+    return h('div',{class:'companion-body companion-rune'},
+      h('p',{class:'hint companion-hello'},'ᚱ Rune is a personal partner, and this seat is not open to guests.'),
+      h('div',{class:'companion-footrow'}, back));
+  }
   const list=h('div',{class:'companion-log rune-log'});
   RUNE_ROOM.listHost=list;
   const status=h('p',{class:'hint companion-report-status rune-banner'}, runeBannerText());
   RUNE_ROOM.statusHost=status;
   const input=h('input',{class:'companion-input', placeholder:'Talk to Rune…', onkeydown:e=>{ if(e.key==='Enter') runeSend(input); }});
   const send=h('button',{class:'navbtn primary', type:'button', onclick:()=>runeSend(input)},'Send');
-  const modelSel=h('select',{class:'rune-model', 'aria-label':'Rune model', onchange:function(){ RUNE_ROOM.model=this.value||'rune'; }});
-  runeModelChoices(runeEngine()).forEach(m=>modelSel.append(h('option',{value:m},m)));
+  const engine=runeEngine();
+  // No engine → a working door, not directions to a menu row that Cozy Maker
+  // devices don't even show (the old copy was a dead end on exactly them).
+  const engineHint=engine?null:h('div',{class:'toolrow'},
+    h('p',{class:'hint', style:{margin:'0'}},'Rune rides the Ollama model named "rune" — no engine is awake on this device.'),
+    h('button',{class:'navbtn ghost', type:'button', onclick:()=>{ if(typeof openEngineSettings==='function') openEngineSettings(); }},'⚙ Engine settings'));
+  const modelSel=h('select',{class:'rune-model', 'aria-label':'Rune model', onchange:function(){
+    RUNE_ROOM.model=this.value||'rune';
+    if(typeof companionRefreshContext==='function') companionRefreshContext();
+  }});
+  runeModelChoices(engine).forEach(m=>modelSel.append(h('option',{value:m},m)));
   modelSel.value=RUNE_ROOM.model||'rune';
   const deepBtn=h('button',{class:'navbtn ghost rune-deep', type:'button', 'aria-pressed':RUNE_ROOM.deep?'true':'false',
     title:'Slower, fuller reasoning for hard questions'},'🧠 Deep thought: '+(RUNE_ROOM.deep?'on':'off'));
@@ -9408,12 +9452,15 @@ function runeBody(){
     deepBtn.setAttribute('aria-pressed',RUNE_ROOM.deep?'true':'false');
     if(typeof companionRefreshContext==='function') companionRefreshContext();
   };
-  const back=h('button',{class:'navbtn ghost', type:'button', onclick:()=>companionSetMode('chat')},'Back to chat');
+  // The think flag only exists on the Ollama native path — on a cloud engine
+  // the toggle would be a lying no-op, so it hides instead.
+  if(!(engine&&engine.type==='OpenAI-compatible local endpoint')) deepBtn.style.display='none';
   runeRenderList();
   runeHydrate();
   return h('div',{class:'companion-body companion-rune'},
     list,
     status,
+    engineHint,
     h('div',{class:'companion-inputrow'}, input, send),
     h('div',{class:'companion-footrow'}, modelSel, deepBtn, back));
 }
@@ -13142,9 +13189,11 @@ function studioAssistant(host){
 
   // Read-only: which engine/model/sampling would actually answer right now.
   // The persona's preferred model rides when the engine honors it (same rule
-  // the ask pipeline uses); everything here is edited in ⚙ Engine settings.
+  // the ask pipeline uses); everything here is edited in ⚙ Engine settings —
+  // so this line reads FRESH profiles every call, or the exact flow its copy
+  // prescribes (tune in the modal) would leave it stale.
   function renderEngineLine(){
-    const engine=assistantEngineById(profiles,engineSel.value);
+    const engine=assistantEngineById(assistantEngineProfiles(),engineSel.value);
     const persona=assistantPersonaById(state.personaId);
     const model=(persona&&persona.model&&assistantPersonaModelAllowed(persona,engine))?persona.model:String(engine&&engine.model||'')||'(engine default)';
     const temp=engine&&engine.temperature!==''?Number(engine.temperature).toFixed(2):'default';
@@ -13237,7 +13286,7 @@ function studioAssistant(host){
     // model, e.g. Claude ignoring a persona that wants an Ollama-only model) when it isn't a
     // local engine and the engine doesn't advertise that model — say so here instead of
     // letting the mismatch pass unremarked.
-    const currentEngine=assistantEngineById(profiles,engineSel.value);
+    const currentEngine=assistantEngineById(assistantEngineProfiles(),engineSel.value);
     const modelNote=current.model&&!assistantPersonaModelAllowed(current,currentEngine)?' Preferred model "'+current.model+'" isn’t available on this engine — using the engine’s own model instead.':'';
     personaMeta.replaceChildren(document.createTextNode((current.builtIn?'Built-in':'Custom')+' persona. '+(current.description||'')+' Grounding: '+current.groundingMode+'.'+modelNote));
     customizeBtn.textContent=current.builtIn?'Customize a copy':'Edit custom';
@@ -13287,7 +13336,7 @@ function studioAssistant(host){
   };
 
   function refreshEngineNote(){
-    const engine=assistantEngineById(profiles,engineSel.value);
+    const engine=assistantEngineById(assistantEngineProfiles(),engineSel.value);
     spend.textContent=assistantSpendLabel(engine);
     renderEngineLine();
   }
@@ -22764,7 +22813,7 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   // Converge on open: a configured device always pulls the repo copy (Slice 63
   // retired the old opt-in toggle — it was a no-op on fresh devices, and Live
   // refresh re-pulls every 120s anyway). Also recovers from storage eviction.
-  if(ghReady()) loadFromRepo({silent:true});
+  if(ghReady()) loadFromRepo({silent:true, gentle:true});
   // household roster: learn people added/edited on other devices, then keep everything
   // gently current in the background (roster + journal — see sync/household.js).
   if(ghReady()) householdLoad({silent:true}).then(changed=>{ if(changed) render(); });
