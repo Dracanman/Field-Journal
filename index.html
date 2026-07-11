@@ -9552,6 +9552,17 @@ function runeBody(){
   }});
   runeModelChoices(engine).forEach(m=>modelSel.append(h('option',{value:m},RUNE_MODEL_LABELS[m]||m)));
   modelSel.value=RUNE_ROOM.model||'rune';
+  // The engine profile's stored model list is a snapshot from its last refresh
+  // — a model pulled onto the shelf yesterday never appears. Ask the server
+  // for the LIVE list when the room opens; quietly keep the snapshot if it's
+  // unreachable. (Selection survives: options are appended, never rebuilt.)
+  if(engine&&typeof aiListModels==='function'&&typeof engineCanListModels==='function'&&engineCanListModels(engine.type)){
+    aiListModels(engine).then(models=>{
+      (Array.isArray(models)?models:[]).map(m=>String(m||'').trim()).filter(Boolean).forEach(m=>{
+        if(![].slice.call(modelSel.children).some(o=>o.getAttribute&&o.getAttribute('value')===m)) modelSel.append(h('option',{value:m},RUNE_MODEL_LABELS[m]||m));
+      });
+    }).catch(()=>{});
+  }
   const deepBtn=h('button',{class:'navbtn ghost rune-deep', type:'button', 'aria-pressed':RUNE_ROOM.deep?'true':'false',
     title:'Slower, fuller reasoning for hard questions'},'🧠 Deep thought: '+(RUNE_ROOM.deep?'on':'off'));
   deepBtn.onclick=()=>{
