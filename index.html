@@ -1372,6 +1372,10 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 .rune-note-new{ border-color:var(--glow); }
 .rune-note-complaint{ border-style:dashed; }
 .rune-note-complaint .rune-note-head b::before{ content:'📮 '; }
+/* what a note read (Slice 66 — the reader): small, quiet, display-only chips */
+.rune-note-sources{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin:2px 0 4px; }
+.rune-source{ font-size:11px; max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rune-reader-hint{ font-size:12px; opacity:.82; }
 /* The list — TASKS.md remote control (Slice 65) */
 .rune-tasks{ margin:14px 0 6px; }
 .rune-tasks-list{ display:grid; gap:4px; margin-top:8px; }
@@ -9576,12 +9580,17 @@ function runeBody(){
   if(!(engine&&engine.type==='OpenAI-compatible local endpoint')) deepBtn.style.display='none';
   const deskBtn=h('button',{class:'navbtn ghost', type:'button', title:'Rune’s notebook — autonomous thoughts land there',
     onclick:()=>{ if(typeof go==='function') go('rune-desk'); companionToggle(false); }},'🗒 Desk');
+  // Slice 66 — the reader: on its own heartbeat Rune can look before it speaks.
+  // A quiet, always-present line so Del knows the notes on the desk are grounded.
+  const readerHint=h('p',{class:'hint rune-reader-hint', style:{margin:'0'}},
+    '🔎 On its own, Rune reads the repo, its skills, canon, and the web — grounded notes land on the 🗒 Desk.');
   runeRenderList();
   runeHydrate();
   return h('div',{class:'companion-body companion-rune'},
     list,
     status,
     engineHint,
+    readerHint,
     h('div',{class:'companion-inputrow'}, input, send),
     h('div',{class:'companion-footrow'}, modelSel, deepBtn, deskBtn, back));
 }
@@ -9798,6 +9807,26 @@ function runeDeskTimeLabel(iso){
   const d=new Date(iso);
   return isNaN(d.getTime())?'':d.toLocaleString([], {month:'short', day:'numeric', hour:'numeric', minute:'2-digit'});
 }
+// A source label is "tool:arg" from the backend reader loop; give each an icon
+// by its tool and show the arg. read-only, display-only — no links (the point
+// is "here's what Rune stood on", not a browse target).
+function runeDeskSourceIcon(tool){
+  if(tool==='search_web') return '🌐';
+  if(tool==='search_canon') return '📜';
+  if(tool==='read_skill') return '📘';
+  return '📄';   // list_files / read_file / anything repo
+}
+function runeDeskSourceChips(sources){
+  const list=(Array.isArray(sources)?sources:[]).map(s=>String(s||'').trim()).filter(Boolean);
+  if(!list.length) return null;
+  const chips=list.slice(0,12).map(s=>{
+    const cut=s.indexOf(':');
+    const tool=cut<0?s:s.slice(0,cut);
+    const arg=cut<0?'':s.slice(cut+1);
+    return h('span',{class:'chip rune-source', title:s}, runeDeskSourceIcon(tool)+' '+(arg||tool));
+  });
+  return h('div',{class:'rune-note-sources'}, h('span',{class:'hint'},'read:'), ...chips);
+}
 function runeDeskNoteCard(note, rerender){
   const chips=(note.tags||[]).map(t=>h('span',{class:'chip dash'},t));
   if(note.category) chips.push(h('span',{class:'chip'},note.category));
@@ -9818,12 +9847,16 @@ function runeDeskNoteCard(note, rerender){
     }
     rerender(); }; };
   wire(keep,'kept'); wire(dismiss,'dismissed');
+  // What the note read (Slice 66): the reader shows its work so a suggestion is
+  // visibly grounded. Absent/empty on old notes → the row simply doesn't render.
+  const sources=runeDeskSourceChips(note.sources);
   return h('div',{class:'panel rune-note'+(note.complaint?' rune-note-complaint':'')+(note.status==='new'?' rune-note-new':'')},
     h('div',{class:'rune-note-head'},
       h('b',null,note.title),
       h('span',{class:'hint'},runeDeskTimeLabel(note.created_at))),
     h('p',null,note.body),
     h('div',{class:'rune-note-meta'},...chips, h('span',{class:'hint'},marker)),
+    sources,
     h('div',{class:'toolrow'}, keep, dismiss, status));
 }
 // Buzz state is SERVER truth (review fix: a localStorage-only marker could
