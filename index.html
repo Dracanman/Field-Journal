@@ -9348,8 +9348,13 @@ function runeRenderList(){
   const status=RUNE_ROOM.statusHost;
   if(status) status.textContent=runeBannerText();
 }
+// Two first-class brains, one persona (rune/make-models.ps1 builds both from
+// the one Modelfile): `rune` = gemma4:26b, quick; `rune-max` = gemma4:31b,
+// deeper and slower — the switch for "let Rune have a little more brain".
+const RUNE_MODEL_CHOICES=['rune','rune-max'];
+const RUNE_MODEL_LABELS={'rune':'rune · quick','rune-max':'rune-max · deeper (31B, slower)'};
 function runeModelChoices(engine){
-  const out=['rune'];
+  const out=RUNE_MODEL_CHOICES.slice();
   const push=m=>{ m=String(m||'').trim(); if(m&&out.indexOf(m)<0) out.push(m); };
   if(typeof assistantAdvertisedModels==='function') assistantAdvertisedModels(engine).forEach(push);
   if(engine&&engine.model) push(engine.model);
@@ -9442,7 +9447,7 @@ function runeBody(){
     RUNE_ROOM.model=this.value||'rune';
     if(typeof companionRefreshContext==='function') companionRefreshContext();
   }});
-  runeModelChoices(engine).forEach(m=>modelSel.append(h('option',{value:m},m)));
+  runeModelChoices(engine).forEach(m=>modelSel.append(h('option',{value:m},RUNE_MODEL_LABELS[m]||m)));
   modelSel.value=RUNE_ROOM.model||'rune';
   const deepBtn=h('button',{class:'navbtn ghost rune-deep', type:'button', 'aria-pressed':RUNE_ROOM.deep?'true':'false',
     title:'Slower, fuller reasoning for hard questions'},'🧠 Deep thought: '+(RUNE_ROOM.deep?'on':'off'));
