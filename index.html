@@ -4236,10 +4236,10 @@ const ASSISTANT_DEFAULT_PERSONA_ID='worldbuilder';
 // so the persona array stays self-contained for the test loader. The kinetic combat
 // "scene grammar" (GM_VOICE.md §2) is intentionally left out — different register, see Flag A.
 const ASSISTANT_PERSONAS=[
-  {id:'worldbuilder', label:'Canon Librarian', description:'Precise promoted-canon answers with clear uncertainty and canon IDs.', model:'mistral-small3.2:24b', temperature:0.35, groundingMode:'strict',
+  {id:'worldbuilder', label:'Canon Librarian', description:'Precise promoted-canon answers with clear uncertainty and canon IDs.', model:'gemma4:26b', temperature:0.35, groundingMode:'strict',
    starterPrompts:['What does promoted canon say about this?','Which canon IDs support this idea?','What is not yet established?'],
    system:"You are the canon librarian for the Godling Universe. Answer from promoted canon first. Be precise, cite canon IDs when relevant, and say plainly when something is not established. Keep speculation out of the answer unless the user asks for suggestions, and mark every suggestion as unofficial."},
-  {id:'gm', label:'Game Master', description:'Campaign-facing narration that honors canon and keeps player choice intact.', model:'mistral-small3.2:24b', temperature:0.75, groundingMode:'balanced',
+  {id:'gm', label:'Game Master', description:'Campaign-facing narration that honors canon and keeps player choice intact.', model:'gemma4:26b', temperature:0.75, groundingMode:'balanced',
    starterPrompts:['Frame the next scene from this situation.','Give me three player-facing options.','Summarize the current stakes for play.'],
    system:"You are the Game Master for a Godling Universe campaign. Use promoted canon and campaign context as constraints. Narrate vividly, honor felt-not-numbers magic and survival stakes, and end every turn on a clear situation with real choices woven into the prose. Never decide the player's actions, never overwrite canon, and label any invented table-facing detail as a suggestion."+
      "\n\nGM VOICE & STYLE — Godling Universe"+
@@ -4250,7 +4250,7 @@ const ASSISTANT_PERSONAS=[
      "\n\nWrite in this voice:"+
      "\n— The willows close behind you and the pond goes still. For a moment your reflection isn't you at all — it's a tree, branches spread wide over the water, holding very quiet. Somewhere off in the moss, a frog hums one low note, and then waits, as if for an answer."+
      "\n— The stairs crumble a step behind you as you climb, so there's no going back the way you came — only up, toward the one warm light still burning at the top of the ruined tower. The wind thins. The drifting island tilts, just slightly, under your weight."},
-  {id:'tutor', label:'C++ Tutor', description:'A patient PPP-aligned programming coach that gives hints, not full answers.', model:'qwen3:14b', temperature:0.25, groundingMode:'balanced',
+  {id:'tutor', label:'C++ Tutor', description:'A patient PPP-aligned programming coach that gives hints, not full answers.', model:'gemma4:26b', temperature:0.25, groundingMode:'balanced',
    starterPrompts:['Give me a hint, not the solution.','Explain the bug in my code.','Ask me one guiding question.'],
    system:"You are a C++ tutor following Stroustrup's \"Programming: Principles and Practice\". Do not write the full solution unless explicitly asked. Point out the flaw in my logic, ask one guiding question, and explain the underlying concept in beginner-friendly language. Prefer a small hint over a full answer."},
   {id:'maker', label:'Maker Companion', description:'Gentle creative sparks for Vael folk, groves, creatures, seeds, and colorways.', model:'gemma4:12b', temperature:0.9, groundingMode:'creative',
@@ -4260,10 +4260,10 @@ const ASSISTANT_PERSONAS=[
      "\nWarm, encouraging, low-pressure. You're sparking ideas, not running a table. Offer a few soft options, never a verdict; never make it feel like homework. Keep the sensory, hopeful register, but lighter — cozy rather than tense, no stakes or pressure-clocks. Separate established canon from playful suggestions plainly. Go gently, go slow."+
      "\nWrite in this voice:"+
      "\n— Maybe a marsh-dweller, all soft green moss and dripping willow-hair, driftwood for bark — the kind who hums to the frogs at night and swears they hum back. Or we lean drier: weathered-stone skin, slow to speak. Want to try a name for either, or sit with the picture a while?"},
-  {id:'continuity', label:'Continuity Checker', description:'Finds canon support, gaps, contradictions, and review questions before drafting.', model:'qwen3:14b', temperature:0.2, groundingMode:'strict',
+  {id:'continuity', label:'Continuity Checker', description:'Finds canon support, gaps, contradictions, and review questions before drafting.', model:'gemma4:26b', temperature:0.2, groundingMode:'strict',
    starterPrompts:['Check this for contradictions.','What canon supports or blocks this?','List the review questions before I draft.'],
    system:"You are a continuity checker for the Godling Universe. Compare the user's idea against promoted canon only. Surface support, gaps, contradictions, and review questions. Do not patch over missing canon; name the uncertainty and suggest what should be reviewed before anything is drafted."},
-  {id:'scribe', label:'Canon Scribe', description:'Turns grounded answers into clear draft-card language without promoting anything.', model:'qwen3:14b', temperature:0.45, groundingMode:'balanced',
+  {id:'scribe', label:'Canon Scribe', description:'Turns grounded answers into clear draft-card language without promoting anything.', model:'gemma4:12b', temperature:0.45, groundingMode:'balanced',
    starterPrompts:['Shape this into draft-card wording.','Make this easier to promote later.','Extract the claim, means, limits, and notes.'],
    system:"You are a canon scribe for draft preparation. Turn grounded material into clear, reviewable wording with a claim, supporting meaning, limits, and notes. Keep the tone useful and concise. Never present a draft as promoted canon, and preserve uncertainties as explicit review notes."},
 ];
@@ -8046,10 +8046,10 @@ const ENGINE_ANTHROPIC_ENDPOINT='https://api.anthropic.com/v1/messages';
 const ENGINE_PRIVATE_BACKEND_TYPE='Private tailnet backend API';
 const ENGINE_CONTEXT_OPTIONS=[4096,8192,16384,32768];
 const ENGINE_TASK_PRESETS=[
-  {label:'Deep lore/logic',model:'mistral-small3.2:24b',temperature:0.35,hint:'Mistral Small 24B - stronger reasoning; on 12 GB VRAM it may partially offload to RAM and run slower.'},
+  {label:'Deep lore/logic',model:'gemma4:26b',temperature:0.35,hint:'Gemma 4 26B MoE - strongest quick local reasoning; ~17 GB, partially offloads past 12 GB VRAM but the 3.8B-active MoE keeps it responsive.'},
   {label:'Prose',model:'gemma4:12b',temperature:0.85,hint:'Gemma 4 12B - warm prose and rewrites; fast, fits 12 GB VRAM.'},
-  {label:'Fast/code',model:'qwen3:14b',temperature:0.3,hint:'Qwen3 14B - fast local reasoning and code-shaped edits.'},
-  {label:'Best prose (slower)',model:'mistral-small3.2:24b',temperature:0.85,hint:'Mistral Small 24B - richest prose; spills past 12 GB VRAM and runs slower.'},
+  {label:'Fast/code',model:'gemma4:12b',temperature:0.3,hint:'Gemma 4 12B - fast local reasoning and code-shaped edits; fits 12 GB VRAM.'},
+  {label:'Best prose (slower)',model:'gemma4:31b',temperature:0.85,hint:'Gemma 4 31B dense - richest local writing; heavy offload past 12 GB VRAM, slow (a few tok/s) but worth it unhurried.'},
 ];
 const ENGINE_SETUP_PRESETS=[
   {id:'local-ollama',label:'Use local Ollama',name:'Ollama on this device',type:'OpenAI-compatible local endpoint',endpoint:'http://localhost:11434/v1',key:'',model:'',embeddingModel:'nomic-embed-text',hint:'Best when the app is open on the same computer as Ollama.'},
@@ -8168,7 +8168,7 @@ function engineProfileForm(profile,onDone,onCancel){
   typeIn.value=current.type||ENGINE_TYPES[0];
   const endpointIn=h('input',{value:current.endpoint,placeholder:'http://127.0.0.1:8000/v1',spellcheck:'false'});
   const endpointHint=h('p',{class:'engine-endpoint-hint hint',role:'status'});
-  const modelIn=h('input',{value:current.model,placeholder:'qwen3:14b',spellcheck:'false',list:modelListId});
+  const modelIn=h('input',{value:current.model,placeholder:'gemma4:12b',spellcheck:'false',list:modelListId});
   const modelList=h('datalist',{id:modelListId});
   const refreshModelsBtn=h('button',{class:'navbtn',type:'button'},'Refresh models');
   const embeddingModelIn=h('input',{value:current.embeddingModel,placeholder:'nomic-embed-text',spellcheck:'false',list:embedListId});
@@ -8217,7 +8217,7 @@ function engineProfileForm(profile,onDone,onCancel){
     embeddingModelIn.disabled=isPrivateBackend;
     refreshModelsBtn.disabled=!engineCanListModels(typeIn.value);
     if(!modelIn.value||modelIn.value===lastModelDefault) modelIn.value=nextDefault;
-    modelIn.placeholder=nextDefault||'qwen3:14b, gpt-4.1, local model name';
+    modelIn.placeholder=nextDefault||'gemma4:12b, gpt-4.1, local model name';
     lastModelDefault=nextDefault;
     refreshEndpointHint();
   }
@@ -11403,10 +11403,13 @@ const CANON_RAG_MAX_ENTRY_CHARS=1200;
 const CANON_RAG_GROUNDING_CHAR_BUDGET=4000;
 // Hybrid retrieval blend: fraction of the ranking decision that comes from the semantic
 // (embedding-cosine) score; the rest comes from the keyword score. 0 = keyword only,
-// 1 = vector only. Vector-leaning by default — semantic recall is the reason to embed at all —
-// while still letting a strong exact-term/canon-id match surface. Tunable per call via
-// opts.vectorWeight.
-const CANON_RAG_VECTOR_WEIGHT=0.7;
+// 1 = vector only. Tunable per call via opts.vectorWeight.
+// 0.9 is MEASURED, not vibed: the FABLE-001 eval sweep (150 gold rows, nomic-embed-text,
+// kit/tools/canon-eval.mjs --sweep, docs/eval/SWEEP_2026-07-10_nomic-embed-text.json) peaked
+// here — hit@1 70% / hit@3 88% / hit@5 92%, vs 64/81/86 at the old 0.7 guess. Pure vector
+// (1.0) loses 4 points of hit@1; the keyword tenth is the tie-break that puts the right
+// entry FIRST. Re-run the sweep before changing this again.
+const CANON_RAG_VECTOR_WEIGHT=0.9;
 const CANON_EMBED_TEXT_CHARS=3000;
 const CANON_EMBED_DB='vfj-canon-embeddings';
 const CANON_EMBED_STORE='vectors';
@@ -21981,7 +21984,7 @@ function campPlayModelFor(engine, persona){
 }
 
 // The Model switch (Del, 2026-07-02: swap the table's prose model without
-// touching the engine profile — e.g. Gemma for speed, Mistral Small 24B for
+// touching the engine profile — e.g. gemma4:12b for speed, gemma4:31b for
 // prose). Choices = whatever the engine advertises plus its configured model.
 function campPlayModelChoices(engine){
   const out=[], seen={};
