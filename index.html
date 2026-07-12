@@ -9414,7 +9414,17 @@ function runeRenderList(){
   if(!items.length) items.push(h('p',{class:'hint companion-hello'},'ᚱ Rune is here — the partner who knows what time it actually is. Say hello.'));
   if(RUNE_ROOM.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,RUNE_ROOM.deep?'thinking…':'…')));
   host.replaceChildren(...items);
-  try{ host.scrollTop=host.scrollHeight||0; }catch(e){}
+  try{
+    host.scrollTop=host.scrollHeight||0;
+    // scrollHeight 0 means the list rendered while still detached (first open) —
+    // re-apply the stick-to-bottom once it's mounted so the room opens on the
+    // newest message instead of scrolled to the top.
+    if(host.scrollHeight===0){
+      const stick=()=>{ try{ host.scrollTop=host.scrollHeight||0; }catch(e){} };
+      if(typeof requestAnimationFrame!=='undefined') requestAnimationFrame(stick);
+      else setTimeout(stick,0);
+    }
+  }catch(e){}
   const status=RUNE_ROOM.statusHost;
   if(status) status.textContent=runeBannerText();
 }
