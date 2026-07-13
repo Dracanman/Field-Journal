@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Field Journal">
-<meta name="theme-color" content="#faf4e6">
+<meta name="theme-color" content="#f4f2ed">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
@@ -2059,6 +2059,543 @@ body.fx-rich .ambient-art svg:nth-child(2n){ animation-duration:19s; animation-d
       color:var(--ink);
     }
   }
+/* ---------- 2026 responsive redesign -------------------------------------
+   A calmer shared layer for every kit surface. The existing feature styles stay
+   intact; this file owns the shell rhythm, touch geometry, and device-specific
+   composition so new views inherit the same visual language.
+*/
+:root{
+  --ui-bg:#f4f2ed;
+  --ui-surface:#fffdfa;
+  --ui-surface-2:#f8f7f3;
+  --ui-line:#d9ddd7;
+  --ui-line-strong:#b9c8bf;
+  --ui-ink:#26332f;
+  --ui-muted:#65716a;
+  --ui-accent:#2e6b59;
+  --ui-accent-soft:#e5efe7;
+  --ui-brass:#b8914b;
+  --ui-radius:14px;
+  --ui-shadow:0 18px 48px -34px rgba(32,49,43,.42);
+  --ui-shadow-soft:0 8px 24px -22px rgba(32,49,43,.42);
+}
+
+html{ scroll-behavior:smooth; }
+body{
+  background:
+    radial-gradient(720px 420px at 8% -12%, rgba(255,255,255,.78), transparent 72%),
+    radial-gradient(700px 460px at 100% 8%, rgba(229,239,231,.48), transparent 70%),
+    var(--ui-bg);
+  color:var(--ui-muted);
+  animation:none;
+}
+body.theme-night{
+  --ui-bg:#101a20;
+  --ui-surface:#17252a;
+  --ui-surface-2:#1b2d32;
+  --ui-line:#30454a;
+  --ui-line-strong:#52746e;
+  --ui-ink:#eef5ef;
+  --ui-muted:#b7cbc1;
+  --ui-accent:#78c5a7;
+  --ui-accent-soft:#1c3b35;
+  --ui-brass:#d7b465;
+  --ui-shadow:0 18px 48px -30px rgba(0,0,0,.72);
+  --ui-shadow-soft:0 8px 24px -20px rgba(0,0,0,.7);
+}
+@media (prefers-color-scheme:dark){
+  body.theme-auto{
+    --ui-bg:#101a20;
+    --ui-surface:#17252a;
+    --ui-surface-2:#1b2d32;
+    --ui-line:#30454a;
+    --ui-line-strong:#52746e;
+    --ui-ink:#eef5ef;
+    --ui-muted:#b7cbc1;
+    --ui-accent:#78c5a7;
+    --ui-accent-soft:#1c3b35;
+    --ui-brass:#d7b465;
+    --ui-shadow:0 18px 48px -30px rgba(0,0,0,.72);
+    --ui-shadow-soft:0 8px 24px -20px rgba(0,0,0,.7);
+  }
+}
+
+#app{
+  max-width:1360px;
+  padding:18px 28px 112px;
+}
+.topbar{
+  gap:14px;
+  padding:10px 14px 12px;
+  margin:-4px -6px 18px;
+  background:rgba(255,253,250,.88);
+  border:1px solid rgba(185,200,191,.72);
+  border-radius:16px;
+  box-shadow:0 10px 28px -24px rgba(42,57,51,.48);
+  -webkit-backdrop-filter:blur(18px) saturate(1.08);
+  backdrop-filter:blur(18px) saturate(1.08);
+}
+body.theme-night .topbar{ background:rgba(17,29,34,.9); }
+.brand{ gap:11px; padding:5px 8px 5px 2px; }
+.brand .mark{ width:34px; height:34px; color:var(--ui-accent); }
+.brand b{ color:var(--ui-ink); font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:21px; letter-spacing:.01em; }
+.navmid{ gap:6px; }
+.navbtn,
+.space-subnav .tab,
+.toolbtn,
+.engine-quick,
+.studio-tabs .tab,
+.prc-lessontabs .tab{
+  min-height:38px;
+  border:1px solid var(--ui-line);
+  border-radius:10px;
+  background:rgba(255,255,255,.54);
+  color:var(--ui-muted);
+  font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:13px;
+  font-weight:600;
+  letter-spacing:.01em;
+  transition:transform .16s ease, border-color .16s ease, background .16s ease, box-shadow .16s ease, color .16s ease;
+}
+.navbtn{ padding:8px 13px; }
+.navbtn:hover,
+.space-subnav .tab:hover,
+.toolbtn:hover,
+.studio-tabs .tab:hover,
+.prc-lessontabs .tab:hover{
+  color:var(--ui-ink);
+  border-color:var(--ui-line-strong);
+  background:var(--ui-surface);
+  transform:translateY(-1px);
+}
+.navbtn:focus-visible,
+.space-subnav .tab:focus-visible,
+.toolbtn:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible{
+  outline:3px solid color-mix(in srgb, var(--ui-accent) 35%, transparent);
+  outline-offset:2px;
+}
+.navbtn.primary{
+  min-height:42px;
+  padding-inline:16px;
+  border-color:var(--ui-accent);
+  background:var(--ui-accent);
+  color:#fff;
+  box-shadow:0 12px 22px -18px var(--ui-accent);
+}
+.navbtn.primary:hover{ background:#255a4b; border-color:#255a4b; color:#fff; }
+.navbtn.ghost{ background:transparent; border-color:var(--ui-line); }
+.modeswitch{ display:flex; padding:3px; gap:3px; border:1px solid var(--ui-line); border-radius:11px; background:var(--ui-surface-2); }
+.modeswitch .seg{ min-height:32px; padding:5px 9px; border:0; border-radius:8px; background:transparent; color:var(--ui-muted); font:600 12px ui-sans-serif,system-ui,sans-serif; }
+.modeswitch .seg.on{ background:var(--ui-surface); color:var(--ui-ink); box-shadow:var(--ui-shadow-soft); }
+.whochip{ color:var(--ui-ink); background:var(--ui-surface); }
+.quick-capture-fab{ right:28px; bottom:28px; min-height:44px; border-radius:12px; }
+
+/* Shared page surfaces: open, editorial, and consistent across features. */
+.framed,
+.region-card,
+.region-map,
+.region-atlas,
+.region-opened,
+.region-forge-stage,
+.region-world-panel,
+.engine-form,
+.prc-card,
+.gal-card,
+.studio-panel{
+  border:1px solid var(--ui-line);
+  border-radius:var(--ui-radius);
+  background:var(--ui-surface);
+  box-shadow:var(--ui-shadow-soft);
+}
+.framed{
+  margin:0;
+  padding:38px 40px 34px;
+  box-shadow:var(--ui-shadow);
+}
+.framed > .sprig{ color:var(--ui-accent); opacity:.45; }
+.pagetitle h2,
+.view-header h1,
+.view-header h2{
+  color:var(--ui-ink);
+  font-family:'Cormorant Garamond','EB Garamond',Georgia,serif;
+  font-size:clamp(32px,3vw,46px);
+  letter-spacing:-.01em;
+}
+.view-header{ max-width:900px; margin:0 auto 26px; }
+.view-header .subtitle,
+.subtitle{ color:var(--ui-muted); }
+.divider{ color:var(--ui-brass); }
+.divider .rule{ background:var(--ui-line); }
+.pagefoot{ color:var(--ui-accent); }
+.toolrow{ gap:10px; }
+label,
+.prc-label,
+.engine-form label,
+.region-forge-field span{ color:var(--ui-muted); font-family:ui-sans-serif,system-ui,sans-serif; font-size:11px; font-weight:800; letter-spacing:.11em; text-transform:uppercase; }
+input,
+textarea,
+select,
+.prc-input,
+.prc-out,
+.quick-capture-input{
+  border:1px solid var(--ui-line);
+  border-radius:10px;
+  background:var(--ui-surface);
+  color:var(--ui-ink);
+  font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  font-size:15px;
+}
+input,select{ min-height:42px; padding:9px 12px; }
+textarea{ padding:11px 12px; }
+
+/* Maker home: a clear landing composition with a useful first viewport. */
+.cover{
+  display:grid;
+  grid-template-columns:96px minmax(0,1fr);
+  align-items:center;
+  column-gap:22px;
+  text-align:left;
+  padding:30px 32px;
+  margin:0 0 20px;
+  border:1px solid var(--ui-line);
+  border-radius:18px;
+  background:linear-gradient(135deg,rgba(255,253,250,.96),rgba(242,247,243,.82));
+  box-shadow:var(--ui-shadow);
+}
+body.theme-night .cover{ background:linear-gradient(135deg,rgba(23,37,42,.96),rgba(28,59,53,.8)); }
+.cover .emblem{ grid-row:1 / span 4; width:94px; height:94px; margin:0; color:var(--ui-accent); }
+.cover h1{ color:var(--ui-ink); font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:clamp(40px,4.5vw,64px); line-height:.98; letter-spacing:-.025em; }
+.cover .sub{ color:var(--ui-accent); font-size:15px; letter-spacing:.08em; margin-top:9px; }
+.cover .tag{ color:var(--ui-muted); margin-top:9px; }
+.cover .tag.hand{ color:var(--ui-accent) !important; font-size:23px !important; margin-top:7px !important; }
+.start-here{
+  margin:0 0 22px;
+  padding:19px 21px;
+  border:1px solid color-mix(in srgb, var(--ui-accent) 35%, var(--ui-line));
+  border-radius:14px;
+  background:var(--ui-accent-soft);
+  box-shadow:none;
+}
+.start-here-title{ font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:24px; }
+.start-here-line{ max-width:68ch; color:var(--ui-ink); }
+.shelf{ margin-top:28px; }
+.shelf h3{
+  margin-bottom:12px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--ui-line);
+  color:var(--ui-ink);
+  font-family:ui-sans-serif,system-ui,sans-serif;
+  font-size:12px;
+  font-weight:800;
+  letter-spacing:.12em;
+}
+.shelf-intro{ color:var(--ui-muted); margin-bottom:18px; }
+.shelf-cat{ margin:19px 0 9px; color:var(--ui-accent); font-size:24px; }
+.shelf-cat .chev{ color:var(--ui-brass); }
+.grid-cards{ gap:12px; }
+.pick{
+  min-height:132px;
+  padding:17px 18px;
+  border:1px solid var(--ui-line);
+  border-radius:12px;
+  background:var(--ui-surface);
+  box-shadow:var(--ui-shadow-soft);
+}
+.pick:hover{ border-color:var(--ui-accent); box-shadow:0 16px 30px -24px var(--ui-accent); }
+.pick b{ color:var(--ui-ink); font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:22px; }
+.pick small{ color:var(--ui-muted); }
+.pick .fav,.pick .addto{ color:var(--ui-brass); }
+.shelf-kicker{ color:var(--ui-accent); border-color:var(--ui-line-strong); background:var(--ui-surface); }
+
+.view-stage{ grid-template-columns:minmax(0,1fr) minmax(250px,300px); gap:22px; }
+.view-rail{ top:84px; gap:12px; }
+.rail-card{ padding:16px; border:1px solid var(--ui-line); border-radius:14px; background:rgba(255,253,250,.78); box-shadow:none; }
+body.theme-night .rail-card{ background:rgba(23,37,42,.82); }
+.rail-card .rail-title{ color:var(--ui-accent); letter-spacing:.12em; }
+.rail-stat .num{ color:var(--ui-ink); }
+.rail-stat .lbl,.rail-empty{ color:var(--ui-muted); }
+.rail-link{ color:var(--ui-ink); }
+.rail-link:hover{ background:var(--ui-accent-soft); }
+
+/* Space chooser: preserve the art, but make the choice/action hierarchy clearer. */
+.spaces-front{ max-width:1040px; margin:10px auto 0; }
+.spaces-intro{ padding:30px 22px 22px; border:1px solid var(--ui-line); border-radius:18px; background:var(--ui-surface); box-shadow:var(--ui-shadow); }
+.spaces-emblem{ width:68px; height:68px; color:var(--ui-accent); filter:none; }
+.spaces-kicker{ color:var(--ui-accent); font-size:11px; letter-spacing:.14em; }
+.spaces-intro h1{ font-size:clamp(38px,5vw,58px); }
+.spaces-intro .hint{ color:var(--ui-muted); }
+.spaces-grid{ gap:14px; margin-top:16px; }
+.space-tile{ min-height:154px; padding:21px; border:1px solid var(--ui-line); border-radius:14px; background:var(--ui-surface); box-shadow:var(--ui-shadow-soft); }
+.space-tile:hover{ border-color:var(--accent); box-shadow:0 18px 34px -25px var(--accent); }
+.space-tile.current{ background:color-mix(in srgb, var(--ui-accent-soft) 52%, var(--ui-surface)); box-shadow:inset 4px 0 var(--accent),var(--ui-shadow-soft); }
+.space-veil{ background:linear-gradient(100deg,var(--ui-surface) 2%,rgba(255,253,250,.82) 36%,rgba(255,253,250,.26) 70%,rgba(255,253,250,.06) 100%); }
+body.theme-night .space-veil{ background:linear-gradient(100deg,var(--ui-surface) 2%,rgba(23,37,42,.86) 36%,rgba(23,37,42,.34) 70%,rgba(23,37,42,.08) 100%); }
+.space-icon{ width:50px; height:50px; border-color:var(--accent); background:rgba(255,255,255,.7); }
+.space-title{ color:var(--ui-ink); font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:29px; }
+.space-subtitle{ color:var(--accent); }
+.space-description{ color:var(--ui-muted); }
+.space-open,.space-current{ color:var(--accent); }
+
+/* Modal / overlay: readable, deliberate, and less visually noisy on first run. */
+.intro-bg,.modal-bg{ background:rgba(25,38,34,.42); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+.intro,.modal{ border:1px solid var(--ui-line-strong); border-radius:18px; background:var(--ui-surface); box-shadow:0 30px 90px -34px rgba(20,35,30,.7); }
+.intro{ max-width:500px; padding:30px 30px 26px; }
+.intro .em{ color:var(--ui-accent); }
+.intro h2,.modal h2{ color:var(--ui-ink); font-family:'Cormorant Garamond','EB Garamond',Georgia,serif; font-size:32px; }
+.intro p,.modal p{ color:var(--ui-muted); }
+.ppick{ border:1px solid var(--ui-line); background:var(--ui-surface-2); }
+.ppick:hover{ border-color:var(--ui-accent); }
+.ppick.primary{ border-color:var(--ui-accent); background:var(--ui-accent-soft); }
+
+/* Desktop / tablet split --------------------------------------------------- */
+@media (min-width:1200px){
+  .topbar{ position:sticky; top:12px; }
+  .cover{ min-height:210px; }
+  .grid-cards{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .spaces-grid{ grid-template-columns:repeat(4,minmax(0,1fr)); }
+  .space-tile{ grid-template-columns:1fr; align-content:start; gap:11px; }
+  .space-open,.space-current{ align-self:end; margin-top:auto; }
+}
+@media (min-width:768px) and (max-width:1199px){
+  #app{ padding-inline:20px; }
+  .topbar{ flex-wrap:wrap; }
+  .brand{ flex:0 0 auto; }
+  .navmid{ order:3; flex-basis:100%; padding-top:2px; }
+  .view-stage{ grid-template-columns:minmax(0,1fr) 240px; }
+  .cover{ grid-template-columns:78px minmax(0,1fr); padding:24px 25px; }
+  .cover .emblem{ width:74px; height:74px; }
+  .cover h1{ font-size:48px; }
+  .grid-cards{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .spaces-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+
+/* iPad: touch-first, still composed. */
+@media (min-width:561px) and (max-width:767px){
+  #app{ padding:14px 16px 104px; }
+  .topbar{ top:0; margin:-2px -3px 14px; padding:9px 10px; }
+  .navmid{ display:none; }
+  .content-subnav{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); position:sticky; top:72px; z-index:29; gap:6px; margin:0 0 14px; padding:6px; border:1px solid var(--ui-line); border-radius:13px; background:var(--ui-surface); }
+  .content-subnav .tab{ min-height:44px; padding:8px 10px; white-space:normal; }
+  .view-stage{ grid-template-columns:1fr; }
+  .view-rail{ position:static; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .rail-card{ min-width:0; }
+  .cover{ grid-template-columns:70px minmax(0,1fr); padding:22px; }
+  .cover .emblem{ width:66px; height:66px; }
+  .cover h1{ font-size:42px; }
+  .grid-cards{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .spaces-grid{ grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .bottom-nav{ display:grid; }
+}
+
+/* iPhone: one clear task at a time, thumb-friendly controls, no horizontal
+   hunting. This is an intentional composition, not a shrunken desktop. */
+@media (max-width:560px){
+  #app{ padding:10px 12px 132px; }
+  .topbar{ gap:8px; top:0; margin:-2px -2px 12px; padding:8px 8px 9px; border-radius:13px; }
+  .brand{ padding-left:0; }
+  .brand .mark{ width:29px; height:29px; }
+  .brand b{ font-size:18px; }
+  .navutil{ gap:6px; }
+  .topbar .navbtn{ min-height:38px; padding:7px 10px; }
+  .content-subnav{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); position:sticky; top:58px; z-index:29; gap:5px; margin:0 0 12px; padding:5px; border:1px solid var(--ui-line); border-radius:13px; background:var(--ui-surface); }
+  .content-subnav .tab{ min-height:42px; padding:7px 6px; font-size:12px; white-space:normal; }
+  .framed{ padding:28px 17px 24px; border-radius:15px; }
+  .framed > .sprig{ display:none; }
+  .pagetitle h2,.view-header h1,.view-header h2{ font-size:36px; }
+  .view-header{ margin-bottom:18px; }
+  .editor-wrap{ display:flex; flex-direction:column; gap:22px; min-width:0; width:100%; }
+  .editor-col,.card-col{ min-width:0; width:100%; }
+  .card-col{ order:-1; position:static; align-items:stretch; overflow:visible; }
+  .keepsake{ width:100%; max-width:430px; margin-inline:auto; }
+  .view-stage{ grid-template-columns:1fr; }
+  .view-rail{ position:static; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
+  .rail-card{ padding:11px 10px; border-radius:11px; }
+  .rail-card .rail-title{ font-size:10px; letter-spacing:.08em; }
+  .rail-stat{ display:block; }
+  .rail-stat .num{ display:block; font-size:20px; }
+  .rail-stat .lbl{ display:block; font-size:11px; }
+  .rail-list{ gap:2px; }
+  .rail-link{ padding:4px 0; font-size:12px; }
+  .cover{ display:block; padding:25px 20px 22px; text-align:center; border-radius:15px; }
+  .cover .emblem{ width:72px; height:72px; margin:0 auto 10px; }
+  .cover h1{ font-size:42px; }
+  .cover .sub{ font-size:12px; }
+  .cover .tag{ font-size:15px; }
+  .cover .tag.hand{ font-size:21px !important; }
+  .start-here{ padding:17px 16px; }
+  .start-here .toolrow{ flex-direction:column; align-items:stretch; }
+  .start-here .toolrow .navbtn{ width:100%; }
+  .grid-cards{ grid-template-columns:1fr; gap:9px; }
+  .pick{ min-height:112px; padding:15px 16px; }
+  .pick b{ font-size:21px; }
+  .spaces-front{ margin-top:2px; }
+  .spaces-intro{ padding:24px 16px 18px; border-radius:15px; }
+  .spaces-emblem{ width:58px; height:58px; }
+  .spaces-intro h1{ font-size:39px; }
+  .spaces-grid{ grid-template-columns:1fr; gap:10px; }
+  .space-tile{ min-height:132px; padding:18px; grid-template-columns:auto 1fr; gap:12px; }
+  .space-icon{ width:46px; height:46px; }
+  .space-title{ font-size:27px; }
+  .space-open,.space-current{ grid-column:2; justify-self:start; margin-top:0; }
+  .bottom-nav{ display:grid; }
+  .quick-capture-fab{ right:14px; bottom:calc(94px + env(safe-area-inset-bottom)); min-height:42px; }
+  .modal-bg,.intro-bg{ padding:12px; }
+  .intro,.modal{ padding:24px 18px 20px; border-radius:16px; }
+  .intro h2,.modal h2{ font-size:30px; }
+  .toolrow{ gap:8px; }
+  .toolrow .navbtn{ min-height:44px; }
+}
+@media (max-width:380px){
+  .brand b{ display:none; }
+  .content-subnav .tab{ font-size:11px; }
+  .cover h1{ font-size:37px; }
+  .view-rail{ grid-template-columns:1fr; }
+  .rail-card{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .rail-card .rail-title{ margin:0; }
+}
+
+@media (prefers-reduced-motion:reduce){
+  html{ scroll-behavior:auto; }
+  *,*::before,*::after{ transition-duration:.001ms !important; animation-duration:.001ms !important; }
+}
+@media print{
+  body{ background:#fff; }
+  #app{ max-width:none; padding:0; }
+}
+
+/* ---------- structure pass: one workshop, one action, one room switcher -- */
+/* Display type belongs to the masthead only. The prior broad Cormorant override
+   made ordinary words (especially card titles and controls) look malformed. */
+.brand b,
+.pagetitle h2,
+.view-header h1,
+.view-header h2,
+.cover h1,
+.start-here-title,
+.pick b,
+.space-title,
+.intro h2,
+.modal h2{
+  font-family:'EB Garamond',Georgia,serif;
+  letter-spacing:normal;
+}
+.pick b,.space-title{ font-size:inherit; }
+
+.home-cover{
+  position:relative;
+  grid-template-columns:minmax(0,1.04fr) minmax(280px,.96fr);
+  gap:30px;
+  min-height:310px;
+  overflow:hidden;
+  padding:34px 34px 30px;
+}
+.home-cover::after{ content:''; position:absolute; inset:auto 0 0; height:1px; background:linear-gradient(90deg,transparent,var(--ui-line-strong),transparent); }
+.home-cover .cover-copy{ position:relative; z-index:1; display:flex; min-width:0; max-width:610px; flex-direction:column; align-items:flex-start; justify-content:center; }
+.home-cover .cover-mark{ margin-bottom:8px; }
+.home-cover .cover-mark .emblem{ width:46px; height:46px; margin:0; color:var(--ui-accent); }
+.home-cover h1{ max-width:9.5ch; margin-top:7px; font-size:clamp(46px,5vw,68px); line-height:.92; }
+.home-cover .sub{ margin-top:0; color:var(--ui-accent); font:700 11px ui-sans-serif,system-ui,sans-serif; letter-spacing:.13em; text-transform:uppercase; }
+.home-cover .tag{ max-width:48ch; margin-top:15px; font-size:16px; line-height:1.45; }
+.home-cover .tag.hand{ margin-top:12px !important; font-family:'EB Garamond',Georgia,serif; font-style:italic; font-size:20px !important; }
+.home-cover-art{ align-self:stretch; width:100%; height:100%; min-height:246px; object-fit:cover; object-position:center; mix-blend-mode:multiply; filter:saturate(.78) contrast(.94); -webkit-mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 100%); mask-image:linear-gradient(90deg,transparent 0,#000 18%,#000 100%); }
+body.theme-night .home-cover-art{ mix-blend-mode:screen; opacity:.58; filter:saturate(.55) contrast(.8); }
+
+.home-main{ min-width:0; }
+.home-continue{ display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0 0 24px; padding:18px 20px; border:1px solid var(--ui-line); border-left:4px solid var(--ui-accent); border-radius:13px; background:var(--ui-surface); box-shadow:var(--ui-shadow-soft); }
+.home-continue-copy{ display:grid; min-width:0; gap:3px; }
+.home-next-label{ margin-bottom:7px; color:rgba(255,255,255,.76); font:700 11px ui-sans-serif,system-ui,sans-serif; letter-spacing:.1em; text-transform:uppercase; }
+.home-continue .home-next-label{ margin:0; color:var(--ui-accent); }
+.home-continue strong{ overflow:hidden; color:var(--ui-ink); font:700 25px/1.05 'EB Garamond',Georgia,serif; text-overflow:ellipsis; white-space:nowrap; }
+.home-continue-action{ flex:0 0 auto; }
+
+.spaces-workbench{
+  display:grid;
+  grid-template-columns:minmax(0,1.08fr) minmax(300px,.92fr);
+  gap:18px;
+  margin-top:18px;
+}
+.space-feature{
+  --accent:var(--accent-maker);
+  position:relative;
+  display:grid;
+  min-height:330px;
+  overflow:hidden;
+  align-content:end;
+  padding:27px;
+  text-align:left;
+  isolation:isolate;
+  border:1px solid var(--ui-line);
+  border-radius:16px;
+  background:var(--ui-surface);
+  color:var(--ui-ink);
+  box-shadow:var(--ui-shadow);
+  transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease;
+}
+.space-feature[data-space="maker"]{ --accent:var(--accent-maker); }
+.space-feature[data-space="worldbuilder"]{ --accent:var(--accent-worldbuilder); }
+.space-feature[data-space="game"]{ --accent:var(--accent-game); }
+.space-feature[data-space="learner"]{ --accent:var(--accent-apprentice); }
+.space-feature:hover{ transform:translateY(-2px); border-color:var(--ui-accent); box-shadow:0 24px 44px -28px var(--ui-accent); }
+.space-feature-art,.space-feature-veil{ position:absolute; inset:0; width:100%; height:100%; }
+.space-feature-art{ object-fit:cover; z-index:-2; }
+.space-feature-veil{ z-index:-1; background:linear-gradient(0deg,rgba(255,253,250,.98) 4%,rgba(255,253,250,.86) 37%,rgba(255,253,250,.14) 100%); }
+body.theme-night .space-feature-veil{ background:linear-gradient(0deg,rgba(23,37,42,.98) 4%,rgba(23,37,42,.86) 37%,rgba(23,37,42,.14) 100%); }
+.space-feature-copy{ display:grid; gap:7px; max-width:34ch; }
+.space-feature-label{ color:var(--accent); font:700 11px ui-sans-serif,system-ui,sans-serif; letter-spacing:.11em; text-transform:uppercase; }
+.space-feature-title{ color:var(--ui-ink); font:700 42px/.95 'EB Garamond',Georgia,serif; }
+.space-feature-description{ color:var(--ui-muted); font-size:15px; line-height:1.42; }
+.space-feature-action{ margin-top:17px; color:var(--accent); font:700 13px ui-sans-serif,system-ui,sans-serif; }
+.spaces-other-rooms{ min-width:0; }
+.spaces-other-heading{ display:flex; align-items:baseline; justify-content:space-between; gap:14px; margin:0 1px 10px; }
+.spaces-other-heading h2{ margin:0; color:var(--ui-ink); font:700 25px/1 'EB Garamond',Georgia,serif; }
+.spaces-other-heading p{ margin:0; color:var(--ui-muted); font:12px/1.35 ui-sans-serif,system-ui,sans-serif; text-align:right; }
+.spaces-workbench .spaces-grid{ display:grid; grid-template-columns:1fr; gap:9px; margin:0; }
+.spaces-workbench .space-tile{ min-height:95px; padding:14px 16px; }
+.spaces-workbench .space-title{ font-size:24px; }
+.spaces-workbench .space-description{ font-size:13px; }
+.spaces-workbench .space-icon{ width:42px; height:42px; }
+.spaces-workbench .space-open,.spaces-workbench .space-current{ align-self:end; }
+
+@media (min-width:768px) and (max-width:1199px){
+  .home-cover{ grid-template-columns:minmax(0,1.06fr) minmax(240px,.94fr); min-height:290px; padding:28px; }
+  .home-cover h1{ font-size:54px; }
+  .spaces-workbench{ grid-template-columns:1fr; }
+  .spaces-workbench .spaces-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .spaces-workbench .space-tile{ min-height:148px; }
+}
+
+@media (min-width:561px) and (max-width:767px){
+  .home-cover{ grid-template-columns:minmax(0,1.08fr) minmax(210px,.92fr); min-height:282px; padding:26px; }
+  .home-cover h1{ font-size:49px; }
+  .home-cover .tag.hand{ display:none; }
+  .home-cover-art{ min-height:220px; }
+  .spaces-workbench{ grid-template-columns:1fr; }
+  .spaces-workbench .spaces-grid{ grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+
+@media (max-width:560px){
+  .home-cover{ display:grid; grid-template-columns:1fr; gap:0; min-height:0; padding:20px 18px 0; text-align:left; }
+  .home-cover .cover-copy{ align-items:flex-start; }
+  .home-cover .cover-mark{ display:none; }
+  .home-cover h1{ max-width:10ch; font-size:40px; }
+  .home-cover .tag{ display:none; }
+  .home-cover .tag.hand{ display:none; }
+  .home-cover-art{ width:calc(100% + 36px); height:142px; min-height:0; margin:7px -18px 0; object-position:center 47%; -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 100%); mask-image:linear-gradient(180deg,transparent 0,#000 22%,#000 100%); }
+  .home-continue{ align-items:stretch; flex-direction:column; gap:13px; padding:16px; }
+  .home-continue strong{ font-size:23px; white-space:normal; }
+  .home-continue-action{ width:100%; justify-content:center; }
+  .spaces-workbench{ grid-template-columns:1fr; gap:22px; margin-top:12px; }
+  .space-feature{ min-height:260px; padding:20px; border-radius:14px; }
+  .space-feature-title{ font-size:37px; }
+  .spaces-other-heading{ display:block; }
+  .spaces-other-heading p{ margin-top:5px; text-align:left; }
+  .spaces-workbench .spaces-grid{ grid-template-columns:1fr; gap:9px; }
+  .spaces-workbench .space-tile{ min-height:112px; }
+}
 </style>
 </head>
 <body>
@@ -4720,14 +5257,15 @@ registerView('campaigns', () => viewCampaigns());
 registerView('campaign', (v) => viewCampaign(v.camp, v.tab));   // campaign name travels as `camp`, never `name` (reserved view id)
 
 function render(){
+  const inSpaces=VIEW.name==='spaces';
   $app.replaceChildren(topbar());
-  $app.append(spaceSubNav('content'));
+  if(!inSpaces) $app.append(spaceSubNav('content'));
   // error boundary: a single view crash shows a gentle recover card, never a blank app.
   try{ $app.append((VIEWS[VIEW.name] || VIEWS.home)(VIEW)); }
   catch(e){ $app.append(errorCard(e)); }
-  $app.append(quickCaptureButton());
+  if(!inSpaces) $app.append(quickCaptureButton());
   $app.append(companionMount());
-  $app.append(bottomNav());
+  if(!inSpaces) $app.append(bottomNav());
   ambientArtMount();   // margin doodles (body layer, wide screens only) follow the space
   ensureSpaceStatusDots();
 }
@@ -4744,7 +5282,8 @@ function errorCard(e){
 function topbar(){
   const full = DB.mode==='full', world = DB.profile==='worldbuilder', game = DB.profile==='game', learn = DB.profile==='learner';
   // each profile sees only its own actions; the same item source feeds desktop and phone nav.
-  const nav = h('div',{class:'navmid top-subnav'}, ...spaceNavItems().map(item=>
+  const navItems=VIEW.name==='spaces'?[]:spaceNavItems();
+  const nav = h('div',{class:'navmid top-subnav'}, ...navItems.map(item=>
     h('button',{class:'navbtn'+(item.primary?' primary':''), onclick:()=>go(item.view,item.params)}, item.label)));
   // utilities collapse into a "⋯ More" sheet so the bar always fits one line (no wrap,
   // no clip). The Cozy/Full toggle stays out (it's how you toggle). More remains available
@@ -4929,26 +5468,40 @@ function modeSwitch(full){
 function profileLanding(p){ return p==='worldbuilder'?'studio' : p==='game'?'campaigns' : p==='learner'?'practice' : 'home'; }
 function setProfile(p){ DB.profile=p; if(p!=='maker') DB.mode='full'; if(typeof rememberPersonHome==='function') rememberPersonHome(p); save(); applyMode(); go(profileLanding(p));
   toast(p==='worldbuilder'? 'Worldbuilder — your canon studio.' : p==='game'? 'The Game — your campaigns.' : p==='learner'? 'Apprentice — code practice.' : 'Maker — the journal.'); }
-
 /* ---------- home ----------------------------------------------------------- */
 function viewHome(){
   seedHomeCollapsed();
-  const wrap = h('div',null);
-  wrap.append(h('div',{class:'cover'},
-    svgUse('ic-seedling','emblem'),
-    h('h1',{class:'display'},'The Vael Field Journal'),
-    h('div',{class:'sub'},'& Archivist’s Kit'),
-    h('div',{class:'tag'},'a cozy little workshop for the rooted folk of the Godling Universe'),
-    h('div',{class:'tag hand', style:{fontSize:'22px', color:'var(--green)', marginTop:'10px'}}, '“same trunk, different branches”'),
+  const wrap = h('div',{class:'home-front'});
+  wrap.append(h('section',{class:'cover home-cover'},
+    h('div',{class:'cover-copy'},
+      h('div',{class:'cover-mark'},svgUse('ic-seedling','emblem')),
+      h('div',{class:'sub'},'The Vael Field Journal'),
+      h('h1',{class:'display'},'Welcome to your workshop.'),
+      h('div',{class:'tag'},'Make a person, place, keepsake, or mystery—then return whenever another branch appears.'),
+      h('div',{class:'tag hand'},'same trunk, different branches')),
+    h('img',{class:'home-cover-art',src:(typeof SPACE_ART!=='undefined'&&SPACE_ART.maker)||'art/space-maker.jpg',alt:'','aria-hidden':'true',decoding:'async'}),
   ));
   // Shelves are the main column; an at-a-glance rail composes the width on iPad/desktop and
   // drops below the shelves on phone. The rail replaces the old inline "Lately" grid.
-  const main = h('div',null,
+  const main = h('div',{class:'home-main'},
     startHereCard(),
+    homeContinueCard(),
     shelf('The Field Journal — make a little world by hand', 'field', 'Make one real thing your own way — a Vael, a grove, a keepsake.'),
     shelf("The Worldmaker's Pages — invent new corners of the world", 'world', 'Dream up a whole new kind — a people, a creature, a place, a Seed.'));
   wrap.append(viewStage(main, homeRail()));
   return wrap;
+}
+
+// Returning makers get one clear continuation. Newcomers get startHereCard() instead,
+// so Home never repeats the same Portrait action in two competing panels.
+function homeContinueCard(){
+  const recent=(DB.creations||[]).slice(-1)[0];
+  if(!recent) return null;
+  return h('section',{class:'home-continue','aria-label':'Continue your journal'},
+    h('div',{class:'home-continue-copy'},
+      h('span',{class:'home-next-label'},'Continue your journal'),
+      h('strong',null,creationTitle(recent))),
+    h('button',{class:'navbtn primary home-continue-action',onclick:()=>openCreation(recent)},'Open page →'));
 }
 // A newcomer lands on collapsed shelves with no obvious first tap (Liz + Del both
 // hit this, 2026-06-30). Until the first piece exists, Home opens with one warm,
@@ -4958,7 +5511,7 @@ function startHereCard(){
   return h('div',{class:'start-here', role:'note'},
     h('button',{class:'toolbtn start-here-dismiss', 'aria-label':'dismiss this', title:'dismiss', onclick:()=>{ DB.startHereDismissed=true; saveLocal(); refreshHome(); }},'×'),
     h('b',{class:'start-here-title'},'✿ Start here'),
-    h('p',{class:'start-here-line'}, voice('hi')+'! The friendliest first page is a Portrait of a Vael — one card, five minutes, no wrong answers. Everything else on these shelves opens the same way: tap a card, fill what you feel like.'),
+    h('p',{class:'start-here-line'}, voice('hi')+'! Start with a Portrait of a Vael — one card, five minutes, no wrong answers.'),
     h('div',{class:'toolrow'},
       h('button',{class:'navbtn primary', onclick:()=>go('worksheet',{id:'portrait'})},'✎ Make your first Vael'),
       h('button',{class:'navbtn ghost', onclick:()=>go('tour')},'Welcome tour'),
@@ -5089,7 +5642,6 @@ function shelf(title, kit, intro){
   return s;
 }
 function accentOf(w){ return ACCENTS[w.accent]||ACCENTS.gold; }
-
 /* ---------- tour (embedded World Reference) -------------------------------- */
 function viewTour(){
   const f = framed('Welcome to the World', 'a little tour before you begin — no need to remember it all', 'go gently, go slow');
@@ -6454,14 +7006,38 @@ function spaceTile(space){
     current?h('span',{class:'space-current'},'CURRENT'):h('span',{class:'space-open'},'Open →'));
 }
 
+function spaceFeature(space){
+  return h('button',{
+    class:'space-feature',
+    type:'button',
+    'data-space':space.profile,
+    'aria-current':'page',
+    'aria-label':'Continue in '+space.title,
+    onclick:()=>setProfile(space.profile),
+  },
+    h('img',{class:'space-feature-art',src:(typeof SPACE_ART!=='undefined'&&SPACE_ART[space.profile])||('art/space-'+space.profile+'.jpg'),alt:'', 'aria-hidden':'true',decoding:'async'}),
+    h('span',{class:'space-feature-veil','aria-hidden':'true'}),
+    h('span',{class:'space-feature-copy'},
+      h('span',{class:'space-feature-label'},'Your current room'),
+      h('span',{class:'space-feature-title'},space.title),
+      h('span',{class:'space-feature-description'},space.description)),
+    h('span',{class:'space-feature-action'},'Continue →'));
+}
+
 function viewSpaces(){
+  const current=SPACES.find(space=>space.profile===DB.profile)||SPACES[0];
+  const others=SPACES.filter(space=>space.profile!==current.profile);
   return h('main',{class:'spaces-front'},
     h('section',{class:'spaces-intro'},
       svgUse('ic-seedling','spaces-emblem'),
       h('p',{class:'spaces-kicker'},'The Vael Field Journal'),
       viewHeader('Choose a space', 'One front door, four rooms. Your work stays where it is when you move between them.'),
       h('div',{class:'spaces-divider','aria-hidden':'true'},svgUse('ic-sprig'))),
-    h('div',{class:'spaces-grid'},...SPACES.map(spaceTile)),
+    h('section',{class:'spaces-workbench'},
+      spaceFeature(current),
+      h('div',{class:'spaces-other-rooms'},
+        h('div',{class:'spaces-other-heading'},h('h2',null,'Other rooms'),h('p',null,'Shift your focus without losing your place.')),
+        h('div',{class:'spaces-grid'},...others.map(spaceTile)))),
     h('p',{class:'spaces-foot hand'},'same trunk, different branches'));
 }
 
@@ -9337,10 +9913,10 @@ function runeBuildToolsRequest(profile){
     opts:{method:'GET',headers:privateApiHeaders(profile,false)},
   };
 }
-function runeBuildToolRunRequest(profile, name, args){
+function runeBuildToolRunRequest(profile, name, args, userApproved){
   return {
     url:privateApiJoinUrl(profile&&profile.endpoint,'rune/tool'),
-    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({name:String(name||''), args:args||{}})},
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({name:String(name||''), args:args||{}, user_approved:!!userApproved})},
   };
 }
 async function runeFetchTools(){
@@ -9523,6 +10099,37 @@ function runeStreamWithWatchdog(streamFn, engine, chat, onChunk, stallMs){
       e=>{ if(!done){ done=true; clearInterval(timer); reject(e); } });
   });
 }
+function runeManualWebText(query, payload){
+  if(payload&&payload.error) return '🔎 Public web search could not run: '+String(payload.error||'').slice(0,200);
+  const rows=Array.isArray(payload&&payload.results)?payload.results:[];
+  if(!rows.length) return '🔎 Public web search — “'+query+'”\nNo public results came back.';
+  return '🔎 Public web search — “'+query+'”\n'+rows.slice(0,5).map(r=>{
+    const title=String(r&&r.title||r&&r.url||'Result').trim();
+    const snippet=String(r&&r.snippet||'').trim();
+    return '• '+title+(snippet?' — '+snippet:'');
+  }).join('\n');
+}
+async function runeManualWebSearch(inputEl, buttonEl){
+  const query=String(inputEl&&inputEl.value||'').trim();
+  const profile=runeBackendProfile();
+  if(!query||!profile||RUNE_ROOM.busy) return false;
+  // This is Del's explicit outbound approval. The model is never offered this
+  // tool and cannot set user_approved through its ordinary tool-call ferry.
+  if(typeof globalThis.confirm!=='function'||!globalThis.confirm('Send this exact query to the public web?\n\n'+query)) return false;
+  if(buttonEl) buttonEl.disabled=true;
+  try{
+    const raw=await privateApiJson(profile, runeBuildToolRunRequest(profile, 'search_web', {q:query}, true));
+    const payload=raw&&raw.result!==undefined?raw.result:raw;
+    RUNE_ROOM.items.push({role:'rune', text:runeManualWebText(query,payload), sources:['search_web:approved']});
+    inputEl.value='';
+    runeRenderList(); runeCacheSave();
+    return !((payload||{}).error);
+  }catch(e){
+    RUNE_ROOM.items.push({role:'rune', text:'🔎 Public web search could not run: '+String(e&&e.message||e).slice(0,200), sources:['search_web:approved']});
+    runeRenderList(); runeCacheSave();
+    return false;
+  }finally{ if(buttonEl) buttonEl.disabled=false; }
+}
 async function runeSend(inputEl){
   const question=String(inputEl.value||'').trim();
   if(!question||RUNE_ROOM.busy) return;
@@ -9569,6 +10176,7 @@ async function runeSend(inputEl){
     const profile=runeBackendProfile();
     const tools=(profile&&Array.isArray(RUNE_ROOM.tools)&&RUNE_ROOM.tools.length)?RUNE_ROOM.tools:null;
     const maxRounds=tools?(RUNE_ROOM.toolMaxSteps||4):0;
+    const allowedToolNames=new Set((tools||[]).map(t=>String(t&&t.function&&t.function.name||'')));
     const readLabels=[];
     const paint=(piece, info)=>{
       if(RUNE_ROOM.sendSeq!==sendId) return;   // stale stream — stop painting
@@ -9588,7 +10196,8 @@ async function runeSend(inputEl){
         const fn=(call&&call['function'])||{};
         let args=fn.arguments;
         if(typeof args==='string'){ try{ args=JSON.parse(args); }catch(e){ args={}; } }
-        const label=runeToolLabel(fn.name, args);
+        const allowed=allowedToolNames.has(String(fn.name||''));
+        const label=allowed?runeToolLabel(fn.name, args):('blocked:'+String(fn.name||'unknown'));
         readLabels.push(label);
         if(RUNE_ROOM.sendSeq===sendId){
           if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
@@ -9596,8 +10205,11 @@ async function runeSend(inputEl){
           runeRenderList();
         }
         let toolReply;
-        try{ toolReply=await privateApiJson(profile, runeBuildToolRunRequest(profile, fn.name, args)); }
-        catch(e){ toolReply={result:{error:String(e&&e.message||e).slice(0,200)}}; }
+        if(!allowed) toolReply={result:{error:'tool is not available in the room'}};
+        else{
+          try{ toolReply=await privateApiJson(profile, runeBuildToolRunRequest(profile, fn.name, args, false)); }
+          catch(e){ toolReply={result:{error:String(e&&e.message||e).slice(0,200)}}; }
+        }
         const payload=toolReply&&toolReply.result!==undefined?toolReply.result:toolReply;
         chat.messages=chat.messages.concat([{role:'tool', tool_name:String(fn.name||''), content:JSON.stringify(payload).slice(0,6000)}]);
       }
@@ -9652,6 +10264,8 @@ function runeBody(){
   RUNE_ROOM.statusHost=status;
   const input=h('input',{class:'companion-input', placeholder:'Talk to Rune…', onkeydown:e=>{ if(e.key==='Enter') runeSend(input); }});
   const send=h('button',{class:'navbtn primary', type:'button', onclick:()=>runeSend(input)},'Send');
+  const webInput=h('input',{class:'companion-input rune-web-query', placeholder:'Search the public web yourself…', onkeydown:e=>{ if(e.key==='Enter') runeManualWebSearch(webInput,webSearch); }});
+  const webSearch=h('button',{class:'navbtn ghost', type:'button', onclick:()=>runeManualWebSearch(webInput,webSearch)},'🔎 Search web');
   const engine=runeEngine();
   // No engine → a working door, not directions to a menu row that Cozy Maker
   // devices don't even show (the old copy was a dead end on exactly them).
@@ -9691,7 +10305,7 @@ function runeBody(){
   // Slice 66 — the reader: on its own heartbeat Rune can look before it speaks.
   // A quiet, always-present line so Del knows the notes on the desk are grounded.
   const readerHint=h('p',{class:'hint rune-reader-hint', style:{margin:'0'}},
-    '🔎 Rune reads the repo, its skills, canon, and the web — here in the room and on its own; grounded notes land on the 🗒 Desk.');
+    '🔎 Rune reads the repo, its skills, and canon. Public web searches here require your confirmation; on its own Rune can search only Del-approved public watch topics. Grounded notes land on the 🗒 Desk.');
   runeRenderList();
   runeHydrate();
   runeFetchTools();   // Slice 68: arm the reader for this conversation
@@ -9701,6 +10315,7 @@ function runeBody(){
     engineHint,
     readerHint,
     h('div',{class:'companion-inputrow'}, input, send),
+    h('div',{class:'companion-inputrow'}, webInput, webSearch),
     h('div',{class:'companion-footrow'}, modelSel, deepBtn, deskBtn, back));
 }
 /* ========================================================================== *
