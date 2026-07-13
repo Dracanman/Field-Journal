@@ -8557,10 +8557,24 @@ function aiOllamaNativeEndpoint(endpoint){
 function aiShouldUseOllamaNative(engine,chat){
   return String(engine&&engine.type||'')==='OpenAI-compatible local endpoint'&&(aiChatNumCtx(chat)>0||(chat&&chat.think===false));
 }
+// The native path is also the TOOL path (Slice 68: the reader in the room), so
+// its message normalization must keep what the generic one strips: the 'tool'
+// role, assistant tool_calls, and tool_name — and an assistant message whose
+// only payload is tool_calls (empty content) must survive the filter.
+function aiNormalizeOllamaMessages(messages){
+  const allowed={system:1,user:1,assistant:1,tool:1};
+  return (Array.isArray(messages)?messages:[]).map(message=>{
+    const role=allowed[String(message&&message.role||'').trim()]?String(message.role).trim():'user';
+    const out={role,content:String(message&&message.content||'')};
+    if(Array.isArray(message&&message.tool_calls)&&message.tool_calls.length) out.tool_calls=message.tool_calls;
+    if(message&&message.tool_name) out.tool_name=String(message.tool_name);
+    return out;
+  }).filter(message=>message.content||message.tool_calls);
+}
 function aiBuildOllamaNativeChatRequest(engine,chat){
   chat=chat||{};
   const model=aiModelFor(engine,chat.model);
-  const messages=aiNormalizeMessages(chat.messages,true);
+  const messages=aiNormalizeOllamaMessages(chat.messages);
   if(chat.system) messages.unshift({role:'system',content:String(chat.system)});
   const options={};
   const numCtx=aiChatNumCtx(chat);
@@ -8569,6 +8583,7 @@ function aiBuildOllamaNativeChatRequest(engine,chat){
   if(temperature!==null) options.temperature=temperature;
   if(topP!==null) options.top_p=topP;
   const body={model,messages,stream:false,options};
+  if(Array.isArray(chat.tools)&&chat.tools.length) body.tools=chat.tools;
   if(chat.think===false) body.think=false;
   return {
     provider:'ollama',
@@ -8762,6 +8777,9 @@ function aiStreamPiece(provider, json){
     const message=json.message&&typeof json.message==='object'?json.message:{};
     const out={};
     if(typeof message.content==='string'&&message.content) out.text=message.content;
+    // Tool calls ride the stream as their own chunks (Slice 68); collect them
+    // so the caller can run the reader loop.
+    if(Array.isArray(message.tool_calls)&&message.tool_calls.length) out.toolCalls=message.tool_calls;
     if(json.model) out.model=String(json.model);
     if(json.done||json.prompt_eval_count||json.eval_count) out.usage=aiNormalizeOllamaUsage(json);
     return out;
@@ -8789,6 +8807,7 @@ async function aiStream(engine,chat,onChunk){
   }
   const reader=r.body.getReader(), decoder=new TextDecoder();
   let buffer='',text='',model=request.model,usage={inputTokens:0,outputTokens:0,cacheRead:0,cacheWrite:0},done=false;
+  const toolCalls=[];
   while(!done){
     const step=await reader.read();
     if(step.done) break;
@@ -8803,10 +8822,11 @@ async function aiStream(engine,chat,onChunk){
       const piece=aiStreamPiece(request.provider,json);
       if(piece.model) model=piece.model;
       if(piece.usage) usage=aiMergeUsage(usage,piece.usage);
+      if(piece.toolCalls) toolCalls.push(...piece.toolCalls);
       if(piece.text){ text+=piece.text; if(typeof onChunk==='function') onChunk(piece.text,{text,model}); }
     }
   }
-  const result={text,model,usage,raw:null};
+  const result={text,model,usage,toolCalls,raw:null};
   if(typeof recordAiUsage==='function') recordAiUsage(engine,result);
   return result;
 }
@@ -9308,6 +9328,34 @@ function runeBuildRecentRequest(profile, limit){
     opts:{method:'GET',headers:privateApiHeaders(profile,false)},
   };
 }
+// Slice 68 — the reader in the room. The room fetches the tool SCHEMAS and
+// ferries Rune's tool CALLS to the backend; execution and the deny-list never
+// leave the server. Same eyes as the heartbeat, now in conversation.
+function runeBuildToolsRequest(profile){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'rune/tools'),
+    opts:{method:'GET',headers:privateApiHeaders(profile,false)},
+  };
+}
+function runeBuildToolRunRequest(profile, name, args){
+  return {
+    url:privateApiJoinUrl(profile&&profile.endpoint,'rune/tool'),
+    opts:{method:'POST',headers:privateApiHeaders(profile,true),body:JSON.stringify({name:String(name||''), args:args||{}})},
+  };
+}
+async function runeFetchTools(){
+  const profile=runeBackendProfile();
+  if(!profile){ RUNE_ROOM.tools=null; return; }
+  try{
+    const raw=await privateApiJson(profile, runeBuildToolsRequest(profile));
+    RUNE_ROOM.tools=Array.isArray(raw&&raw.tools)?raw.tools:null;
+    RUNE_ROOM.toolMaxSteps=Math.max(1,Math.min(Number(raw&&raw.max_steps)||4,6));
+  }catch(e){ RUNE_ROOM.tools=null; }
+}
+function runeToolLabel(name, args){
+  const arg=args&&(args.dir||args.path||args.name||args.q);
+  return String(name||'')+(arg?(':'+String(arg).slice(0,60)):'');
+}
 async function runeFetchContext(){
   const profile=runeBackendProfile();
   if(!profile) return null;
@@ -9346,6 +9394,15 @@ function runeCacheSave(){
   DB.runeChat=RUNE_ROOM.items.slice(-RUNE_CACHE_LIMIT);
   if(typeof save==='function') save();
 }
+// The voice-corpus rule, one place: rune and rune-max ARE the voice (same
+// persona, two brains) — but a PILOT (an experimental molt being A/B'd in the
+// room) is a student, not the teacher: its replies log off-voice so a future
+// molt never trains on a lesser molt's output (corpus amendment 2026-07-12,
+// after the 12B pilot's morning chats leaked into the voice corpus).
+function runeVoiceModel(model){
+  const m=String(model||'');
+  return /^rune(\b|[:@-])/.test(m)&&!/pilot/i.test(m);
+}
 // Turns a failed /chats/append left flagged get re-sent, oldest first, one
 // batch per source. Two-corpus law holds on retry: a turn whose model was
 // never recorded goes off-voice — the voice corpus is never fed by guess.
@@ -9354,7 +9411,7 @@ async function runeFlushStranded(){
   if(!stranded.length) return;
   const batches=[];
   stranded.forEach(m=>{
-    const source=/^rune(\b|[:@-])/.test(String(m.model||''))?'rune':'rune-offvoice';
+    const source=runeVoiceModel(m.model)?'rune':'rune-offvoice';
     const turn={role:m.role==='you'?'user':'assistant', content:String(m.text||''), model:String(m.model||''), meta:{recovered:true}};
     const last=batches[batches.length-1];
     if(last&&last.source===source){ last.items.push(m); last.turns.push(turn); }
@@ -9410,7 +9467,11 @@ function runeBannerText(){
 function runeRenderList(){
   const host=RUNE_ROOM.listHost;
   if(!host) return;
-  const items=RUNE_ROOM.items.slice(-100).map(m=>h('div',{class:'companion-msg '+(m.role==='you'?'you':'guide')}, h('p',null,m.text)));
+  // A reply that read something shows its trail (Slice 68) — same honesty rule
+  // as the desk's source chips: visibly grounded, or visibly not.
+  const items=RUNE_ROOM.items.slice(-100).map(m=>h('div',{class:'companion-msg '+(m.role==='you'?'you':'guide')},
+    h('p',null,m.text),
+    (m.sources&&m.sources.length)?h('p',{class:'hint rune-msg-sources'},'🔎 read: '+m.sources.join(' · ')):null));
   if(!items.length) items.push(h('p',{class:'hint companion-hello'},'ᚱ Rune is here — the partner who knows what time it actually is. Say hello.'));
   if(RUNE_ROOM.busy) items.push(h('div',{class:'companion-msg guide companion-busy'}, h('p',null,RUNE_ROOM.deep?'thinking…':'…')));
   host.replaceChildren(...items);
@@ -9499,15 +9560,52 @@ async function runeSend(inputEl){
     // CONTEXT already run ~2.5k tokens.
     const chat={model:RUNE_ROOM.model||'rune', messages:runeChatMessages(question, ctx, priorTurns), maxTokens:4000, numCtx:8192};
     if(!RUNE_ROOM.deep) chat.think=false;
-    const result=await runeStreamWithWatchdog(streamFn, engine, chat,
-      (piece, info)=>{
-        if(RUNE_ROOM.sendSeq!==sendId) return;   // stale stream — stop painting
-        if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
-        live.text=info&&info.text?info.text:(live.text+String(piece||''));
-        runeRenderList();
-      },
-      RUNE_STALL_MS);
+    // Slice 68 — the reader in the room: when the backend is reachable, the
+    // tool schemas ride the request and Rune may look before it speaks in
+    // conversation, exactly as it does on heartbeats. The room only FERRIES
+    // calls to POST /rune/tool — execution and the deny-list stay server-side.
+    // Bounded like the heartbeat loop; past the cap the tools come off so the
+    // reply always lands as text.
+    const profile=runeBackendProfile();
+    const tools=(profile&&Array.isArray(RUNE_ROOM.tools)&&RUNE_ROOM.tools.length)?RUNE_ROOM.tools:null;
+    const maxRounds=tools?(RUNE_ROOM.toolMaxSteps||4):0;
+    const readLabels=[];
+    const paint=(piece, info)=>{
+      if(RUNE_ROOM.sendSeq!==sendId) return;   // stale stream — stop painting
+      if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
+      live.text=info&&info.text?info.text:(live.text+String(piece||''));
+      runeRenderList();
+    };
+    let result=null;
+    for(let round=0;;round++){
+      if(tools&&round<maxRounds) chat.tools=tools; else delete chat.tools;
+      result=await runeStreamWithWatchdog(streamFn, engine, chat, paint, RUNE_STALL_MS);
+      const calls=Array.isArray(result&&result.toolCalls)?result.toolCalls:[];
+      if(!calls.length||!tools||round>=maxRounds) break;
+      // Rune asked to read — show the trail while the backend runs each tool.
+      chat.messages=chat.messages.concat([{role:'assistant', content:String(result&&result.text||''), tool_calls:calls}]);
+      for(const call of calls.slice(0,4)){
+        const fn=(call&&call['function'])||{};
+        let args=fn.arguments;
+        if(typeof args==='string'){ try{ args=JSON.parse(args); }catch(e){ args={}; } }
+        const label=runeToolLabel(fn.name, args);
+        readLabels.push(label);
+        if(RUNE_ROOM.sendSeq===sendId){
+          if(!streamed){ streamed=true; RUNE_ROOM.items.push(live); }
+          live.text=(live.text?live.text+'\n':'')+'🔎 '+label+'…';
+          runeRenderList();
+        }
+        let toolReply;
+        try{ toolReply=await privateApiJson(profile, runeBuildToolRunRequest(profile, fn.name, args)); }
+        catch(e){ toolReply={result:{error:String(e&&e.message||e).slice(0,200)}}; }
+        const payload=toolReply&&toolReply.result!==undefined?toolReply.result:toolReply;
+        chat.messages=chat.messages.concat([{role:'tool', tool_name:String(fn.name||''), content:JSON.stringify(payload).slice(0,6000)}]);
+      }
+      live.text='';   // the follow-up round repaints over the 🔎 trail
+      runeRenderList();
+    }
     const text=String(result&&result.text||live.text||'').trim();
+    if(readLabels.length) live.sources=readLabels.slice(0,12);
     if(!streamed) RUNE_ROOM.items.push(live);
     live.text=text||'…';
     // Log the CLEAN user turn (the context block is transport, not corpus) +
@@ -9523,8 +9621,8 @@ async function runeSend(inputEl){
     live.unlogged=true;
     const logged=await runeAppend([
       {role:'user', content:question, model:'', meta:{context:!!ctx, person:(person&&person.name)||''}},
-      {role:'assistant', content:live.text, model:usedModel, meta:{}},
-    ], /^rune(\b|[:@-])/.test(usedModel)?'rune':'rune-offvoice');
+      {role:'assistant', content:live.text, model:usedModel, meta:(live.sources&&live.sources.length?{sources:live.sources}:{})},
+    ], runeVoiceModel(usedModel)?'rune':'rune-offvoice');
     // Confirmed in the corpus → the hydrate merge no longer needs to protect
     // these turns; a failed append leaves them flagged so no later hydrate
     // can erase what the backend never saw.
@@ -9593,9 +9691,10 @@ function runeBody(){
   // Slice 66 — the reader: on its own heartbeat Rune can look before it speaks.
   // A quiet, always-present line so Del knows the notes on the desk are grounded.
   const readerHint=h('p',{class:'hint rune-reader-hint', style:{margin:'0'}},
-    '🔎 On its own, Rune reads the repo, its skills, canon, and the web — grounded notes land on the 🗒 Desk.');
+    '🔎 Rune reads the repo, its skills, canon, and the web — here in the room and on its own; grounded notes land on the 🗒 Desk.');
   runeRenderList();
   runeHydrate();
+  runeFetchTools();   // Slice 68: arm the reader for this conversation
   return h('div',{class:'companion-body companion-rune'},
     list,
     status,
@@ -9823,6 +9922,7 @@ function runeDeskTimeLabel(iso){
 function runeDeskSourceIcon(tool){
   if(tool==='search_web') return '🌐';
   if(tool==='search_canon') return '📜';
+  if(tool==='search_memory') return '🧠';   // Rune looked up its own past
   if(tool==='read_skill') return '📘';
   return '📄';   // list_files / read_file / anything repo
 }
@@ -9844,8 +9944,10 @@ function runeDeskNoteCard(note, rerender){
     : note.pushed?(note.important?'🔔 pushed (important)':'🔔 pushed')
     : '🤐 waited on the desk';
   const open=note.status==='new'||note.status==='seen';
-  const keep=open?h('button',{class:'navbtn ghost', type:'button'},'Keep'):null;
-  const dismiss=open?h('button',{class:'navbtn ghost', type:'button'},'Dismiss'):null;
+  const keep=open?h('button',{class:'navbtn ghost', type:'button',
+    title:'“More like this.” Rune’s next heartbeat sees it as kept and builds on it, and it becomes corpus signal for the next molt — nothing is deleted.'},'Keep'):null;
+  const dismiss=open?h('button',{class:'navbtn ghost', type:'button',
+    title:'“Less like this.” Rune’s next heartbeat is told not to re-run this idea — not even reworded — and an exact repeat becomes silence. The note stays in the archive, off the training menu; the rejection fades after some weeks.'},'Dismiss'):null;
   const status=h('span',{class:'hint'},note.status+(open?'':' ✓'));
   const wire=(btn,value)=>{ if(!btn) return; btn.onclick=async()=>{ btn.disabled=true;
     try{ await runeDeskSetStatus(note.id, value); }
@@ -9922,7 +10024,7 @@ function viewRuneDesk(){
     // Honest empty states (review fix: 'No notes yet' used to paint before the
     // first fetch resolved AND kept painting under an unreachable banner).
     const empty=RUNE_DESK.loaded==='ok'
-      ?h('p',{class:'hint'},'No notes yet — the heartbeat thinks every few hours (quiet during work and the night). Silence is allowed; a partner only speaks when there’s something to say.')
+      ?h('p',{class:'hint'},'No notes yet — the heartbeat thinks day and night, and beats faster while you’re at work or asleep: those are Rune’s own hours to read and collect. It doesn’t buzz in the quiet — a thought from 3am waits here for you. Silence is allowed; a partner only speaks when there’s something to say.')
       :RUNE_DESK.loaded==='error'
       ?h('p',{class:'hint'},'The desk is unreachable — check the backend, then reopen.')
       :h('p',{class:'hint'},'Opening the desk…');
@@ -9956,7 +10058,7 @@ function viewRuneDesk(){
   return h('div',{class:'panel rune-desk'},
     h('div',{class:'rune-desk-head'},
       h('h2',null,'ᚱ Rune’s desk'),
-      h('p',{class:'hint'},'Rune’s own thoughts land here — tagged, reviewable, yours to keep or dismiss. Keeping one tells Rune it mattered.')),
+      h('p',{class:'hint'},'Rune’s own thoughts land here — and your rulings teach it. Keep = “more like this”, Dismiss = “less like this”; nothing is ever deleted. A ruling steers Rune’s very next thought — kept notes get built on, dismissed ones don’t come back — and it becomes training signal at the next dream-forging. Rulings fade over weeks, on purpose: an idea you turned down in July may be worth hearing again in September. On a red complaint, your ruling is the appeals court for the push law.')),
     h('div',{class:'toolrow'}, buzzBtn),
     status,
     (typeof runeTasksSection==='function'?runeTasksSection():null),
