@@ -1462,7 +1462,8 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
   .companion-head{ cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
   .companion-head:active{ cursor:grabbing; }
 }
-@media (min-width:701px) and (max-width:1024px){
+@media (min-width:701px) and (max-width:1024px),
+       (min-width:701px) and (max-width:1366px) and (pointer:coarse){
   /* Tablet is its own reading surface. Important values deliberately beat a
      remembered desktop drag/resize box from an older layout on this device. */
   .companion-panel{
@@ -11063,7 +11064,10 @@ function companionSetReading(force){
    sheet is anchored on purpose — no dragging there. */
 function companionDesktop(){
   try{
-    return !(typeof window!=='undefined'&&typeof window.matchMedia==='function'&&window.matchMedia('(max-width:700px)').matches);
+    if(typeof window==='undefined'||typeof window.matchMedia!=='function') return true;
+    const phone=window.matchMedia('(max-width:700px)').matches;
+    const touchTablet=window.matchMedia('(pointer:coarse)').matches&&window.matchMedia('(max-width:1366px)').matches;
+    return !(phone||touchTablet);
   }catch(e){ return true; }
 }
 // Pure clamp: the panel stays reachable — never off-screen, never absurdly small.
@@ -11087,6 +11091,9 @@ function companionApplyBox(){
   panel.style.width=c.w+'px'; panel.style.height=c.hgt+'px'; panel.style.maxWidth='none'; panel.style.maxHeight='none';
   // A resize-only box (no left) keeps the default corner anchor; a dragged box pins left/top.
   if(box.left!=null){ panel.style.left=c.left+'px'; panel.style.top=c.top+'px'; panel.style.right='auto'; panel.style.bottom='auto'; }
+  // A very tall resize-only box plus the default 112px bottom anchor can put the
+  // header above a shorter viewport. Pin its top instead so Close is reachable.
+  else if(c.hgt>Math.max(300,vh-120)){ panel.style.top='8px'; panel.style.bottom='auto'; }
 }
 function companionSaveBox(part){
   DB.companionBox=Object.assign({}, DB.companionBox||{}, part);
