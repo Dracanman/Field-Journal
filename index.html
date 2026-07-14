@@ -10371,7 +10371,7 @@ function runeBody(){
 /* ========================================================================== *
    THE TASKS REMOTE CONTROL — TASKS.md from any device (Slice 65).
 
-   TASKS.md stays Del's plain-text master exactly as it is; this section of
+   TASKS.md stays Del's plain-text master; this section of
    Rune's desk renders its headings + checkbox tasks and posts edits through
    the backend (/tasks, /tasks/toggle, /tasks/add, /tasks/edit). Every write
    names the exact line it expects — a 409 means the file changed underneath
@@ -10383,6 +10383,7 @@ function runeBody(){
 
 const RUNE_TASKS={lines:[], newline:'lf', loaded:'', host:null, statusHost:null, fetchSeq:0};
 const RUNE_TASK_BOX_RE=/^(\s*- \[)([ xX])(\] ?)(.*)$/;
+const RUNE_TASK_ID_RE=/^\[(T-\d{3,})\]\s*/;
 
 function runeTasksProfile(){
   return typeof privateActiveBackendProfile==='function'?privateActiveBackendProfile():null;
@@ -10415,16 +10416,23 @@ async function runeTasksFetch(){
 function runeTasksRows(){
   const rows=[];
   RUNE_TASKS.lines.forEach((line, i)=>{
-    if(line.startsWith('## ')) rows.push({kind:'heading', line_no:i, text:line.slice(3).trim()});
+    const heading=/^(##|###)\s+(.+)$/.exec(line);
+    if(heading) rows.push({kind:'heading', level:heading[1].length, line_no:i, text:heading[2].trim()});
     else{
       const m=RUNE_TASK_BOX_RE.exec(line);
-      if(m) rows.push({kind:'task', line_no:i, raw:line, done:m[2]!==' ', prefix:m[1]+m[2]+m[3], text:m[4]});
+      if(m){
+        const tagged=RUNE_TASK_ID_RE.exec(m[4]);
+        rows.push({kind:'task', line_no:i, raw:line, done:m[2]!==' ',
+          id:tagged?tagged[1]:'', text:m[4].replace(RUNE_TASK_ID_RE,'')});
+      }
     }
   });
   return rows;
 }
 function runeTasksSections(){
-  return runeTasksRows().filter(r=>r.kind==='heading').map(r=>r.text);
+  // Direct phone adds are backlog capture only. Active promotion must create a
+  // full PROJECT_MAP card atomically through the later control plane.
+  return runeTasksRows().filter(r=>r.kind==='heading'&&(r.level===3||r.text==='Someday')).map(r=>r.text);
 }
 async function runeTasksPost(path, body){
   const profile=runeTasksProfile();
@@ -10465,7 +10473,7 @@ function runeTasksSection(){
         const text=String(input.value||'').trim();
         if(!text) return;
         save.disabled=true;
-        act('edit', {line_no:row.line_no, expect:row.raw, text:row.prefix+text});
+        act('edit', {line_no:row.line_no, expect:row.raw, text});
       };
       rowEl.replaceChildren(box, input, save);
     };
@@ -10496,7 +10504,7 @@ function runeTasksSection(){
         addIn.value='';
         act('add', {section:sectionSel.value, text});
       }
-      nodes.push(h('div',{class:'rune-task-addrow'}, sectionSel, addIn, addBtn));
+      if(sections.length) nodes.push(h('div',{class:'rune-task-addrow'}, sectionSel, addIn, addBtn));
     }
     list.replaceChildren(...nodes);
   }
@@ -10505,7 +10513,7 @@ function runeTasksSection(){
   return h('div',{class:'rune-tasks'},
     h('div',{class:'rune-desk-head'},
       h('h3',null,'☑ The list'),
-      h('p',{class:'hint'},'TASKS.md, live — the file stays the master; this is its remote control.')),
+      h('p',{class:'hint'},'TASKS.md, live — stable IDs stay in the file while this view keeps them out of your way.')),
     status,
     list);
 }
