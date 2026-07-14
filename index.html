@@ -5293,6 +5293,40 @@ let spaceStatusPromise=null;
 // caller param so a param literally called `name` can't silently reroute to home.
 function go(name, params){ VIEW = Object.assign({}, params, {name}); window.scrollTo(0,0); render(); }
 
+// Slice 69 — two narrow doors from the desktop Familiar. Query state is
+// launch-only: consume it after the existing view/companion opens so normal
+// in-app navigation remains local and refreshes do not re-open Rune forever.
+function runeDeepLinkIntent(search,hash){
+  let value='';
+  try{
+    const query=new URLSearchParams(String(search||''));
+    const fragment=new URLSearchParams(String(hash||'').replace(/^#/,''));
+    value=query.get('rune')||fragment.get('rune')||'';
+  }catch(e){}
+  return value==='desk'||value==='talk'?value:'';
+}
+function runeDeepLinkConsume(){
+  try{
+    const url=new URL(location.href);
+    const fragment=new URLSearchParams(url.hash.replace(/^#/,''));
+    if(!url.searchParams.has('rune')&&!fragment.has('rune')) return;
+    url.searchParams.delete('rune');
+    fragment.delete('rune');
+    url.hash=fragment.toString()?('#'+fragment.toString()):'';
+    history.replaceState(null,'',url.pathname+url.search+url.hash);
+  }catch(e){}
+}
+function runeDeepLinkOpen(intent){
+  if(intent!=='talk') return false;
+  if(typeof companionSetMode!=='function'||typeof companionToggle!=='function') return false;
+  companionSetMode('rune'); companionToggle(true);
+  setTimeout(()=>{
+    const input=document.querySelector&&document.querySelector('.companion-rune .companion-input');
+    if(input&&input.focus) input.focus();
+  },0);
+  return true;
+}
+
 // view registry — register(name, fn(VIEW)->node). Adding a screen is one call; no
 // edits to render(). Builders run lazily, so the view fns may be defined in later modules.
 const VIEWS = {};
@@ -24101,9 +24135,13 @@ document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState=
   if(navigator.storage && navigator.storage.persist){ try{ navigator.storage.persist(); }catch(e){} }   // resist eviction
   if(DB.who) applyPersonContext(activePerson());   // returning person: their file, favorites & space (Phase B)
   applyMode();
+  const runeLaunch=typeof runeDeepLinkIntent==='function'?runeDeepLinkIntent(location.search,location.hash):'';
   const initialView=initialOpenViewName(DB);
-  if(initialView) VIEW={name:initialView};   // null leaves the untouched first-run screen in charge
+  if(runeLaunch==='desk') VIEW={name:'rune-desk'};
+  else if(initialView) VIEW={name:initialView};   // null leaves the untouched first-run screen in charge
   render();
+  if(runeLaunch==='talk'&&typeof runeDeepLinkOpen==='function') runeDeepLinkOpen(runeLaunch);
+  if(runeLaunch&&typeof runeDeepLinkConsume==='function') runeDeepLinkConsume();
   // Identity first: on a shared device, learn who's here before the space first-run. A
   // returning person is only gently re-confirmed after an idle gap (see maybeConfirmWho).
   if(!DB.who){ whoPicker({firstTime:true}); }
