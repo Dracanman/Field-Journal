@@ -1006,11 +1006,18 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
   .companion-gm .play-chat-stack, .companion-gm .play-chat-stack.lens-collapsed{
     display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:8px;
   }
-  .companion-gm .play-transcript-card{ flex:1 1 auto; display:flex; flex-direction:column; min-height:0; padding:8px; }
-  .companion-gm .play-log, .companion-gm .play-chat-stack.lens-collapsed .play-log{
-    flex:1 1 auto; min-height:120px; max-height:none;
+  .companion-gm .play-transcript-card{
+    flex:1 1 auto; display:flex; flex-direction:column; min-height:0; padding:0;
+    border:0; border-radius:0; background:transparent; box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none;
   }
-  .companion-gm .play-input-card{ position:static; padding:9px; gap:7px; }
+  .companion-gm .play-log, .companion-gm .play-chat-stack.lens-collapsed .play-log{
+    flex:1 1 auto; min-height:120px; max-height:none; gap:16px; padding:18px 18px 10px;
+  }
+  .companion-gm .play-msg{ padding:11px 13px 12px; border:1px solid color-mix(in srgb, var(--gold) 32%, transparent); box-shadow:0 8px 24px -22px rgba(33,44,35,.8); }
+  .companion-gm .play-msg.you{ max-width:min(82%,42ch); border-radius:14px 4px 14px 14px; background:var(--green,#244435); border-color:color-mix(in srgb,var(--gold) 45%,transparent); color:#fffaf0; }
+  .companion-gm .play-msg.you .who{ color:#f4dfad; text-align:right; }
+  .companion-gm .play-msg.gm{ max-width:min(88%,48ch); border-radius:4px 14px 14px 14px; border-left:1px solid color-mix(in srgb,var(--gold) 32%,transparent); background:color-mix(in srgb,var(--paper-card) 90%,white); }
+  .companion-gm .play-input-card{ position:static; padding:10px 14px 12px; gap:7px; border-radius:0; border-width:1px 0 0; box-shadow:none; }
   .companion-gm .play-input{ min-height:56px; }
   .companion-gm .play-grounding{ font-size:11px; margin:0 2px; }
   .companion-gm .play-msg.you, .companion-gm .play-msg.gm{ max-width:100%; }
@@ -1313,7 +1320,7 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
 }
 .companion-panel{
   position:fixed; right:max(14px, env(safe-area-inset-right)); bottom:max(112px, calc(94px + env(safe-area-inset-bottom)));
-  z-index:57; width:min(380px, calc(100vw - 28px)); max-height:min(560px, 72vh);
+  z-index:57; width:min(520px, calc(100vw - 28px)); height:min(690px, 80dvh); max-height:calc(100dvh - 32px);
   display:flex; flex-direction:column; overflow:hidden;
   background:var(--glass-solid, var(--paper-card)); border:1.5px solid var(--glass-border); border-radius:16px;
   -webkit-backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12); backdrop-filter:blur(var(--glass-blur, 10px)) saturate(1.12);
@@ -1322,39 +1329,66 @@ body.fx-calm .start-here{ -webkit-backdrop-filter:none; backdrop-filter:none; ba
 /* calm visuals: the panel is already solid — just skip the per-frame re-blur */
 body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:none; }
 .companion-head{
-  display:flex; align-items:center; gap:8px; padding:10px 12px;
-  border-bottom:1px solid var(--glass-border);
+  display:flex; align-items:center; gap:14px; padding:14px 16px 12px;
+  background:color-mix(in srgb, var(--green, #244435) 94%, transparent);
+  border-bottom:1px solid color-mix(in srgb, var(--gold, #a88748) 38%, transparent);
 }
-.companion-head b{ color:var(--ink); }
+.companion-heading{ display:grid; gap:2px; flex:1; min-width:0; }
+.companion-head b{ color:#fffaf0; font-size:19px; line-height:1.15; font-weight:600; }
 .companion-context{
-  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  font-size:12px; color:var(--ink-soft);
+  min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-size:12px; line-height:1.35; color:#f4dfad;
 }
-.companion-close{ padding:2px 9px; line-height:1; }
+.companion-utilities{ display:flex; align-items:center; gap:3px; }
+.companion-utility,.companion-close{ min-width:36px; min-height:36px; padding:5px 8px; line-height:1; color:#fffaf0; border-color:transparent; }
+.companion-modes{
+  display:flex; flex:none; gap:2px; padding:7px 10px 0; overflow-x:auto; scrollbar-width:none;
+  background:color-mix(in srgb, var(--green, #244435) 94%, transparent);
+  border-bottom:1px solid color-mix(in srgb, var(--gold, #a88748) 45%, transparent);
+}
+.companion-modes::-webkit-scrollbar{ display:none; }
+.companion-msg-btn{
+  position:relative; flex:1 0 auto; min-height:42px; padding:7px 10px 10px;
+  border:0; border-radius:0; background:transparent; color:#e8ddc5; font:600 12px/1.1 system-ui,sans-serif; cursor:pointer;
+}
+.companion-msg-btn::after{ content:''; position:absolute; left:10px; right:10px; bottom:0; height:2px; border-radius:2px; background:transparent; }
+.companion-msg-btn:hover,.companion-msg-btn.on{ color:#fffaf0; background:color-mix(in srgb, #fff 7%, transparent); }
+.companion-msg-btn.on::after{ background:var(--gold, #c6a461); }
+.companion-msg-btn:focus-visible{ outline:2px solid #f4dfad; outline-offset:-3px; }
 .companion-panel-body{ display:flex; flex-direction:column; min-height:0; flex:1; }
-.companion-body{ display:flex; flex-direction:column; gap:10px; padding:12px; min-height:0; flex:1; overflow:auto; }
-.companion-log{ display:flex; flex-direction:column; gap:8px; overflow:auto; flex:1; min-height:120px; }
-.companion-msg{ max-width:88%; padding:8px 11px; border-radius:12px; border:1px solid var(--glass-border); }
-.companion-msg p{ margin:0; font-size:14px; line-height:1.45; color:var(--ink); }
-.companion-msg.guide{ align-self:flex-start; background:var(--glass-bg); }
-.companion-msg.you{ align-self:flex-end; background:var(--paper-card); }
+.companion-body{ display:flex; flex-direction:column; gap:10px; padding:0; min-height:0; flex:1; overflow:hidden; }
+.companion-report{ overflow:auto; padding:16px; }
+.companion-log{ display:flex; flex-direction:column; gap:16px; overflow:auto; flex:1; min-height:120px; padding:18px 18px 10px; overscroll-behavior:contain; }
+.companion-msg{ position:relative; max-width:min(82%, 42ch); padding:11px 13px 12px; border:1px solid color-mix(in srgb, var(--gold, #a88748) 32%, transparent); box-shadow:0 8px 24px -22px rgba(33,44,35,.8); overflow-wrap:break-word; word-break:normal; }
+.companion-msg p{ margin:0; font-size:14px; line-height:1.55; color:var(--ink); }
+.companion-msg.guide{ align-self:flex-start; border-radius:4px 14px 14px 14px; background:color-mix(in srgb, var(--paper-card) 90%, white); }
+.companion-msg.you{ align-self:flex-end; border-radius:14px 4px 14px 14px; background:var(--green, #244435); border-color:color-mix(in srgb, var(--gold, #a88748) 45%, transparent); }
+.companion-msg.you p{ color:#fffaf0; }
+.companion-msg:not(:has(.messages-meta))::before{ display:block; margin-bottom:5px; color:var(--gold, #896c35); font:700 10px/1.2 system-ui,sans-serif; letter-spacing:.08em; text-transform:uppercase; }
+.companion-msg.guide:not(:has(.messages-meta))::before{ content:'Guide'; }
+.companion-rune .companion-msg.guide:not(:has(.messages-meta))::before{ content:'Rune'; }
+.companion-coach .companion-msg.guide:not(:has(.messages-meta))::before{ content:'Coach'; }
+.companion-studio .companion-msg.guide:not(:has(.messages-meta))::before{ content:'Canon assistant'; }
+.companion-msg.you:not(:has(.messages-meta))::before{ content:'You'; color:#f4dfad; text-align:right; }
 .companion-msg .toolrow{ margin-top:6px; }
 .companion-busy p{ color:var(--ink-soft); font-style:italic; }
-.companion-hello{ margin:auto 0; }
-.companion-inputrow{ display:flex; gap:8px; }
+.companion-hello{ margin:auto 18px; text-align:center; line-height:1.5; }
+.companion-inputrow{ display:flex; flex:none; gap:8px; padding:12px 14px; background:color-mix(in srgb, var(--paper-card) 94%, transparent); border-top:1px solid var(--glass-border); }
 .companion-input, .companion-area{
   flex:1; width:100%; box-sizing:border-box; border:1.5px solid var(--glass-border); border-radius:10px;
-  padding:8px 10px; background:var(--glass-bg); color:var(--ink); font:inherit; font-size:14px;
+  min-height:44px; padding:10px 12px; background:var(--glass-bg); color:var(--ink); font:inherit; font-size:16px; overflow-wrap:normal; word-break:normal;
 }
+.companion-input:focus,.companion-area:focus{ outline:2px solid color-mix(in srgb, var(--gold, #a88748) 55%, transparent); outline-offset:1px; }
+.companion-inputrow > button{ min-height:44px; padding-inline:16px; }
 .companion-area{ resize:vertical; }
 .companion-preview{ font-size:12.5px; line-height:1.4; }
-.companion-footrow{ display:flex; justify-content:flex-end; }
+.companion-footrow{ display:flex; justify-content:flex-end; gap:6px; padding:0 14px 12px; flex-wrap:wrap; }
 .companion-report-link{ font-size:12.5px; }
 .companion-report{ gap:8px; }
 .companion-clarify{ display:grid; gap:5px; color:var(--ink); font-weight:600; font-size:13px; }
 .companion-report-status{ min-height:16px; margin:0; }
-.companion-msg-btn{ padding:2px 8px; }
 .messages-meta{ font-size:11px; margin:0 0 2px; opacity:.72; }
+.companion-msg.you .messages-meta{ color:#f4dfad; }
 .companion-messages .companion-msg{ max-width:92%; }
 /* Rune room (Slice 62): the model select shares the foot row with "Back" */
 .companion-rune .companion-footrow{ justify-content:space-between; gap:8px; align-items:center; }
@@ -1390,16 +1424,9 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 .rune-notes-heading{ margin:16px 0 4px; }
 .rune-tasks-status{ min-height:16px; margin:2px 0 0; }
 /* ⤢ one toggle, two shapes: desktop grows wider + taller for long GM turns… */
-.companion-panel.tall{ width:min(540px, calc(100vw - 28px)); max-height:min(860px, 88vh); }
-/* the GM deserves a wider seat by default — there's room at the sides on desktop */
-.companion-panel:has(.companion-gm){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
-.companion-panel.tall:has(.companion-gm){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
-/* the canon assistant shares that wider seat (Slice 46) */
-.companion-panel:has(.companion-studio){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
-.companion-panel.tall:has(.companion-studio){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
-/* …and so does the practice coach (Slice 47); its mode chips fold in 📖 reading mode */
-.companion-panel:has(.companion-coach){ width:min(470px, calc(100vw - 28px)); max-height:min(680px, 80vh); }
-.companion-panel.tall:has(.companion-coach){ width:min(600px, calc(100vw - 28px)); max-height:min(900px, 90vh); }
+.companion-panel.tall{ width:min(620px, calc(100vw - 28px)); height:min(860px, 91dvh); max-height:calc(100dvh - 24px); }
+/* every conversation now shares the same panel geometry; specialized chats only
+   extend the transcript and controls inside that shell. */
 .companion-panel.reading .prc-coach-mode-row{ display:none; }
 /* the studio chat: transcript flexes; the ask row carries a compact persona select */
 .companion-studio{ display:flex; flex-direction:column; min-height:0; }
@@ -1431,9 +1458,12 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
 @media (min-width:701px){
   /* desktop: drag the header to move, native corner handle to resize —
      both remembered per device; double-click the header to snap back */
-  .companion-panel{ resize:both; min-width:300px; min-height:260px; }
+  .companion-panel{ resize:both; min-width:420px; min-height:460px; }
   .companion-head{ cursor:grab; user-select:none; -webkit-user-select:none; touch-action:none; }
   .companion-head:active{ cursor:grabbing; }
+}
+@media (min-width:701px) and (max-width:1024px){
+  .companion-panel{ right:16px; bottom:20px; width:min(600px, calc(100vw - 32px)); height:min(820px, calc(100dvh - 40px)); }
 }
 @media (max-width:700px){
   .companion-fab{ bottom:calc(136px + env(safe-area-inset-bottom)); padding:7px 12px; }
@@ -1444,9 +1474,20 @@ body.fx-calm .companion-panel{ -webkit-backdrop-filter:none; backdrop-filter:non
   .companion-panel{
     left:0; right:0; bottom:0; width:auto; z-index:61;
     border-radius:16px 16px 0 0; border-left:none; border-right:none; border-bottom:none;
-    max-height:46vh; padding-bottom:env(safe-area-inset-bottom);
+    height:88dvh; max-height:88dvh; padding-bottom:env(safe-area-inset-bottom);
   }
-  .companion-panel.tall{ max-height:88vh; }
+  .companion-panel.tall{ width:auto; height:96dvh; max-height:96dvh; }
+  .companion-head{ padding:13px 12px 10px; }
+  .companion-head b{ font-size:18px; }
+  .companion-utility{ display:none; }
+  .companion-close{ min-width:42px; min-height:42px; font-size:22px; }
+  .companion-modes{ padding-inline:6px; }
+  .companion-msg-btn{ min-height:46px; padding-inline:11px; font-size:12px; }
+  .companion-log{ padding:16px 12px 8px; gap:14px; }
+  .companion-msg{ max-width:86%; }
+  .companion-inputrow{ padding:10px 10px max(10px, env(safe-area-inset-bottom)); }
+  .companion-footrow{ padding:0 10px 8px; }
+  .companion-rune .companion-footrow{ overflow-x:auto; flex-wrap:nowrap; justify-content:flex-start; }
 }
 @media print{ .companion-fab, .companion-panel{ display:none !important; } }
 /* ---------- Spaces: iPad-friendly front door ------------------------------ */
@@ -10899,7 +10940,7 @@ function companionRefreshContext(){
   const runeBtn=COMPANION.panel&&COMPANION.panel._runeBtn;
   if(runeBtn){
     const n=(typeof RUNE_DESK!=='undefined'&&RUNE_DESK.newCount)||0;
-    runeBtn.textContent=n>0?('ᚱ·'+n):'ᚱ';
+    runeBtn.textContent=n>0?('ᚱ Rune · '+n):'ᚱ Rune';
     runeBtn.setAttribute('title', n>0?('Rune — '+n+' new note'+(n===1?'':'s')+' on the desk'):'Rune — your partner');
   }
   const chip=COMPANION.panel&&COMPANION.panel._context;
@@ -10970,6 +11011,11 @@ function companionSetMode(mode){
   body.replaceChildren(mode==='report'?companionReportBody():mode==='messages'?messagesBody():mode==='rune'?runeBody():mode==='gm'?campPlayCompanionBody():mode==='studio'?assistantCompanionBody():mode==='coach'?practiceCoachCompanionBody():companionChatBody());
   const title=COMPANION.panel._title;
   if(title) title.textContent=COMPANION_TITLES[mode]||COMPANION_TITLES.chat;
+  (COMPANION.panel._modeButtons||[]).forEach(btn=>{
+    const on=btn.dataset.mode===mode;
+    btn.classList.toggle('on',on);
+    btn.setAttribute('aria-current',on?'page':'false');
+  });
   companionRefreshContext();
   if(mode==='chat') companionRenderLog();
 }
@@ -11126,32 +11172,36 @@ function companionEnsurePanel(){
   const title=h('b',null,'✦ Guide');
   const context=h('span',{class:'companion-context'}, companionContext().line);
   const body=h('div',{class:'companion-panel-body'});
-  const gmBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Game Master', title:'The campaign table',
-    onclick:()=>companionSetMode(COMPANION.mode==='gm'?'chat':'gm')}, '♟');
-  const studioBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Canon assistant', title:'The canon assistant',
-    onclick:()=>companionSetMode(COMPANION.mode==='studio'?'chat':'studio')}, '✒');
-  const coachBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Practice coach', title:'The practice coach',
-    onclick:()=>companionSetMode(COMPANION.mode==='coach'?'chat':'coach')}, '✶');
-  const msgBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Messages', title:'Messages',
-    onclick:()=>companionSetMode(COMPANION.mode==='messages'?'chat':'messages')}, '💬');
-  const runeBtn=h('button',{class:'navbtn ghost companion-msg-btn', type:'button', 'aria-label':'Rune', title:'Rune — your partner',
-    onclick:()=>companionSetMode(COMPANION.mode==='rune'?'chat':'rune')}, 'ᚱ');
-  const readBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
+  const modeAria={chat:'Guide',messages:'Messages',rune:'Rune',gm:'Game Master',studio:'Canon assistant',coach:'Practice coach'};
+  const modeBtn=(mode,label,titleText)=>h('button',{class:'companion-msg-btn', type:'button', 'data-mode':mode, 'aria-label':modeAria[mode]||label, title:titleText||label,
+    onclick:()=>companionSetMode(mode)},label);
+  const guideBtn=modeBtn('chat','✦ Guide','App guide');
+  const msgBtn=modeBtn('messages','💬 Notes','Notes home');
+  const runeBtn=modeBtn('rune','ᚱ Rune','Rune — your partner');
+  const gmBtn=modeBtn('gm','♟ GM','The campaign table');
+  const studioBtn=modeBtn('studio','✒ Canon','The canon assistant');
+  const coachBtn=modeBtn('coach','✶ Coach','The practice coach');
+  const modeButtons=[guideBtn,msgBtn,runeBtn,gmBtn,studioBtn,coachBtn];
+  const modeNav=h('nav',{class:'companion-modes','aria-label':'Conversations'},...modeButtons);
+  const readBtn=h('button',{class:'navbtn ghost companion-utility companion-read', type:'button', 'aria-label':'Reading mode', 'aria-pressed':'false',
     title:'Hide the writing area to read', onclick:()=>companionSetReading()}, '📖');
-  const sizeBtn=h('button',{class:'navbtn ghost companion-msg-btn companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
+  const sizeBtn=h('button',{class:'navbtn ghost companion-utility companion-size', type:'button', 'aria-label':'Expand the panel', 'aria-pressed':'false',
     title:'Bigger / smaller', onclick:()=>companionSetTall()}, '⤢');
   const closeBtn=h('button',{class:'navbtn ghost companion-close', type:'button', 'aria-label':'Close the guide', onclick:()=>companionToggle(false)}, '×');
-  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'}, title, context, gmBtn, studioBtn, coachBtn, msgBtn, runeBtn, readBtn, sizeBtn, closeBtn);
+  const head=h('div',{class:'companion-head', title:'Drag to move · double-click to reset the size and position'},
+    h('div',{class:'companion-heading'},title,context),
+    h('div',{class:'companion-utilities'},readBtn,sizeBtn,closeBtn));
   // Safari (iPad included) never renders the native CSS resize corner, so the
   // panel carries its own touch grip: the top-left corner resizes toward/away
   // from the bottom-right, which stays visually put.
   const grip=h('div',{class:'companion-grip', 'aria-hidden':'true'});
   const panel=h('div',{class:'companion-panel glass no-print', role:'dialog', 'aria-label':'Guide'},
     head,
+    modeNav,
     body,
     grip);
   panel.style.display='none';
-  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn; panel._coachBtn=coachBtn; panel._runeBtn=runeBtn;
+  panel._context=context; panel._body=body; panel._title=title; panel._sizeBtn=sizeBtn; panel._readBtn=readBtn; panel._studioBtn=studioBtn; panel._coachBtn=coachBtn; panel._runeBtn=runeBtn; panel._modeButtons=modeButtons;
   COMPANION.panel=panel;
   companionWireDrag(panel, head);
   companionWireResize(panel);
